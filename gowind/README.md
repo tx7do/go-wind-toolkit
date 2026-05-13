@@ -110,6 +110,8 @@ gow api
 
 ```shell
 gow new <project-name> [flags]
+# 或者
+gow new project <project-name> [flags]
 
 Flags:
   -m, --module string   Go module 名称（默认：项目名）

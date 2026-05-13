@@ -77,7 +77,11 @@ func run(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	ctx, cancel := context.WithTimeout(cmd.Context(), t)
+	parentCtx := cmd.Context()
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, t)
 	defer cancel()
 
 	name := ""
