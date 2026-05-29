@@ -22,7 +22,6 @@ func mysqlProvider(dsn string) (*ImportDriver, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
 
 	drv, err := atlasmysql.Open(db)
 	if err != nil {
@@ -48,7 +47,6 @@ func postgresProvider(dsn string) (*ImportDriver, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
 
 	drv, err := postgres.Open(db)
 	if err != nil {
