@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {ref, watch, reactive} from "vue";
 import {message} from "ant-design-vue";
-import {GenerateFrontendCode} from "../../wailsjs/go/main/App";
+import {GenerateRestCode} from "../../../wailsjs/go/main/App";
 
 const props = defineProps<{
   open?: boolean
@@ -17,23 +17,12 @@ const formRef = ref()
 const confirmLoading = ref(false)
 
 const formData = reactive({
-  serviceName: 'admin',
-  frontendType: 'vue'
+  serviceName: 'admin'
 })
-
-const frontendTypes = [
-  {value: 'vue', label: 'Vue3'},
-  {value: 'react', label: 'React'},
-  {value: 'dart', label: 'Dart'},
-  {value: 'qt', label: 'Qt6'}
-]
 
 const formRules = {
   serviceName: [
     {required: true, message: '请输入REST服务名', trigger: 'change'}
-  ],
-  frontendType: [
-    {required: true, message: '请选择前端类型', trigger: 'change'}
   ]
 }
 
@@ -62,7 +51,7 @@ async function handleCommit() {
 
     confirmLoading.value = true
 
-    const res = await GenerateFrontendCode(formData.serviceName, formData.frontendType);
+    const res = await GenerateRestCode(formData.serviceName);
     if (res == "") {
       message.success('代码生成成功');
 
@@ -83,7 +72,7 @@ async function handleCommit() {
 <template>
   <a-modal
       v-model:open="innerOpen"
-      title="生成前端代码"
+      title="生成BFF服务"
       :width="500"
       @cancel="handleClose"
   >
@@ -94,21 +83,6 @@ async function handleCommit() {
         :label-col="{ span: 6 }"
         :wrapper-col="{ span: 16 }"
     >
-      <a-form-item label="前端类型" name="frontendType">
-        <a-select
-            v-model:value="formData.frontendType"
-            placeholder="请选择前端类型"
-        >
-          <a-select-option
-              v-for="item in frontendTypes"
-              :key="item.value"
-              :value="item.value"
-          >
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
-      </a-form-item>
-
       <a-form-item label="REST服务名" name="serviceName">
         <a-input
             v-model:value="formData.serviceName">

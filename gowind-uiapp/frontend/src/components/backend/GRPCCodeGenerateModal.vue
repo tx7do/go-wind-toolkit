@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {ref, watch, reactive} from "vue";
 import {message} from "ant-design-vue";
-import {GenerateRestCode} from "../../wailsjs/go/main/App";
+import {GenerateGrpcCode} from "../../../wailsjs/go/main/App";
 
 const props = defineProps<{
   open?: boolean
@@ -9,7 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
-  (e: 'success', value: { serviceName: string }): void
+  (e: 'success', value: { ormType: string }): void
 }>()
 
 const innerOpen = ref(false)
@@ -17,12 +17,17 @@ const formRef = ref()
 const confirmLoading = ref(false)
 
 const formData = reactive({
-  serviceName: 'admin'
+  ormType: 'ent'
 })
 
+const ormTypes = [
+  {value: 'ent', label: 'Ent'},
+  {value: 'gorm', label: 'GORM'}
+]
+
 const formRules = {
-  serviceName: [
-    {required: true, message: '请输入REST服务名', trigger: 'change'}
+  ormType: [
+    {required: true, message: '请选择 ORM 类型', trigger: 'change'}
   ]
 }
 
@@ -39,7 +44,7 @@ function handleClose() {
 
 // 重置表单
 function resetForm() {
-  formData.serviceName = 'admin'
+  formData.ormType = 'ent'
   formRef.value?.clearValidate()
 }
 
@@ -51,11 +56,11 @@ async function handleCommit() {
 
     confirmLoading.value = true
 
-    const res = await GenerateRestCode(formData.serviceName);
+    const res = await GenerateGrpcCode(formData.ormType);
     if (res == "") {
       message.success('代码生成成功');
 
-      emit('success', {serviceName: formData.serviceName})
+      emit('success', {ormType: formData.ormType})
     } else {
       message.error('代码生成失败: ' + res)
     }
@@ -72,7 +77,7 @@ async function handleCommit() {
 <template>
   <a-modal
       v-model:open="innerOpen"
-      title="生成BFF服务"
+      title="生成gRPC服务"
       :width="500"
       @cancel="handleClose"
   >
@@ -83,10 +88,19 @@ async function handleCommit() {
         :label-col="{ span: 6 }"
         :wrapper-col="{ span: 16 }"
     >
-      <a-form-item label="REST服务名" name="serviceName">
-        <a-input
-            v-model:value="formData.serviceName">
-        </a-input>
+      <a-form-item label="ORM 类型" name="ormType">
+        <a-select
+            v-model:value="formData.ormType"
+            placeholder="请选择 ORM 类型"
+        >
+          <a-select-option
+              v-for="item in ormTypes"
+              :key="item.value"
+              :value="item.value"
+          >
+            {{ item.label }}
+          </a-select-option>
+        </a-select>
       </a-form-item>
     </a-form>
 

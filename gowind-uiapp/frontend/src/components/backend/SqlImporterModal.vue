@@ -2,7 +2,7 @@
 import {ref, watch, nextTick, computed} from "vue";
 import {message} from "ant-design-vue";
 
-import {ImportSqlTables, SetDBConfig} from "../../wailsjs/go/main/App";
+import {ImportSqlTables, SetDBConfig} from "../../../wailsjs/go/main/App";
 
 import MonacoEditor from './MonacoEditor.vue';
 

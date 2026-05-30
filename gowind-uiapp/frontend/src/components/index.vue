@@ -2,17 +2,23 @@
 import {Tabs} from 'ant-design-vue';
 
 import Header from "./Header.vue";
-import CodeGeneratorPage from "./CodeGeneratorPage.vue";
-import RemoteConfigPage from "./RemoteConfigPage.vue";
+import CodeGeneratorPage from "./backend/CodeGeneratorPage.vue";
+import FrontendCodeGenPage from "./frontend/FrontendCodeGenPage.vue";
+import RemoteConfigPage from "./remote-config/RemoteConfigPage.vue";
 
 const settingList = [
   {
     key: '1',
-    name: '代码生成',
+    name: '后端代码生成',
     component: CodeGeneratorPage,
   },
   {
     key: '2',
+    name: '前端代码生成',
+    component: FrontendCodeGenPage,
+  },
+  {
+    key: '3',
     name: '远程配置',
     component: RemoteConfigPage,
   },

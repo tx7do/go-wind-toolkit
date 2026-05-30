@@ -1,25 +1,47 @@
 <script setup lang="ts">
-import {ref, reactive} from 'vue'
+import {ref, reactive, onMounted} from 'vue'
 
-import {EditGeneratorOption, GetGeneratorOptions, GetProjectInfo, SetGeneratorOption} from "../../wailsjs/go/main/App";
-import {generator} from "../../wailsjs/go/models";
-import {EventsOn} from "../../wailsjs/runtime";
+import {
+  EditGeneratorOption,
+  GetGeneratorOptions,
+  GetProjectInfo,
+  SetGeneratorOption,
+  OpenProject,
+  SelectFolder,
+} from "../../../wailsjs/go/main/App";
+import {generator, detect} from "../../../wailsjs/go/models";
+import {EventsOn} from "../../../wailsjs/runtime";
 
 import DatabaseImporterModal from "./DatabaseImporterModal.vue";
 import SqlImporterModal from "./SqlImporterModal.vue";
 import GRPCCodeGenerateModal from "./GRPCCodeGenerateModal.vue";
 import RESTCodeGenerateModal from "./RESTCodeGenerateModal.vue";
-import FrontendCodeGenerateModal from "./FrontendCodeGenerateModal.vue";
 
 const openDatabaseImporter = ref<boolean>(false);
 const openSqlImporter = ref<boolean>(false);
 
 const grpcCodeGenerateImporter = ref<boolean>(false);
 const restCodeGenerateImporter = ref<boolean>(false);
-const frontendCodeGenerateImporter = ref<boolean>(false);
 
 // 快速选择服务
 const quickSelectService = ref<string>('');
+
+// 项目信息
+const projectInfo = ref<detect.ProjectInfo>()
+
+// 打开后端项目
+async function handleOpenProject() {
+  try {
+    const path = await SelectFolder();
+    if (path) {
+      const pi = await OpenProject(path);
+      projectInfo.value = pi;
+      await refreshServiceOptions();
+    }
+  } catch (err) {
+    console.error('选择文件夹出错：', err);
+  }
+}
 
 // 表格数据
 const tableData = ref<Array<{ id: number; tableName: string; service: string; exclude: boolean }>>([])
@@ -35,9 +57,7 @@ function handleGenerateRESTCode() {
   restCodeGenerateImporter.value = true;
 }
 
-function handleGenerateFrontendCode() {
-  frontendCodeGenerateImporter.value = true;
-}
+// ==================== 操作 ====================
 
 function handleDatabaseImport() {
   openDatabaseImporter.value = true;
@@ -114,6 +134,10 @@ async function refreshTableData() {
 EventsOn('project-opened', () => {
   console.log("project-opened");
   refreshServiceOptions();
+  // 同时刷新项目信息
+  GetProjectInfo().then(pi => {
+    if (pi) projectInfo.value = pi;
+  });
 })
 EventsOn('table-imported', () => {
   console.log("table-imported");
@@ -123,14 +147,41 @@ EventsOn('table-imported', () => {
 
 <template>
   <div class="code-generator-container">
-    <a-card title="代码生成" class="full-card">
+    <!-- 项目信息栏 -->
+    <div class="project-bar">
+      <div class="project-bar-left">
+        <a-button type="primary" @click="handleOpenProject">打开项目</a-button>
+      </div>
+      <div class="project-bar-right" v-if="projectInfo">
+        <div class="info-item">
+          <span class="info-label">项目</span>
+          <span class="info-value">{{ projectInfo.ModPath }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Go版本</span>
+          <span class="info-value">{{ projectInfo.GoVersion }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">服务数</span>
+          <span class="info-value">{{ projectInfo.Services?.length ?? 0 }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">有API</span>
+          <span class="info-value">{{ projectInfo.HasApi ? '有' : '无' }}</span>
+        </div>
+      </div>
+      <div class="project-bar-right" v-else>
+        <span class="prompt-text">请先打开一个微服务项目</span>
+      </div>
+    </div>
+
+    <a-card title="后端代码生成" class="full-card">
       <template #extra>
         <a-space>
           <a-button type="primary" @click="handleDatabaseImport">数据库导入</a-button>
           <a-button type="primary" @click="handleSQLImport">SQL导入</a-button>
           <a-button type="primary" danger @click="handleGenerateGRPCCode">生成gRPC服务</a-button>
           <a-button type="primary" danger @click="handleGenerateRESTCode">生成BFF服务</a-button>
-          <a-button type="primary" danger @click="handleGenerateFrontendCode">生成前端代码</a-button>
         </a-space>
       </template>
 
@@ -186,8 +237,6 @@ EventsOn('table-imported', () => {
       v-model:open="grpcCodeGenerateImporter"/>
   <RESTCodeGenerateModal
       v-model:open="restCodeGenerateImporter"/>
-  <FrontendCodeGenerateModal
-      v-model:open="frontendCodeGenerateImporter"/>
 </template>
 
 <style scoped>
@@ -197,11 +246,57 @@ EventsOn('table-imported', () => {
   padding: 0;
   margin: 0;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 项目信息栏 */
+.project-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.project-bar-left {
+  display: flex;
+  align-items: center;
+}
+
+.project-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.info-label {
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+.info-value {
+  color: #262626;
+  font-weight: 500;
+}
+
+.prompt-text {
+  color: #8c8c8c;
+  font-size: 13px;
+  font-style: italic;
 }
 
 .full-card {
   width: 100%;
-  height: 100%;
+  flex: 1;
   box-sizing: border-box;
 }
 

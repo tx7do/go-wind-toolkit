@@ -2,7 +2,7 @@
 import {reactive, ref, watch} from "vue";
 import {message} from "ant-design-vue";
 
-import {ImportDatabaseTables, SetDBConfig, TestDatabaseConnection} from "../../wailsjs/go/main/App";
+import {ImportDatabaseTables, SetDBConfig, TestDatabaseConnection} from "../../../wailsjs/go/main/App";
 
 const props = defineProps<{
   open?: boolean
