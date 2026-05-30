@@ -13,6 +13,7 @@ import (
 	authz "github.com/tx7do/kratos-authz/middleware"
 
 	authnEngine "github.com/tx7do/kratos-authn/engine"
+	authn "github.com/tx7do/kratos-authn/engine"
 
 	swaggerUI "github.com/tx7do/kratos-swagger-ui"
 
@@ -25,7 +26,6 @@ import (
 	{{lower .Service}}V1 "{{.Module}}/api/gen/go/{{lower .Service}}/service/v1"
 
 	"{{.Module}}/pkg/middleware/auth"
-	applogging "{{.Module}}/pkg/middleware/logging"
 )
 
 type RestMiddlewares []middleware.Middleware
@@ -46,7 +46,7 @@ func NewRestMiddleware(
 		authn.Server(authenticator),
 		auth.Server(),
 		authz.Server(authorizer),
-	).Match(newRestWhiteListMatcher()).Build())
+	).Match(rpc.NewRestWhiteListMatcher()).Build())
 
 	return ms
 }
