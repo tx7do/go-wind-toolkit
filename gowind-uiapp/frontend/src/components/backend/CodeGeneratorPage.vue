@@ -495,7 +495,7 @@ EventsOn('table-imported', () => {
             </span>
           </div>
         </div>
-        <a-button size="small" @click="handleOpenProject">切换项目</a-button>
+        <span class="switch-project-link" @click="handleOpenProject">切换项目</span>
       </div>
 
       <!-- 导入方式 -->
@@ -696,7 +696,7 @@ EventsOn('table-imported', () => {
               <a-checkbox v-model:checked="generateConfig.generateGrpc">
                 <span class="target-title">gRPC 微服务</span>
               </a-checkbox>
-              <a-tag color="blue" size="small">Go + Protobuf</a-tag>
+              <a-tag color="blue" size="small">gRPC</a-tag>
             </div>
             <div v-if="generateConfig.generateGrpc" class="target-body">
               <a-form layout="inline">
@@ -717,7 +717,7 @@ EventsOn('table-imported', () => {
               <a-checkbox v-model:checked="generateConfig.generateBff">
                 <span class="target-title">BFF 微服务</span>
               </a-checkbox>
-              <a-tag color="green" size="small">REST API</a-tag>
+              <a-tag color="green" size="small">REST</a-tag>
             </div>
             <div v-if="generateConfig.generateBff" class="target-body">
               <a-form layout="inline">
@@ -879,6 +879,24 @@ EventsOn('table-imported', () => {
 
 .meta-divider {
   color: #d9d9d9;
+}
+
+.switch-project-link {
+  font-size: 12px;
+  color: #595959;
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.switch-project-link:hover {
+  color: #389e0d;
+  border-color: #b7eb8f;
+  background: rgba(255, 255, 255, 0.8);
 }
 
 /* 项目错误卡片 */
