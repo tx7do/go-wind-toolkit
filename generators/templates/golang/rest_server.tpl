@@ -70,7 +70,7 @@ func NewRestServer(
 		return nil, err
 	}
 {{range $key, $value := .Services}}
-    {{$value}}.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
+    {{$value}}V1.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
 {{- end}}
 
 	if cfg.GetServer().GetRest().GetEnableSwagger() {

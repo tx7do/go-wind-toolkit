@@ -23,12 +23,14 @@ type (
 
 		UseRepo bool
 
-		GenerateProto   bool
-		GenerateServer  bool
-		GenerateService bool
-		GenerateORM     bool
-		GenerateData    bool
-		GenerateMain    bool
+		GenerateProto    bool
+		GenerateServer   bool
+		GenerateService  bool
+		GenerateORM      bool
+		GenerateData     bool
+		GenerateMain     bool
+		GenerateConfig   bool
+		GenerateMakefile bool
 	}
 
 	GeneratorOption func(*GeneratorOptions)

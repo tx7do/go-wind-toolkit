@@ -10,7 +10,7 @@ import (
 
 	"{{.Module}}/app/{{lower .Service}}/service/internal/service"
 {{range $key, $value := .Packages}}
-    {{lower $value}} "{{lower $.Module}}/api/gen/go/{{lower $value}}/service/v1"
+    {{lower $value}}V1 "{{lower $.Module}}/api/gen/go/{{lower $value}}/service/v1"
 {{- end}}
 )
 

@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/jinzhu/inflection"
+	"github.com/tx7do/go-utils/code_generator"
 	"github.com/tx7do/go-wind-toolkit/generators"
 
 	sqlorm "github.com/tx7do/go-wind-toolkit/sql-orm"
@@ -119,6 +120,22 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			servicePackageMap,
 			opts.Servers,
 		); err != nil {
+			return err
+		}
+	}
+
+	// 生成配置文件
+	if opts.GenerateConfig {
+		configPath := fmt.Sprintf("%s/app/%s/service/configs", opts.OutputPath, opts.ModuleName)
+		if err = g.generateConfigCode(ctx, configPath, opts.Servers); err != nil {
+			return err
+		}
+	}
+
+	// 生成Makefile
+	if opts.GenerateMakefile {
+		makefilePath := fmt.Sprintf("%s/app/%s/service", opts.OutputPath, opts.ModuleName)
+		if err = g.generateMakefileCode(ctx, makefilePath); err != nil {
 			return err
 		}
 	}
@@ -333,4 +350,52 @@ func (g *Generator) generateMainPackageCode(
 		outputPath,
 		projectName, serviceName,
 	)
+}
+
+// generateConfigCode 生成配置文件 (client.yaml, server.yaml, logger.yaml, data.yaml)
+func (g *Generator) generateConfigCode(ctx context.Context, configPath string, servers []string) error {
+	log.Println("Generating config files...")
+
+	if _, err := g.yamlGenerator.GenerateLoggerYaml(ctx, code_generator.Options{
+		OutDir: configPath,
+	}); err != nil {
+		return err
+	}
+
+	if _, err := g.yamlGenerator.GenerateDataYaml(ctx, code_generator.Options{
+		OutDir: configPath,
+	}); err != nil {
+		return err
+	}
+
+	if _, err := g.yamlGenerator.GenerateClientYaml(ctx, code_generator.Options{
+		OutDir: configPath,
+	}); err != nil {
+		return err
+	}
+
+	if _, err := g.yamlGenerator.GenerateServerYaml(ctx, code_generator.Options{
+		OutDir: configPath,
+	}); err != nil {
+		return err
+	}
+
+	log.Println("Config files generation completed.")
+	return nil
+}
+
+// generateMakefileCode 生成 Makefile
+func (g *Generator) generateMakefileCode(ctx context.Context, servicePath string) error {
+	log.Println("Generating Makefile...")
+
+	_, err := g.makefileGenerator.GenerateAppMakefile(ctx, code_generator.Options{
+		OutDir: servicePath,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	log.Println("Makefile generation completed.")
+	return nil
 }

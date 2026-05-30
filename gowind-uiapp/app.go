@@ -248,6 +248,7 @@ func (a *App) GenerateRestCode(serviceName string) string {
 	if err := a.generator.GenerateRestCode(
 		a.ctx,
 		serviceName,
+		"", // REST服务不生成ORM代码
 		*a.dbConfig,
 		a.projectInfo.Root,
 		a.projectInfo.ModPath,
@@ -282,7 +283,6 @@ func (a *App) GenerateFrontendCode(serviceName string, frontendType string) stri
 		return "未配置数据库连接，无法生成代码"
 	}
 
-	runtime.EventsEmit(a.ctx, "code-generated")
-
-	return ""
+	runtime.LogErrorf(a.ctx, "前端代码生成功能尚未实现")
+	return "前端代码生成功能尚未实现"
 }

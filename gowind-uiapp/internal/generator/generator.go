@@ -143,6 +143,9 @@ func (g *Generator) GenerateGrpcCode(
 		options.GenerateData = true
 		options.GenerateService = true
 		options.GenerateServer = true
+		options.GenerateMain = true
+		options.GenerateConfig = true
+		options.GenerateMakefile = true
 
 		options.Servers = []string{"grpc"}
 
@@ -171,6 +174,7 @@ func (g *Generator) GenerateGrpcCode(
 func (g *Generator) GenerateRestCode(
 	ctx context.Context,
 	restServiceName string,
+	ormType string,
 	dbConfig database.DBConfig,
 	rootPath string,
 	projectName string,
@@ -192,6 +196,7 @@ func (g *Generator) GenerateRestCode(
 		log.Info("开始为服务生成代码: ", serviceName)
 
 		options.Driver = string(dbConfig.Type)
+		options.OrmType = ormType
 
 		if dbConfig.SQLContent != "" {
 			options.Source = dbConfig.SQLContent
@@ -213,6 +218,9 @@ func (g *Generator) GenerateRestCode(
 		options.GenerateData = true
 		options.GenerateService = true
 		options.GenerateServer = true
+		options.GenerateMain = true
+		options.GenerateConfig = true
+		options.GenerateMakefile = true
 
 		options.Servers = []string{"rest"}
 

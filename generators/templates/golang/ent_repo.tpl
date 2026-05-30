@@ -10,7 +10,7 @@ import (
 	"github.com/tx7do/go-utils/copierutil"
 	"github.com/tx7do/go-utils/mapper"
 
-	pagination "github.com/tx7do/go-crud/api/gen/go/pagination/v1"
+	paginationV1 "github.com/tx7do/go-crud/api/gen/go/pagination/v1"
 	entCrud "github.com/tx7do/go-crud/entgo"
 
 	"{{.Module}}/app/{{lower .Service}}/service/internal/data/ent"
@@ -78,7 +78,7 @@ func (r *{{.ClassName}}) Count(ctx context.Context, req *paginationV1.PagingRequ
 	return count, nil
 }
 
-func (r *{{.ClassName}}) List(ctx context.Context, req *pagination.PagingRequest) (*{{.ApiPackage}}.List{{pascal .Model}}Response, error) {
+func (r *{{.ClassName}}) List(ctx context.Context, req *paginationV1.PagingRequest) (*{{.ApiPackage}}.List{{pascal .Model}}Response, error) {
 	if req == nil {
 		return nil, {{.ApiPackage}}.ErrorBadRequest("invalid parameter")
 	}
