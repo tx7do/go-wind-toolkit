@@ -106,11 +106,35 @@ function handleChooseFile() {
   fileInputRef.value?.click()
 }
 
-function handleFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+// 拖拽状态
+const fileDragging = ref(false)
+
+function handleFileDragOver(e: DragEvent) {
+  e.preventDefault()
+  fileDragging.value = true
+}
+
+function handleFileDragLeave() {
+  fileDragging.value = false
+}
+
+function handleFileDrop(e: DragEvent) {
+  e.preventDefault()
+  fileDragging.value = false
+
+  const file = e.dataTransfer?.files?.[0]
   if (!file) return
 
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (!ext || !['yaml', 'yml', 'json'].includes(ext)) {
+    message.warning('请拖入 .yaml / .yml / .json 格式的文件')
+    return
+  }
+
+  processOpenApiFile(file)
+}
+
+function processOpenApiFile(file: File) {
   selectedFileName.value = file.name
   const reader = new FileReader()
   reader.onload = (e) => {
@@ -118,7 +142,14 @@ function handleFileChange(event: Event) {
     handleParse()
   }
   reader.readAsText(file)
-  // 重置 input 以支持重复选择同一文件
+}
+
+function handleFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  processOpenApiFile(file)
   input.value = ''
 }
 
@@ -392,11 +423,18 @@ function getFrameworkLabel(value: string) {
             style="display: none"
             @change="handleFileChange"
           />
-          <div class="file-drop-zone" @click="handleChooseFile">
+          <div
+            class="file-drop-zone"
+            :class="{ dragging: fileDragging }"
+            @click="handleChooseFile"
+            @dragover="handleFileDragOver"
+            @dragleave="handleFileDragLeave"
+            @drop="handleFileDrop"
+          >
             <div class="drop-zone-content">
               <div style="font-size: 32px; color: #1890ff; margin-bottom: 8px">&#128196;</div>
               <div style="font-weight: 500; margin-bottom: 4px">
-                {{ selectedFileName || '点击选择 OpenAPI 文件' }}
+                {{ selectedFileName || '点击或拖拽 OpenAPI 文件到此处' }}
               </div>
               <div style="color: #999; font-size: 12px">支持 .yaml / .yml / .json 格式</div>
             </div>
@@ -591,6 +629,12 @@ function getFrameworkLabel(value: string) {
 .file-drop-zone:hover {
   border-color: #1890ff;
   background: #f0f7ff;
+}
+
+.file-drop-zone.dragging {
+  border-color: #1890ff;
+  background: #e6f7ff;
+  box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
 }
 
 .drop-zone-content {
