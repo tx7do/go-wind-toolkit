@@ -54,7 +54,7 @@ func (r *{{.ClassName}}) init() {
 		ent.{{pascal .Model}}Update, ent.{{pascal .Model}}UpdateOne,
 		ent.{{pascal .Model}}Delete,
 		predicate.{{pascal .Model}},
-		userV1.{{pascal .Model}}, ent.{{pascal .Model}},
+		{{.ApiPackage}}.{{pascal .Model}}, ent.{{pascal .Model}},
 	](r.mapper)
 
 	r.mapper.AppendConverters(copierutil.NewTimeStringConverterPair())

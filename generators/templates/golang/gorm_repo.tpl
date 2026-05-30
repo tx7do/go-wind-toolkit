@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/tx7do/go-utils/copierutil"
-	"github.com/tx7do/go-utils/crypto"
 	"github.com/tx7do/go-utils/mapper"
 
 	pagination "github.com/tx7do/go-crud/api/gen/go/pagination/v1"
@@ -42,7 +41,7 @@ func New{{.ClassName}}(ctx *bootstrap.Context, gormClient *gormCrud.Client) *{{.
 
 func (r *{{.ClassName}}) init() {
     r.repository = gormCurd.NewRepository[{{.ApiPackage}}.{{pascal .Model}}, models.{{pascal .Model}}](
-        repo.mapper,
+        r.mapper,
     )
 
 	r.mapper.AppendConverters(copierutil.NewTimeStringConverterPair())

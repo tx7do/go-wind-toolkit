@@ -12,6 +12,8 @@ import (
 	authzEngine "github.com/tx7do/kratos-authz/engine"
 	authz "github.com/tx7do/kratos-authz/middleware"
 
+	authnEngine "github.com/tx7do/kratos-authn/engine"
+
 	swaggerUI "github.com/tx7do/kratos-swagger-ui"
 
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
@@ -32,7 +34,7 @@ type RestMiddlewares []middleware.Middleware
 func NewRestMiddleware(
 	ctx *bootstrap.Context,
 	authenticator authnEngine.Authenticator,
-	authorizer *authorizer.Authorizer,
+	authorizer authzEngine.Engine,
 ) RestMiddlewares {
 	var ms []middleware.Middleware
 	ms = append(ms, logging.Server(ctx.GetLogger()))
@@ -70,7 +72,7 @@ func NewRestServer(
 		return nil, err
 	}
 {{range $key, $value := .Services}}
-    {{$value}}V1.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
+    {{lower $value}}V1.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
 {{- end}}
 
 	if cfg.GetServer().GetRest().GetEnableSwagger() {
