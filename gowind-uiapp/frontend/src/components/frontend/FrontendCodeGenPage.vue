@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref} from 'vue'
+import {ref, computed} from 'vue'
 import {message} from 'ant-design-vue'
 
 import {GenerateFrontendCode} from "../../../wailsjs/go/main/App";
@@ -12,6 +12,7 @@ import {
   type GenerateFileType,
   type RouterModuleConfig,
 } from "../../generators/vue-element";
+import MonacoEditor from "../backend/MonacoEditor.vue";
 
 const confirmLoading = ref(false)
 
@@ -384,6 +385,35 @@ function getFileTypeColor(type: string) {
 function getFrameworkLabel(value: string) {
   return frameworkOptions.find(f => f.value === value)?.label || value
 }
+
+// 根据文件路径推断 Monaco 语言
+function detectLanguage(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || ''
+  const langMap: Record<string, string> = {
+    ts: 'typescript',
+    tsx: 'typescript',
+    js: 'javascript',
+    jsx: 'javascript',
+    vue: 'html',
+    html: 'html',
+    css: 'css',
+    scss: 'css',
+    less: 'css',
+    json: 'json',
+    yaml: 'yaml',
+    yml: 'yaml',
+    sql: 'sql',
+    md: 'markdown',
+    xml: 'xml',
+  }
+  return langMap[ext] || 'plaintext'
+}
+
+const previewLanguage = computed(() => {
+  if (filteredFiles.value.length === 0) return 'plaintext'
+  const file = filteredFiles.value[selectedFileIndex.value]
+  return file ? detectLanguage(file.path) : 'plaintext'
+})
 </script>
 
 <template>
@@ -583,7 +613,15 @@ function getFrameworkLabel(value: string) {
 
         <!-- 右侧代码预览 -->
         <div class="code-preview-panel">
-          <pre v-if="currentFileContent" class="code-content">{{ currentFileContent }}</pre>
+          <div v-if="currentFileContent" class="monaco-wrapper">
+            <MonacoEditor
+              :key="selectedFileIndex + '-' + previewLanguage"
+              :model-value="currentFileContent"
+              :language="previewLanguage"
+              :read-only="true"
+              height="100%"
+            />
+          </div>
           <a-empty v-else description="没有生成的文件" style="margin-top: 100px"/>
         </div>
       </div>
@@ -712,18 +750,16 @@ function getFrameworkLabel(value: string) {
   min-width: 0;
   border: 1px solid #f0f0f0;
   border-radius: 6px;
-  overflow: auto;
+  overflow: hidden;
   background: #fafafa;
+  position: relative;
 }
 
-.code-content {
-  padding: 16px;
-  margin: 0;
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #333;
+.monaco-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 </style>

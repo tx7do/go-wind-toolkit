@@ -1,18 +1,35 @@
 <script setup lang="ts">
 import {onMounted, ref, watch, onUnmounted} from 'vue'
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.main'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
+import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
+import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
+import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
 
-// 注册 Web Worker（必须）
+// 注册 Web Worker（按语言分发）
 self.MonacoEnvironment = {
   getWorker(_: any, label: string) {
+    if (label === 'json') {
+      return new jsonWorker()
+    }
+    if (label === 'typescript' || label === 'javascript') {
+      return new tsWorker()
+    }
+    if (label === 'html' || label === 'handlebars' || label === 'razor') {
+      return new htmlWorker()
+    }
+    if (label === 'css' || label === 'scss' || label === 'less') {
+      return new cssWorker()
+    }
     return new editorWorker()
   }
 }
 
 const props = defineProps<{
   modelValue?: string
-  dbType?: 'mysql' | 'postgresql' | 'sqlite' | 'oracle' // 新增数据库类型
+  dbType?: 'mysql' | 'postgresql' | 'sqlite' | 'oracle'
+  language?: string // 直接指定 Monaco 语言，如 typescript, vue, html, css, json, yaml 等
   height?: string | number
   readOnly?: boolean
 }>()
@@ -276,8 +293,13 @@ function getDatabaseSnippets(dbType: string) {
 onMounted(() => {
   if (!editorRef.value) return
 
-  // 根据 dbType 注册语言
-  const languageId = registerDatabaseLanguage(props.dbType || 'mysql')
+  // 如果直接指定了 language prop，优先使用它
+  let languageId: string
+  if (props.language) {
+    languageId = props.language
+  } else {
+    languageId = registerDatabaseLanguage(props.dbType || 'mysql')
+  }
 
   editor = monaco.editor.create(editorRef.value, {
     value: props.modelValue || '',
@@ -331,9 +353,18 @@ watch(() => props.modelValue, (newVal) => {
   }
 })
 
-// 监听数据库类型变化（重新配置编辑器）
+// 监听语言变化
+watch(() => props.language, (newLang) => {
+  if (!editor || !newLang) return
+  const model = editor.getModel()
+  if (model) {
+    monaco.editor.setModelLanguage(model, newLang)
+  }
+})
+
+// 监听数据库类型变化（仅当未指定 language 时生效）
 watch(() => props.dbType, async (newType) => {
-  if (!editor || !newType) return
+  if (!editor || !newType || props.language) return
 
   // 重新注册语言
   const languageId = registerDatabaseLanguage(newType)
@@ -362,7 +393,7 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="editorRef" :style="{ height: typeof height === 'number' ? height + 'px' : height || '400px' }"></div>
+  <div ref="editorRef" :style="{ height: typeof height === 'number' ? height + 'px' : height || '400px', width: '100%' }"></div>
 </template>
 
 <style scoped>
