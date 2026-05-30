@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {ref, computed} from 'vue'
 import {message} from 'ant-design-vue'
+import {useI18n} from 'vue-i18n'
 
 import {GenerateFrontendCode} from "../../../wailsjs/go/main/App";
 import {SelectFolder} from "../../../wailsjs/go/main/App";
@@ -13,6 +14,8 @@ import {
   type RouterModuleConfig,
 } from "../../generators/vue-element";
 import MonacoEditor from "../backend/MonacoEditor.vue";
+
+const {t} = useI18n()
 
 const confirmLoading = ref(false)
 
@@ -64,15 +67,15 @@ const currentFileContent = ref('')
 
 // ==================== 文件列表过滤 ====================
 const activeFileType = ref<string>('all')
-const fileTypeOptions = [
-  {label: '全部', value: 'all'},
+const fileTypeOptions = computed(() => [
+  {label: t('frontend.fileType.all'), value: 'all'},
   {label: 'Service', value: 'service'},
   {label: 'Composable', value: 'composable'},
-  {label: '页面', value: 'page'},
-  {label: '抽屉', value: 'drawer'},
-  {label: '路由', value: 'router'},
-  {label: '国际化', value: 'locale'},
-]
+  {label: t('frontend.fileType.page'), value: 'page'},
+  {label: t('frontend.fileType.drawer'), value: 'drawer'},
+  {label: t('frontend.fileType.router'), value: 'router'},
+  {label: t('frontend.fileType.locale'), value: 'locale'},
+])
 
 const filteredFiles = ref<GeneratedFile[]>([])
 
@@ -128,7 +131,7 @@ function handleFileDrop(e: DragEvent) {
 
   const ext = file.name.split('.').pop()?.toLowerCase()
   if (!ext || !['yaml', 'yml', 'json'].includes(ext)) {
-    message.warning('请拖入 .yaml / .yml / .json 格式的文件')
+    message.warning(t('frontend.import.fileDragWarning'))
     return
   }
 
@@ -157,7 +160,7 @@ function handleFileChange(event: Event) {
 // ==================== 远程 URL 拉取 ====================
 async function handleFetchRemote() {
   if (!remoteUrl.value.trim()) {
-    message.warning('请输入 OpenAPI 文档地址')
+    message.warning(t('frontend.import.remoteUrlRequired'))
     return
   }
 
@@ -173,21 +176,21 @@ async function handleFetchRemote() {
     }
 
     if (!response.ok) {
-      message.error(`请求失败: ${response.status} ${response.statusText}`)
+      message.error(t('frontend.import.requestFailed', {status: response.status, text: response.statusText}))
       return
     }
 
     const text = await response.text()
     if (!text.trim()) {
-      message.error('获取到的内容为空')
+      message.error(t('frontend.import.remoteEmpty'))
       return
     }
 
     yamlContent.value = text
-    message.success('远程文档加载成功')
+    message.success(t('frontend.import.remoteSuccess'))
     handleParse()
   } catch (e: any) {
-    message.error(`拉取失败: ${e.message || e}`)
+    message.error(t('frontend.import.remoteFetchFailed', {error: e.message || e}))
   } finally {
     remoteLoading.value = false
   }
@@ -203,7 +206,7 @@ function fetchViaXhr(url: string): Promise<Response> {
         statusText: xhr.statusText,
       }))
     }
-    xhr.onerror = () => reject(new Error('网络请求失败'))
+    xhr.onerror = () => reject(new Error(t('frontend.import.networkError')))
     xhr.send()
   })
 }
@@ -222,7 +225,7 @@ function handleParse() {
     autoDetectRouterModules(parsedServices.value)
     currentStep.value = 1
   } catch (e: any) {
-    message.error('解析 OpenAPI 失败: ' + (e.message || e))
+    message.error(t('frontend.import.parseFailed', {msg: e.message || e}))
     console.error('解析 OpenAPI 失败:', e)
   }
 }
@@ -245,9 +248,9 @@ function handlePreview() {
     // 其他框架暂未实现，生成占位提示
     generatedFiles.value = selectedServices.map(s => ({
       path: `${targetFramework.value}/${s.tagName}/placeholder.txt`,
-      content: `[${frameworkOptions.find(f => f.value === targetFramework.value)?.label}] 代码生成器尚未实现\n\n服务: ${s.modelName}\n描述: ${s.description}\n字段数: ${s.fields.length}\n操作: ${s.operations.map(o => o.type).join(', ')}\n\n敬请期待...`,
+      content: `[${frameworkOptions.find(f => f.value === targetFramework.value)?.label}] ${t('frontend.placeholder.notImplemented')}\n\n${t('frontend.placeholder.service')}: ${s.modelName}\n${t('frontend.placeholder.description')}: ${s.description}\n${t('frontend.placeholder.fields')}: ${s.fields.length}\n${t('frontend.placeholder.operations')}: ${s.operations.map(o => o.type).join(', ')}\n\n${t('frontend.placeholder.comingSoon')}`,
       type: 'service' as GenerateFileType,
-      description: `${s.modelName} - 待实现`,
+      description: `${s.modelName} - ${t('frontend.placeholder.notImplemented')}`,
       serviceName: s.tagName,
     }))
   }
@@ -367,9 +370,9 @@ function autoDetectRouterModules(services: ParsedService[]) {
 
 function getOperationTag(type: string) {
   const map: Record<string, { color: string; text: string }> = {
-    list: {color: 'blue', text: '列表'}, get: {color: 'cyan', text: '详情'},
-    create: {color: 'green', text: '创建'}, update: {color: 'orange', text: '更新'},
-    delete: {color: 'red', text: '删除'}, other: {color: 'default', text: '其他'},
+    list: {color: 'blue', text: t('frontend.operation.list')}, get: {color: 'cyan', text: t('frontend.operation.get')},
+    create: {color: 'green', text: t('frontend.operation.create')}, update: {color: 'orange', text: t('frontend.operation.update')},
+    delete: {color: 'red', text: t('frontend.operation.delete')}, other: {color: 'default', text: t('frontend.operation.other')},
   }
   return map[type] || map.other
 }
@@ -420,15 +423,15 @@ const previewLanguage = computed(() => {
   <div class="frontend-gen-container">
     <!-- 步骤条 -->
     <a-steps :current="currentStep" size="small" style="margin-bottom: 20px">
-      <a-step title="导入 OpenAPI"/>
-      <a-step title="生成配置"/>
-      <a-step title="预览 &amp; 生成"/>
+      <a-step :title="t('frontend.steps.importOpenApi')"/>
+      <a-step :title="t('frontend.steps.genConfig')"/>
+      <a-step :title="t('frontend.steps.previewGenerate')"/>
     </a-steps>
 
     <!-- ====== 步骤 0: 导入 OpenAPI ====== -->
     <div v-if="currentStep === 0" class="step-content">
       <!-- 目标框架选择 -->
-      <a-card title="目标框架" size="small" style="margin-bottom: 16px">
+      <a-card :title="t('frontend.framework.title')" size="small" style="margin-bottom: 16px">
         <a-radio-group v-model:value="targetFramework" button-style="solid">
           <a-radio-button v-for="opt in frameworkOptions" :key="opt.value" :value="opt.value">
             {{ opt.label }}
@@ -437,11 +440,11 @@ const previewLanguage = computed(() => {
       </a-card>
 
       <!-- 导入方式切换 -->
-      <a-card title="导入 OpenAPI 文档" size="small">
+      <a-card :title="t('frontend.import.title')" size="small">
         <a-radio-group v-model:value="importSource" style="margin-bottom: 16px">
-          <a-radio-button value="local">本地文件</a-radio-button>
-          <a-radio-button value="remote">远程地址</a-radio-button>
-          <a-radio-button value="paste">粘贴内容</a-radio-button>
+          <a-radio-button value="local">{{ t('frontend.import.local') }}</a-radio-button>
+          <a-radio-button value="remote">{{ t('frontend.import.remote') }}</a-radio-button>
+          <a-radio-button value="paste">{{ t('frontend.import.paste') }}</a-radio-button>
         </a-radio-group>
 
         <!-- 本地文件选择 -->
@@ -464,9 +467,9 @@ const previewLanguage = computed(() => {
             <div class="drop-zone-content">
               <div style="font-size: 32px; color: #1890ff; margin-bottom: 8px">&#128196;</div>
               <div style="font-weight: 500; margin-bottom: 4px">
-                {{ selectedFileName || '点击或拖拽 OpenAPI 文件到此处' }}
+                {{ selectedFileName || t('frontend.import.fileDropHint') }}
               </div>
-              <div style="color: #999; font-size: 12px">支持 .yaml / .yml / .json 格式</div>
+              <div style="color: #999; font-size: 12px">{{ t('frontend.import.fileFormatHint') }}</div>
             </div>
           </div>
         </div>
@@ -475,20 +478,20 @@ const previewLanguage = computed(() => {
         <div v-if="importSource === 'remote'">
           <a-input-search
             v-model:value="remoteUrl"
-            placeholder="输入 OpenAPI 文档 URL，如 https://petstore.swagger.io/v2/swagger.yaml"
-            enter-button="拉取"
+            :placeholder="t('frontend.import.remotePlaceholder')"
+            :enter-button="t('frontend.import.fetchBtn')"
             :loading="remoteLoading"
             @search="handleFetchRemote"
             style="margin-bottom: 12px"
           />
-          <a-alert v-if="!remoteUrl" message="请输入可公开访问的 OpenAPI 文档地址" type="info" show-icon/>
+          <a-alert v-if="!remoteUrl" :message="t('frontend.import.remoteHint')" type="info" show-icon/>
         </div>
 
         <!-- 粘贴 YAML -->
         <div v-if="importSource === 'paste'">
           <a-textarea
             v-model:value="yamlContent"
-            placeholder="请粘贴 OpenAPI 3.0 YAML / JSON 内容..."
+            :placeholder="t('frontend.import.pastePlaceholder')"
             :auto-size="{ minRows: 12, maxRows: 22 }"
             style="font-family: 'Courier New', monospace; font-size: 12px;"
           />
@@ -497,7 +500,7 @@ const previewLanguage = computed(() => {
 
       <div style="text-align: right; margin-top: 16px">
         <a-button type="primary" @click="handleParse" :disabled="!yamlContent.trim()">
-          解析 OpenAPI
+          {{ t('frontend.import.parseBtn') }}
         </a-button>
       </div>
     </div>
@@ -505,40 +508,40 @@ const previewLanguage = computed(() => {
     <!-- ====== 步骤 1: 配置生成 ====== -->
     <div v-if="currentStep === 1" class="step-content">
       <!-- 生成配置 -->
-      <a-card title="生成配置" size="small" style="margin-bottom: 16px">
+      <a-card :title="t('frontend.config.title')" size="small" style="margin-bottom: 16px">
         <a-form layout="inline">
-          <a-form-item label="目标框架">
+          <a-form-item :label="t('frontend.framework.selectFramework')">
             <a-select v-model:value="targetFramework" style="width: 180px">
               <a-select-option v-for="opt in frameworkOptions" :key="opt.value" :value="opt.value">
                 {{ opt.label }}
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="输出目录">
+          <a-form-item :label="t('frontend.config.outputDir')">
             <a-input-group compact>
               <a-input
                 v-model:value="generateOptions.outputDir"
-                placeholder="选择前端项目根目录"
+                :placeholder="t('frontend.config.outputDirPlaceholder')"
                 style="width: calc(100% - 90px)"
                 read-only
               />
-              <a-button type="primary" @click="handleSelectOutputDir">选择目录</a-button>
+              <a-button type="primary" @click="handleSelectOutputDir">{{ t('frontend.config.selectDir') }}</a-button>
             </a-input-group>
           </a-form-item>
-          <a-form-item v-if="targetFramework === 'vue-element'" label="生成类型">
+          <a-form-item v-if="targetFramework === 'vue-element'" :label="t('frontend.config.generateTypes')">
             <a-checkbox-group v-model:value="generateOptions.generateTypes">
-              <a-checkbox value="service">Service层</a-checkbox>
-              <a-checkbox value="composable">Composable层</a-checkbox>
-              <a-checkbox value="page">列表页面</a-checkbox>
-              <a-checkbox value="drawer">编辑抽屉</a-checkbox>
-              <a-checkbox value="router">路由配置</a-checkbox>
-              <a-checkbox value="locale">国际化</a-checkbox>
+              <a-checkbox value="service">{{ t('frontend.config.serviceLayer') }}</a-checkbox>
+              <a-checkbox value="composable">{{ t('frontend.config.composableLayer') }}</a-checkbox>
+              <a-checkbox value="page">{{ t('frontend.config.listPage') }}</a-checkbox>
+              <a-checkbox value="drawer">{{ t('frontend.config.editDrawer') }}</a-checkbox>
+              <a-checkbox value="router">{{ t('frontend.config.routerConfig') }}</a-checkbox>
+              <a-checkbox value="locale">{{ t('frontend.config.i18n') }}</a-checkbox>
             </a-checkbox-group>
           </a-form-item>
         </a-form>
         <a-alert
           v-if="targetFramework !== 'vue-element'"
-          :message="`${getFrameworkLabel(targetFramework)} 代码生成器尚未实现，预览将显示占位内容`"
+          :message="t('frontend.config.notImplemented', {framework: getFrameworkLabel(targetFramework)})"
           type="warning"
           show-icon
           style="margin-top: 12px"
@@ -549,12 +552,12 @@ const previewLanguage = computed(() => {
       <a-card size="small">
         <template #title>
           <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span>选择要生成的服务 ({{ selectedServiceKeys.length }}/{{ parsedServices.length }})</span>
+            <span>{{ t('frontend.service.selectTitle', {selected: selectedServiceKeys.length, total: parsedServices.length}) }}</span>
             <a-space>
               <a-button size="small" @click="handleSelectAll">
-                {{ selectedServiceKeys.length === parsedServices.length ? '取消全选' : '全选' }}
+                {{ selectedServiceKeys.length === parsedServices.length ? t('frontend.service.deselectAll') : t('frontend.service.selectAll') }}
               </a-button>
-              <a-button size="small" type="dashed" @click="handleSelectCrud">仅选有列表的</a-button>
+              <a-button size="small" type="dashed" @click="handleSelectCrud">{{ t('frontend.service.selectListOnly') }}</a-button>
             </a-space>
           </div>
         </template>
@@ -573,7 +576,7 @@ const previewLanguage = computed(() => {
                        :color="getOperationTag(op.type).color" size="small">
                   {{ getOperationTag(op.type).text }}
                 </a-tag>
-                <span style="color: #999; font-size: 12px; margin-left: 8px;">{{ service.fields.length }} 个字段</span>
+                <span style="color: #999; font-size: 12px; margin-left: 8px;">{{ t('frontend.service.fields', {count: service.fields.length}) }}</span>
               </div>
             </div>
           </div>
@@ -581,9 +584,9 @@ const previewLanguage = computed(() => {
       </a-card>
 
       <div style="display: flex; justify-content: space-between; margin-top: 16px">
-        <a-button @click="currentStep = 0">上一步</a-button>
+        <a-button @click="currentStep = 0">{{ t('common.prevStep') }}</a-button>
         <a-button type="primary" @click="handlePreview" :disabled="selectedServiceKeys.length === 0">
-          预览生成代码
+          {{ t('frontend.preview.previewBtn') }}
         </a-button>
       </div>
     </div>
@@ -594,7 +597,7 @@ const previewLanguage = computed(() => {
         <!-- 左侧文件列表 -->
         <div class="file-list-panel">
           <div class="file-list-header">
-            <span>文件 ({{ filteredFiles.length }})</span>
+            <span>{{ t('frontend.preview.files', {count: filteredFiles.length}) }}</span>
             <a-select v-model:value="activeFileType" :options="fileTypeOptions" size="small"
                       style="width: 110px" @change="filterFiles"/>
           </div>
@@ -622,16 +625,16 @@ const previewLanguage = computed(() => {
               height="100%"
             />
           </div>
-          <a-empty v-else description="没有生成的文件" style="margin-top: 100px"/>
+          <a-empty v-else :description="t('frontend.preview.noFiles')" style="margin-top: 100px"/>
         </div>
       </div>
 
       <div style="display: flex; justify-content: space-between; margin-top: 16px">
-        <a-button @click="currentStep = 1">上一步</a-button>
+        <a-button @click="currentStep = 1">{{ t('common.prevStep') }}</a-button>
         <a-space>
-          <a-button @click="currentStep = 0; resetState()">重新开始</a-button>
+          <a-button @click="currentStep = 0; resetState()">{{ t('frontend.preview.resetBtn') }}</a-button>
           <a-button type="primary" :loading="confirmLoading" @click="handleCommit">
-            确认生成代码
+            {{ t('frontend.preview.confirmBtn') }}
           </a-button>
         </a-space>
       </div>

@@ -13,8 +13,11 @@ import 'vxe-pc-ui/es/style.css'
 import VxeUITable from 'vxe-table'
 import 'vxe-table/es/style.css'
 
+import i18n from './i18n'
+
 const app = createApp(App);
 
+app.use(i18n)
 app.use(Antd).use(DatePicker).use(Tabs);
 app.use(VxeUIBase).use(VxeUITable);
 
