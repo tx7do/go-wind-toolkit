@@ -463,6 +463,8 @@ export namespace devtools {
 	    hasConfig: boolean;
 	    hasEnt: boolean;
 	    entSchemas?: string[];
+	    hasGorm: boolean;
+	    gormModels?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ServiceInfo(source);
@@ -475,6 +477,8 @@ export namespace devtools {
 	        this.hasConfig = source["hasConfig"];
 	        this.hasEnt = source["hasEnt"];
 	        this.entSchemas = source["entSchemas"];
+	        this.hasGorm = source["hasGorm"];
+	        this.gormModels = source["gormModels"];
 	    }
 	}
 

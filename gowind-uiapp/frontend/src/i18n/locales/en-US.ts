@@ -290,6 +290,7 @@ export default {
       hasServer: 'Server',
       hasConfig: 'Config',
       hasEnt: 'Ent',
+      hasGorm: 'GORM',
       entSchemas: 'Schema',
     },
   },

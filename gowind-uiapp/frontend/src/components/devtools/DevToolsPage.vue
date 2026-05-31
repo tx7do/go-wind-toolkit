@@ -255,7 +255,7 @@ onUnmounted(() => {})
           :row-selection="rowSelection"
           :row-key="(record: any) => record.name"
           :pagination="false"
-          :scroll="{ x: 700 }"
+          :scroll="{ x: 800 }"
           size="small"
           bordered
       >
@@ -275,6 +275,12 @@ onUnmounted(() => {})
         <a-table-column :title="t('projectManager.overview.hasEnt')" :width="90" align="center">
           <template #default="{record}">
             <a-tag v-if="record.hasEnt" color="orange">{{ (record.entSchemas || []).length }} schemas</a-tag>
+            <span v-else class="muted">-</span>
+          </template>
+        </a-table-column>
+        <a-table-column :title="t('projectManager.overview.hasGorm')" :width="90" align="center">
+          <template #default="{record}">
+            <a-tag v-if="record.hasGorm" color="purple">{{ (record.gormModels || []).length }} models</a-tag>
             <span v-else class="muted">-</span>
           </template>
         </a-table-column>

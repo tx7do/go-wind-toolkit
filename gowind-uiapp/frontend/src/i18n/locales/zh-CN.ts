@@ -317,6 +317,7 @@ export default {
       hasServer: 'Server',
       hasConfig: '配置',
       hasEnt: 'Ent',
+      hasGorm: 'GORM',
       entSchemas: 'Schema',
     },
   },

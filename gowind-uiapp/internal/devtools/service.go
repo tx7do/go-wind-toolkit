@@ -26,6 +26,8 @@ type ServiceInfo struct {
 	HasConfig  bool     `json:"hasConfig"`
 	HasEnt     bool     `json:"hasEnt"`
 	EntSchemas []string `json:"entSchemas,omitempty"`
+	HasGorm    bool     `json:"hasGorm"`
+	GormModels []string `json:"gormModels,omitempty"`
 }
 
 // CreateProjectOptions 创建项目选项
@@ -80,6 +82,17 @@ func GetServices(projectRoot string) ([]ServiceInfo, error) {
 			for _, e := range entries {
 				if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
 					info.EntSchemas = append(info.EntSchemas, strings.TrimSuffix(e.Name(), ".go"))
+				}
+			}
+		}
+
+		// 检查是否有 gorm model
+		gormDir := filepath.Join(servicePath, "internal", "data", "gorm", "models")
+		if entries, err := os.ReadDir(gormDir); err == nil {
+			info.HasGorm = true
+			for _, e := range entries {
+				if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
+					info.GormModels = append(info.GormModels, strings.TrimSuffix(e.Name(), ".go"))
 				}
 			}
 		}
