@@ -20,6 +20,7 @@ type DataField struct {
 	Name         string // 字段名
 	Type         string // 字段类型
 	Comment      string // 字段注释
+	Null         bool   // 是否允许为 NULL
 	IsPrimaryKey bool   // 是否为主键
 }
 
@@ -43,6 +44,16 @@ func (f DataField) EntPascalName() string {
 
 func (f DataField) EntSetNillableFunc() string {
 	return MakeEntSetNillableFunc(f.Name)
+}
+
+// EntCreateSetFunc 根据字段是否可为 NULL 选择合适的 setter：
+// NOT NULL → SetXxx(req.Data.GetXxx())
+// NULL     → SetNillableXxx(req.Data.Xxx)
+func (f DataField) EntCreateSetFunc() string {
+	if f.Null {
+		return MakeEntSetNillableFunc(f.Name)
+	}
+	return MakeEntSetFunc(f.Name)
 }
 
 // TableData 表数据

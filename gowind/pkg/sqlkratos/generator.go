@@ -302,10 +302,10 @@ func (g *Generator) generateDataPackageCode(
 			}
 
 			dataField := generators.DataField{
-				Name: field.Name,
-				Type: field.Type,
-				//Null:    field.Null,
+				Name:         field.Name,
+				Type:         field.Type,
 				Comment:      field.Comment,
+				Null:         field.Null,
 				IsPrimaryKey: field.IsPrimaryKey,
 			}
 			dataFields = append(dataFields, dataField)

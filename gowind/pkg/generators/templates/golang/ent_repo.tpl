@@ -140,7 +140,7 @@ func (r *{{.ClassName}}) Create(ctx context.Context, req *{{.ApiPackage}}.Create
 	builder := r.entClient.Client().{{pascal .Model}}.Create()
 {{- range .Fields}}
 {{- if not .IsPrimaryKey}}
-	builder.{{.EntSetNillableFunc}}
+	builder.{{.EntCreateSetFunc}}
 {{- end}}
 {{- end}}
 
