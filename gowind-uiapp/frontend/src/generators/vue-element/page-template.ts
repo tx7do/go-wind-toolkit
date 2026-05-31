@@ -26,7 +26,6 @@ function getFieldFormType(field: ParsedField): {
   }
   if (field.isEnum && field.enumValues) {
     if (field.enumValues.length <= 3) {
-      const options = field.enumValues.map(v => `            <ElRadioButton :value="'${v}'">{{ $t("enum.${field.name}.${v}") }}</ElRadioButton>`).join('\n')
       return {
         type: 'radio',
         component: 'ElRadioGroup',
@@ -40,18 +39,18 @@ function getFieldFormType(field: ParsedField): {
     }
   }
   if (field.isInteger && field.name.toLowerCase().includes('sort')) {
-    return { type: 'input-number', component: 'ElInputNumber', attrs: ' :min="1" style="width: 100%"' }
+    return { type: 'input-number', component: 'ElInputNumber', attrs: '          :min="1"\n          style="width: 100%"' }
   }
   if (field.isDate) {
-    return { type: 'date-picker', component: 'ElDatePicker', attrs: ' type="datetime" style="width: 100%"' }
+    return { type: 'date-picker', component: 'ElDatePicker', attrs: '          type="datetime"\n          style="width: 100%"' }
   }
   if (field.isArray) {
     return { type: 'input', component: 'ElInput', attrs: '' }
   }
   if (field.name.toLowerCase().includes('description') || field.name.toLowerCase().includes('remark')) {
-    return { type: 'textarea', component: 'ElInput', attrs: ' type="textarea" :rows="3"' }
+    return { type: 'textarea', component: 'ElInput', attrs: '          type="textarea"\n          :rows="3"' }
   }
-  return { type: 'input', component: 'ElInput', attrs: ' clearable' }
+  return { type: 'input', component: 'ElInput', attrs: '' }
 }
 
 /**
@@ -347,7 +346,6 @@ ${radioButtons}
           v-model="formData.${f.name}"
 ${formType.attrs}
           :placeholder="$t('common.placeholder.input')"
-          style="width: 100%"
         />
       </ElFormItem>`
     }
