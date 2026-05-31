@@ -2,6 +2,11 @@
 import {ref, reactive} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
+import {
+  PlusOutlined,
+  GlobalOutlined,
+  FolderOutlined,
+} from '@ant-design/icons-vue'
 import {SelectFolder, OpenProject, CreateProject} from '../../wailsjs/go/main/App'
 
 const {t} = useI18n()
@@ -79,8 +84,8 @@ async function handleCreateProject() {
       <span class="app-title">{{ t('app.title') }}</span>
     </div>
     <div class="header-right">
-      <a-button size="small" @click="openCreateModal">{{ t('devTools.create.btn') }}</a-button>
-      <span class="lang-switch" @click="emit('switchLocale')">{{ t('header.switchLang') }}</span>
+      <a-button size="small" type="primary" ghost @click="openCreateModal"><PlusOutlined style="margin-right: 4px"/> {{ t('devTools.create.btn') }}</a-button>
+      <span class="lang-switch" @click="emit('switchLocale')"><GlobalOutlined style="margin-right: 4px"/> {{ t('header.switchLang') }}</span>
     </div>
   </div>
 

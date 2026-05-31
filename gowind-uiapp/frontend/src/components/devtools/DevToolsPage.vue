@@ -3,6 +3,16 @@ import {ref, reactive, computed, onMounted, onUnmounted} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
+  FolderOpenOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  PlayCircleOutlined,
+  ThunderboltOutlined,
+  ToolOutlined,
+  ApiOutlined,
+  ClearOutlined,
+} from '@ant-design/icons-vue'
+import {
   SelectFolder, OpenProject, GetProjectInfo, GetDevServices,
   AddService,
   DevRunService,
@@ -218,24 +228,24 @@ onUnmounted(() => {})
     <!-- 顶部：项目操作 + 管理按钮 -->
     <div class="top-bar">
       <a-button type="primary" @click="handleOpenProject">
-        {{ projectInfo ? t('backend.project.switchProject') : t('backend.project.clickToOpen') }}
+        <FolderOpenOutlined style="margin-right: 4px"/> {{ projectInfo ? t('backend.project.switchProject') : t('backend.project.clickToOpen') }}
       </a-button>
       <span v-if="projectInfo" class="project-path">{{ projectInfo.ModPath }}</span>
       <span v-else class="project-path project-path--empty">{{ t('devTools.service.noServices') }}</span>
 
       <div class="spacer"/>
 
-      <a-button size="small" :disabled="!projectInfo" @click="openAddModal">{{ t('devTools.addService.btn') }}</a-button>
-      <a-button size="small" @click="loadServices" :disabled="!projectInfo">{{ t('common.refresh') }}</a-button>
+      <a-button size="small" type="primary" ghost :disabled="!projectInfo" @click="openAddModal"><PlusOutlined style="margin-right: 4px"/> {{ t('devTools.addService.btn') }}</a-button>
+      <a-button size="small" @click="loadServices" :disabled="!projectInfo"><ReloadOutlined style="margin-right: 4px"/> {{ t('common.refresh') }}</a-button>
     </div>
 
     <!-- 群控 + 批量按钮栏 -->
     <div class="global-actions" v-if="projectInfo">
       <span class="action-group-label">{{ t('devTools.commands.globalActions') }}</span>
-      <a-button :loading="loading" @click="handleBufGenerate">{{ t('devTools.commands.bufGenerate') }}</a-button>
-      <a-button :loading="loading" @click="handleEntGenerateAll">{{ t('devTools.commands.entGenerateAll') }}</a-button>
-      <a-button :loading="loading" @click="handleWireGenerateAll">{{ t('devTools.commands.wireGenerateAll') }}</a-button>
-      <a-button :loading="loading" @click="handleGoModTidy">{{ t('devTools.commands.goModTidy') }}</a-button>
+      <a-button size="small" type="primary" ghost :loading="loading" @click="handleBufGenerate"><ThunderboltOutlined style="margin-right: 4px"/> {{ t('devTools.commands.bufGenerate') }}</a-button>
+      <a-button size="small" ghost :loading="loading" @click="handleEntGenerateAll">{{ t('devTools.commands.entGenerateAll') }}</a-button>
+      <a-button size="small" ghost :loading="loading" @click="handleWireGenerateAll">{{ t('devTools.commands.wireGenerateAll') }}</a-button>
+      <a-button size="small" type="dashed" :loading="loading" @click="handleGoModTidy"><ToolOutlined style="margin-right: 4px"/> {{ t('devTools.commands.goModTidy') }}</a-button>
 
       <a-divider type="vertical" style="height: 24px; margin: 0 8px"/>
 
@@ -243,9 +253,9 @@ onUnmounted(() => {})
         {{ t('devTools.commands.batchActions') }}
         <a-tag v-if="hasSelection" color="blue" style="margin-left: 4px">{{ selectedRowKeys.length }}</a-tag>
       </span>
-      <a-button :loading="loading" :disabled="!hasSelection" @click="handleBatchRun">{{ t('devTools.commands.runService') }}</a-button>
-      <a-button :loading="loading" :disabled="!hasSelection" @click="handleBatchEnt">{{ t('devTools.commands.entGenerate') }}</a-button>
-      <a-button :loading="loading" :disabled="!hasSelection" @click="handleBatchWire">{{ t('devTools.commands.wireGenerate') }}</a-button>
+      <a-button size="small" type="primary" ghost :loading="loading" :disabled="!hasSelection" @click="handleBatchRun">{{ t('devTools.commands.runService') }}</a-button>
+      <a-button size="small" ghost :loading="loading" :disabled="!hasSelection" @click="handleBatchEnt">{{ t('devTools.commands.entGenerate') }}</a-button>
+      <a-button size="small" ghost :loading="loading" :disabled="!hasSelection" @click="handleBatchWire">{{ t('devTools.commands.wireGenerate') }}</a-button>
     </div>
 
     <!-- 服务表格 -->
@@ -287,9 +297,9 @@ onUnmounted(() => {})
         <a-table-column :title="t('devTools.commands.title')" :width="260">
           <template #default="{record}">
             <div class="row-actions">
-              <a-button size="small" type="primary" :loading="loading" :disabled="!record.hasServer" @click="handleRunService(record.name)">{{ t('devTools.commands.runService') }}</a-button>
-              <a-button size="small" :loading="loading" :disabled="!record.hasEnt" @click="handleEntGenerate(record.name)">{{ t('devTools.commands.entGenerate') }}</a-button>
-              <a-button size="small" :loading="loading" :disabled="!record.hasServer" @click="handleWireGenerate(record.name)">{{ t('devTools.commands.wireGenerate') }}</a-button>
+              <a-button size="small" type="primary" :loading="loading" :disabled="!record.hasServer" @click="handleRunService(record.name)"><PlayCircleOutlined style="margin-right: 4px"/> {{ t('devTools.commands.runService') }}</a-button>
+              <a-button size="small" type="dashed" :loading="loading" :disabled="!record.hasEnt" @click="handleEntGenerate(record.name)">{{ t('devTools.commands.entGenerate') }}</a-button>
+              <a-button size="small" type="dashed" :loading="loading" :disabled="!record.hasServer" @click="handleWireGenerate(record.name)">{{ t('devTools.commands.wireGenerate') }}</a-button>
             </div>
           </template>
         </a-table-column>
@@ -305,7 +315,7 @@ onUnmounted(() => {})
     <div class="output-panel" v-if="projectInfo">
       <div class="output-header">
         <span class="panel-title">{{ t('devTools.output.title') }}</span>
-        <a-button size="small" type="link" @click="clearOutput" :disabled="!outputText">{{ t('devTools.output.clear') }}</a-button>
+        <a-button size="small" type="link" @click="clearOutput" :disabled="!outputText"><ClearOutlined style="margin-right: 4px"/> {{ t('devTools.output.clear') }}</a-button>
       </div>
       <div class="output-content" v-if="outputText"><pre>{{ outputText }}</pre></div>
       <div class="output-content output-empty" v-else>{{ t('devTools.output.empty') }}</div>
@@ -360,6 +370,7 @@ onUnmounted(() => {})
   padding: 8px 0;
   flex-shrink: 0;
   flex-wrap: wrap;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .action-group-label {

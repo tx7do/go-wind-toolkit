@@ -3,6 +3,18 @@ import {ref, reactive, computed} from 'vue'
 import {message, Modal} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
+  FolderOpenOutlined,
+  SaveOutlined,
+  ApiOutlined,
+  RobotOutlined,
+  TableOutlined,
+  ThunderboltOutlined,
+  SearchOutlined,
+  EyeOutlined,
+  RightOutlined,
+  LeftOutlined,
+} from '@ant-design/icons-vue'
+import {
   GetAIConfig,
   SetAIConfig,
   GetAIProviderPresets,
@@ -322,7 +334,7 @@ loadAIConfig()
     <!-- 项目选择 -->
     <div class="project-bar">
       <a-button type="primary" :loading="projectLoading" @click="handleOpenProject">
-        {{ projectInfo ? t('ai.project.switchProject') : t('ai.project.selectProject') }}
+        <FolderOpenOutlined style="margin-right: 4px"/> {{ projectInfo ? t('ai.project.switchProject') : t('ai.project.selectProject') }}
       </a-button>
       <span v-if="projectInfo" class="project-info">
         {{ projectInfo.ModPath }} ({{ projectInfo.Services?.length || 0 }} {{ t('ai.project.services') }})
@@ -377,9 +389,9 @@ loadAIConfig()
               </a-col>
             </a-row>
             <div class="config-actions">
-              <a-button @click="handleSaveConfig">{{ t('ai.config.save') }}</a-button>
+              <a-button type="primary" ghost @click="handleSaveConfig"><SaveOutlined style="margin-right: 4px"/> {{ t('ai.config.save') }}</a-button>
               <a-button type="primary" :loading="testingConnection" @click="handleTestConnection">
-                {{ t('ai.config.testConnection') }}
+                <ApiOutlined style="margin-right: 4px"/> {{ t('ai.config.testConnection') }}
               </a-button>
             </div>
           </a-form>
@@ -409,7 +421,7 @@ loadAIConfig()
             <div class="card-title-row">
               <span>{{ t('ai.ddl.title') }}</span>
               <a-button type="primary" :loading="ddlGenerating" @click="handleGenerateDDL">
-                {{ t('ai.ddl.generateBtn') }}
+                <RobotOutlined style="margin-right: 4px"/> {{ t('ai.ddl.generateBtn') }}
               </a-button>
             </div>
           </template>
@@ -424,7 +436,7 @@ loadAIConfig()
             <div class="card-title-row">
               <span>{{ t('ai.partition.title') }}</span>
               <a-button type="primary" :loading="partitionLoading" @click="handlePartition">
-                {{ t('ai.partition.generateBtn') }}
+                <TableOutlined style="margin-right: 4px"/> {{ t('ai.partition.generateBtn') }}
               </a-button>
             </div>
           </template>
@@ -484,7 +496,7 @@ loadAIConfig()
         <a-card :title="t('ai.openapi.title')" size="small">
           <p class="step-desc">{{ t('ai.openapi.desc') }}</p>
           <a-button type="primary" :loading="openapiLoading" :disabled="!projectInfo" @click="handleFindOpenAPI">
-            {{ t('ai.openapi.searchBtn') }}
+            <SearchOutlined style="margin-right: 4px"/> {{ t('ai.openapi.searchBtn') }}
           </a-button>
 
           <div v-if="openapiFiles.length > 0" class="openapi-results">
@@ -510,7 +522,7 @@ loadAIConfig()
               :disabled="!projectInfo"
               @click="handleReview"
           >
-            {{ t('ai.review.startBtn') }}
+            <EyeOutlined style="margin-right: 4px"/> {{ t('ai.review.startBtn') }}
           </a-button>
 
           <div v-if="reviewResult" class="review-result">
@@ -524,11 +536,11 @@ loadAIConfig()
     <!-- 底部导航 -->
     <div class="step-footer">
       <a-button v-if="currentStep > 0" @click="prevStep">
-        {{ t('common.prevStep') }}
+        <LeftOutlined style="margin-right: 4px"/> {{ t('common.prevStep') }}
       </a-button>
       <div style="flex: 1"></div>
       <a-button v-if="currentStep < steps.length - 1" type="primary" :disabled="!canNext()" @click="nextStep">
-        {{ t('common.nextStep') }}
+        {{ t('common.nextStep') }} <RightOutlined style="margin-left: 4px"/>
       </a-button>
     </div>
   </div>
@@ -673,8 +685,10 @@ loadAIConfig()
 .step-footer {
   display: flex;
   align-items: center;
-  padding-top: 8px;
+  gap: 8px;
+  padding-top: 12px;
   border-top: 1px solid #f0f0f0;
   flex-shrink: 0;
+  justify-content: space-between;
 }
 </style>

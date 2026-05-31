@@ -3,6 +3,12 @@ import {ref, reactive, onMounted} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
+  FolderOpenOutlined,
+  FolderOutlined,
+  PlusOutlined,
+  AppstoreAddOutlined,
+} from '@ant-design/icons-vue'
+import {
   SelectFolder, OpenProject, GetProjectInfo,
   GetDevServices, CreateProject, AddService,
 } from '../../../wailsjs/go/main/App'
@@ -164,7 +170,7 @@ onMounted(async () => {
     <!-- 顶部项目操作栏 -->
     <div class="top-bar">
       <a-button type="primary" @click="handleOpenProject">
-        {{ projectInfo ? t('backend.project.switchProject') : t('backend.project.clickToOpen') }}
+        <FolderOpenOutlined style="margin-right: 4px"/> {{ projectInfo ? t('backend.project.switchProject') : t('backend.project.clickToOpen') }}
       </a-button>
       <span v-if="projectInfo" class="project-path">
         {{ projectInfo.ModPath }}
@@ -228,7 +234,7 @@ onMounted(async () => {
             <a-form-item :label="t('projectManager.create.parentDir')" required>
               <a-input-group compact>
                 <a-input v-model:value="createForm.parentDir" :placeholder="t('projectManager.create.parentDirPlaceholder')" style="width: calc(100% - 100px)" read-only/>
-                <a-button type="primary" @click="handleSelectParentDir">{{ t('projectManager.create.selectDir') }}</a-button>
+                <a-button type="primary" @click="handleSelectParentDir"><FolderOutlined style="margin-right: 4px"/> {{ t('projectManager.create.selectDir') }}</a-button>
               </a-input-group>
             </a-form-item>
             <a-row :gutter="16">
@@ -256,7 +262,7 @@ onMounted(async () => {
               </a-col>
             </a-row>
             <a-button type="primary" :loading="creating" @click="handleCreateProject" block>
-              {{ t('projectManager.create.title') }}
+              <PlusOutlined style="margin-right: 4px"/> {{ t('projectManager.create.title') }}
             </a-button>
           </a-form>
         </a-card>
@@ -280,7 +286,7 @@ onMounted(async () => {
               </a-checkbox-group>
             </a-form-item>
             <a-button type="primary" :loading="adding" :disabled="!projectInfo" @click="handleAddService" block>
-              {{ t('projectManager.addService.addBtn') }}
+              <AppstoreAddOutlined style="margin-right: 4px"/> {{ t('projectManager.addService.addBtn') }}
             </a-button>
             <p v-if="!projectInfo" style="color: #faad14; text-align: center; margin-top: 8px; font-size: 12px">
               {{ t('projectManager.overview.noProject') }}

@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import {ref, watch, nextTick, computed} from "vue";
 import {message} from "ant-design-vue";
+import {
+  DeleteOutlined,
+  FormatPainterOutlined,
+  CheckOutlined,
+  FileTextOutlined,
+  BarChartOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+} from '@ant-design/icons-vue';
 
 import {ImportSqlTables, SetDBConfig} from "../../../wailsjs/go/main/App";
 
@@ -211,7 +220,7 @@ function jumpToLine(lineNumber: number) {
             title="清空内容"
         >
           <template #icon>
-            <span class="icon-btn">⌫</span>
+            <DeleteOutlined/>
           </template>
           清空
         </a-button>
@@ -222,7 +231,7 @@ function jumpToLine(lineNumber: number) {
             title="格式化 SQL"
         >
           <template #icon>
-            <span class="icon-btn">✎</span>
+            <FormatPainterOutlined/>
           </template>
           格式化
         </a-button>
@@ -235,7 +244,7 @@ function jumpToLine(lineNumber: number) {
             title="验证 SQL 语法"
         >
           <template #icon>
-            <span class="icon-btn">✓</span>
+            <CheckOutlined/>
           </template>
           验证语法
         </a-button>
@@ -243,8 +252,8 @@ function jumpToLine(lineNumber: number) {
         <a-tag color="blue">SQL</a-tag>
       </div>
       <div class="toolbar-right">
-        <span class="stat-item">📝 行数: {{ lineCount }}</span>
-        <span class="stat-item">📊 字符: {{ charCount }}</span>
+        <span class="stat-item"><FileTextOutlined style="margin-right: 4px"/> 行数: {{ lineCount }}</span>
+        <span class="stat-item"><BarChartOutlined style="margin-right: 4px"/> 字符: {{ charCount }}</span>
       </div>
     </div>
 
@@ -264,7 +273,8 @@ function jumpToLine(lineNumber: number) {
          :class="{ 'success': validateResult.success, 'error': !validateResult.success }">
       <div class="validate-header">
         <span class="validate-icon" :class="{ 'success': validateResult.success, 'error': !validateResult.success }">
-          {{ validateResult.success ? '✓' : '✗' }}
+          <CheckCircleOutlined v-if="validateResult.success"/>
+          <CloseCircleOutlined v-else/>
         </span>
         <span class="validate-message">{{ validateResult.message }}</span>
       </div>

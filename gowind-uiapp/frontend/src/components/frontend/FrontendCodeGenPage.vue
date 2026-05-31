@@ -2,6 +2,19 @@
 import {ref, computed} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
+import {
+  InboxOutlined,
+  CloudDownloadOutlined,
+  FileTextOutlined,
+  SettingOutlined,
+  FolderOpenOutlined,
+  EyeOutlined,
+  CheckSquareOutlined,
+  FilterOutlined,
+  SendOutlined,
+  UndoOutlined,
+  RightOutlined,
+} from '@ant-design/icons-vue'
 
 import {GenerateFrontendCode} from "../../../wailsjs/go/main/App";
 import {SelectFolder} from "../../../wailsjs/go/main/App";
@@ -320,6 +333,15 @@ function handleSelectCrud() {
     .map(s => s.tagName)
 }
 
+function toggleServiceSelection(tagName: string) {
+  const idx = selectedServiceKeys.value.indexOf(tagName)
+  if (idx >= 0) {
+    selectedServiceKeys.value.splice(idx, 1)
+  } else {
+    selectedServiceKeys.value.push(tagName)
+  }
+}
+
 // ==================== 确认生成 ====================
 async function handleCommit() {
   try {
@@ -500,7 +522,7 @@ const previewLanguage = computed(() => {
             @drop="handleFileDrop"
           >
             <div class="drop-zone-content">
-              <div style="font-size: 32px; color: #1890ff; margin-bottom: 8px">&#128196;</div>
+              <div style="font-size: 32px; color: #1890ff; margin-bottom: 8px"><InboxOutlined/></div>
               <div style="font-weight: 500; margin-bottom: 4px">
                 {{ selectedFileName || t('frontend.import.fileDropHint') }}
               </div>
@@ -533,9 +555,9 @@ const previewLanguage = computed(() => {
         </div>
       </a-card>
 
-      <div style="text-align: right; margin-top: 16px">
+      <div class="step-footer" style="justify-content: flex-end">
         <a-button type="primary" @click="handleParse" :disabled="!yamlContent.trim()">
-          {{ t('frontend.import.parseBtn') }}
+          <RightOutlined style="margin-right: 4px"/> {{ t('frontend.import.parseBtn') }}
         </a-button>
       </div>
     </div>
@@ -560,7 +582,7 @@ const previewLanguage = computed(() => {
                 style="width: calc(100% - 90px)"
                 read-only
               />
-              <a-button type="primary" @click="handleSelectOutputDir">{{ t('frontend.config.selectDir') }}</a-button>
+              <a-button size="small" type="primary" @click="handleSelectOutputDir"><FolderOpenOutlined style="margin-right: 4px"/> {{ t('frontend.config.selectDir') }}</a-button>
             </a-input-group>
           </a-form-item>
           <a-form-item v-if="targetFramework === 'vue-element' || targetFramework === 'react' || targetFramework === 'vue-vben'" :label="t('frontend.config.generateTypes')">
@@ -598,31 +620,54 @@ const previewLanguage = computed(() => {
           </div>
         </template>
 
-        <a-checkbox-group v-model:value="selectedServiceKeys" style="width: 100%">
-          <div v-for="service in parsedServices" :key="service.tagName"
-               style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center;">
-            <a-checkbox :value="service.tagName" style="margin-right: 12px"/>
-            <div style="flex: 1">
-              <div style="font-weight: 500; margin-bottom: 4px;">
-                {{ service.modelName }}
-                <span style="color: #999; font-weight: normal; margin-left: 8px; font-size: 12px;">{{ service.description }}</span>
-              </div>
-              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                <a-tag v-for="op in service.operations" :key="op.operationId"
-                       :color="getOperationTag(op.type).color" size="small">
-                  {{ getOperationTag(op.type).text }}
-                </a-tag>
-                <span style="color: #999; font-size: 12px; margin-left: 8px;">{{ t('frontend.service.fields', {count: service.fields.length}) }}</span>
-              </div>
-            </div>
-          </div>
-        </a-checkbox-group>
+        <a-list
+          :data-source="parsedServices"
+          size="small"
+          :split="true"
+          class="service-select-list"
+        >
+          <template #renderItem="{ item: service }">
+            <a-list-item
+              class="service-list-item"
+              :class="{ selected: selectedServiceKeys.includes(service.tagName) }"
+              @click="toggleServiceSelection(service.tagName)"
+            >
+              <a-list-item-meta>
+                <template #title>
+                  <div class="service-item-title">
+                    <span class="service-model-name">{{ service.modelName }}</span>
+                    <a-tag v-if="selectedServiceKeys.includes(service.tagName)" color="blue" size="small" style="margin-left: 6px">{{ t('frontend.service.selected') || 'Selected' }}</a-tag>
+                  </div>
+                </template>
+                <template #description>
+                  <div class="service-item-desc">
+                    <span class="service-desc-text">{{ service.description }}</span>
+                    <div class="service-meta-row">
+                      <a-tag v-for="op in service.operations" :key="op.operationId"
+                             :color="getOperationTag(op.type).color" size="small">
+                        {{ getOperationTag(op.type).text }}
+                      </a-tag>
+                      <span class="service-field-count">{{ t('frontend.service.fields', {count: service.fields.length}) }}</span>
+                    </div>
+                  </div>
+                </template>
+                <template #avatar>
+                  <a-checkbox
+                    :checked="selectedServiceKeys.includes(service.tagName)"
+                    @click.stop
+                    @change="toggleServiceSelection(service.tagName)"
+                  />
+                </template>
+              </a-list-item-meta>
+            </a-list-item>
+          </template>
+        </a-list>
       </a-card>
 
-      <div style="display: flex; justify-content: space-between; margin-top: 16px">
+      <div class="step-footer">
         <a-button @click="currentStep = 0">{{ t('common.prevStep') }}</a-button>
         <a-button type="primary" @click="handlePreview" :disabled="selectedServiceKeys.length === 0">
-          {{ t('frontend.preview.previewBtn') }}
+          <EyeOutlined style="margin-right: 4px"/> {{ t('frontend.preview.previewBtn') }}
         </a-button>
       </div>
     </div>
@@ -665,12 +710,12 @@ const previewLanguage = computed(() => {
         </div>
       </div>
 
-      <div style="display: flex; justify-content: space-between; margin-top: 16px">
+      <div class="step-footer">
         <a-button @click="currentStep = 1">{{ t('common.prevStep') }}</a-button>
         <a-space>
-          <a-button @click="currentStep = 0; resetState()">{{ t('frontend.preview.resetBtn') }}</a-button>
+          <a-button @click="currentStep = 0; resetState()"><UndoOutlined style="margin-right: 4px"/> {{ t('frontend.preview.resetBtn') }}</a-button>
           <a-button type="primary" :loading="confirmLoading" @click="handleCommit">
-            {{ t('frontend.preview.confirmBtn') }}
+            <SendOutlined style="margin-right: 4px"/> {{ t('frontend.preview.confirmBtn') }}
           </a-button>
         </a-space>
       </div>

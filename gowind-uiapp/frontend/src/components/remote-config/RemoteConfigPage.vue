@@ -3,6 +3,12 @@ import {ref, reactive} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
+  FolderOpenOutlined,
+  ReloadOutlined,
+  CloudUploadOutlined,
+  SendOutlined,
+} from '@ant-design/icons-vue'
+import {
   OpenProject,
   SelectFolder,
   GetProjectInfo,
@@ -172,7 +178,7 @@ loadConfigTypes()
     <!-- 项目选择 -->
     <div class="project-bar">
       <a-button type="primary" :loading="projectLoading" @click="handleOpenProject">
-        {{ projectInfo ? t('remoteConfig.project.switchProject') : t('remoteConfig.project.selectProject') }}
+        <FolderOpenOutlined style="margin-right: 4px"/> {{ projectInfo ? t('remoteConfig.project.switchProject') : t('remoteConfig.project.selectProject') }}
       </a-button>
       <span v-if="projectInfo" class="project-info">
         {{ projectInfo.ModPath }}
@@ -239,7 +245,7 @@ loadConfigTypes()
               <span>{{ t('remoteConfig.service.title') }}</span>
               <div class="card-title-actions">
                 <a-button size="small" :loading="servicesLoading" @click="loadServices" :disabled="!projectInfo">
-                  {{ t('common.refresh') }}
+                  <ReloadOutlined style="margin-right: 4px"/> {{ t('common.refresh') }}
                 </a-button>
                 <a-button
                     type="primary"
@@ -248,7 +254,7 @@ loadConfigTypes()
                     :disabled="services.length === 0"
                     @click="handleExportAll"
                 >
-                  {{ t('remoteConfig.export.exportAll') }}
+                  <CloudUploadOutlined style="margin-right: 4px"/> {{ t('remoteConfig.export.exportAll') }}
                 </a-button>
               </div>
             </div>
@@ -268,7 +274,7 @@ loadConfigTypes()
                       :loading="exportingService === svc.name"
                       @click="handleExportOne(svc.name)"
                   >
-                    {{ t('remoteConfig.export.exportOne') }}
+                    <SendOutlined style="margin-right: 4px"/> {{ t('remoteConfig.export.exportOne') }}
                   </a-button>
                 </div>
                 <div class="service-files">
