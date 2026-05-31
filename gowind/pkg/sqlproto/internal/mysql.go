@@ -9,15 +9,20 @@ import (
 
 // MySQL到Protobuf的类型映射
 var mysqlTypeMapping = map[string]string{
-	// 整数类型
-	"TINYINT":          "int32",
-	"SMALLINT":         "int32",
-	"MEDIUMINT":        "int32",
-	"INT":              "int32",
-	"INTEGER":          "int32",
-	"BIGINT":           "int64",
-	"UNSIGNED BIG INT": "uint64",
-	"INT UNSIGNED":     "uint32",
+	// 整数类型（有符号）
+	"TINYINT":   "int32",
+	"SMALLINT":  "int32",
+	"MEDIUMINT": "int32",
+	"INT":       "int32",
+	"INTEGER":   "int32",
+	"BIGINT":    "int64",
+
+	// 整数类型（无符号）
+	"TINYINT UNSIGNED":   "uint32",
+	"SMALLINT UNSIGNED":  "uint32",
+	"MEDIUMINT UNSIGNED": "uint32",
+	"INT UNSIGNED":       "uint32",
+	"BIGINT UNSIGNED":    "uint64",
 
 	// 浮点类型
 	"FLOAT":   "float",
@@ -43,13 +48,30 @@ var mysqlTypeMapping = map[string]string{
 	// 日期和时间类型
 	"DATE":      "string",
 	"TIME":      "string",
-	"DATETIME":  "string",
-	"TIMESTAMP": "string",
+	"DATETIME":  "google.protobuf.Timestamp",
+	"TIMESTAMP": "google.protobuf.Timestamp",
 	"YEAR":      "int32",
 
 	// 布尔类型
 	"BOOLEAN": "bool",
 	"BOOL":    "bool",
+
+	// JSON类型
+	"JSON":  "string",
+	"JSONB": "string", // MySQL 5.7.8+
+
+	// 位类型
+	"BIT": "int64",
+
+	// 空间类型
+	"GEOMETRY":           "bytes",
+	"POINT":              "bytes",
+	"LINESTRING":         "bytes",
+	"POLYGON":            "bytes",
+	"MULTIPOINT":         "bytes",
+	"MULTILINESTRING":    "bytes",
+	"MULTIPOLYGON":       "bytes",
+	"GEOMETRYCOLLECTION": "bytes",
 
 	// 其他类型
 	"ENUM": "string", // 通常映射为字符串

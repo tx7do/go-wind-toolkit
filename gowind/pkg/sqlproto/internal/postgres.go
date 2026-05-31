@@ -12,24 +12,28 @@ import (
 // PostgreSQL到Protobuf的类型映射
 var postgresqlTypeMapping = map[string]string{
 	// 整数类型
-	"SMALLINT":  "int32",
-	"INT2":      "int32",
-	"INTEGER":   "int32",
-	"INT":       "int32",
-	"INT4":      "int32",
-	"BIGINT":    "int64",
-	"INT8":      "int64",
-	"SERIAL":    "int32",
-	"SERIAL4":   "int32",
-	"BIGSERIAL": "int64",
-	"SERIAL8":   "int64",
+	"SMALLINT":    "int32",
+	"INT2":        "int32",
+	"SMALLSERIAL": "int32", // 2字节自增
+	"SERIAL2":     "int32",
+	"INTEGER":     "int32",
+	"INT":         "int32",
+	"INT4":        "int32",
+	"SERIAL":      "int32",
+	"SERIAL4":     "int32",
+	"BIGINT":      "int64",
+	"INT8":        "int64",
+	"BIGSERIAL":   "int64",
+	"SERIAL8":     "int64",
 
 	// 浮点类型
 	"REAL":             "float",
 	"FLOAT4":           "float",
+	"FLOAT":            "float",
 	"DOUBLE PRECISION": "double",
 	"FLOAT8":           "double",
 	"NUMERIC":          "string", // Protobuf没有直接对应类型，通常用string表示
+	"DECIMAL":          "string",
 
 	// 字符串类型
 	"CHAR":              "string",
@@ -45,8 +49,9 @@ var postgresqlTypeMapping = map[string]string{
 	// 日期和时间类型
 	"DATE":        "string",
 	"TIME":        "string",
-	"TIMESTAMP":   "string",
-	"TIMESTAMPTZ": "string",
+	"TIMETZ":      "string",
+	"TIMESTAMP":   "google.protobuf.Timestamp",
+	"TIMESTAMPTZ": "google.protobuf.Timestamp",
 	"INTERVAL":    "string",
 
 	// 布尔类型
@@ -64,6 +69,33 @@ var postgresqlTypeMapping = map[string]string{
 
 	// UUID类型
 	"UUID": "string",
+
+	// 位串类型
+	"BIT":         "bytes",
+	"BIT VARYING": "bytes",
+	"VARBIT":      "bytes",
+
+	// XML类型
+	"XML": "string",
+
+	// 货币类型
+	"MONEY": "string",
+
+	// 几何类型
+	"POINT":   "string",
+	"LINE":    "string",
+	"LSEG":    "string",
+	"BOX":     "string",
+	"PATH":    "string",
+	"POLYGON": "string",
+	"CIRCLE":  "string",
+
+	// 全文搜索类型
+	"TSVECTOR": "string",
+	"TSQUERY":  "string",
+
+	// 数组类型（PostgreSQL特有，通常映射为JSON字符串）
+	"ARRAY": "string",
 }
 
 // Postgres implements SchemaConverter for PostgreSQL databases.
@@ -111,7 +143,7 @@ func PostgresFieldType(sqlType string) (f string) {
 	baseType = strings.TrimSpace(strings.ToUpper(baseType))
 
 	// 查找映射
-	if protoType, exists := mysqlTypeMapping[baseType]; exists {
+	if protoType, exists := postgresqlTypeMapping[baseType]; exists {
 		return protoType
 	}
 
