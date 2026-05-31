@@ -193,12 +193,18 @@ func (g *Generator) WriteServerPackageCode(
 ) error {
 	switch strings.ToLower(serviceType) {
 	case "grpc":
+		// 从 Services 中提取去重的模块名，用于生成 import 语句
+		packagesMap := make(map[string]string)
+		for _, moduleName := range services {
+			packagesMap[moduleName] = moduleName
+		}
 		o := code_generator.Options{
 			OutDir: outputPath,
 			Module: projectName,
 			Vars: map[string]any{
 				"Service":  serviceName,
 				"Services": services,
+				"Packages": packagesMap,
 			},
 		}
 		if _, err := g.goGenerator.GenerateGrpcServer(context.Background(), o); err != nil {
