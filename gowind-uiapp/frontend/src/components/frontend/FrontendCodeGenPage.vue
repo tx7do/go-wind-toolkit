@@ -846,4 +846,61 @@ const previewLanguage = computed(() => {
   right: 0;
   bottom: 0;
 }
+
+/* 服务选择列表 */
+.service-select-list {
+  max-height: calc(100vh - 420px);
+  overflow-y: auto;
+}
+
+.service-list-item {
+  cursor: pointer;
+  padding: 10px 16px !important;
+  transition: background 0.15s, border-color 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.service-list-item:hover {
+  background: #f5f7fa;
+}
+
+.service-list-item.selected {
+  background: #f0f7ff;
+  border-left-color: #1890ff;
+}
+
+.service-item-title {
+  display: flex;
+  align-items: center;
+}
+
+.service-model-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #262626;
+}
+
+.service-item-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.service-desc-text {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.service-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.service-field-count {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-left: 4px;
+}
 </style>
