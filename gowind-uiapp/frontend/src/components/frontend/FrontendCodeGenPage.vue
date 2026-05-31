@@ -19,6 +19,12 @@ import {
   type ReactGenerateFileType,
   type ReactRouterModuleConfig,
 } from "../../generators/react-antd";
+import {
+  generateAll as generateVbenAll,
+  type VbenGeneratedFile,
+  type VbenGenerateFileType,
+  type VbenRouterModuleConfig,
+} from "../../generators/vue-vben";
 import MonacoEditor from "../backend/MonacoEditor.vue";
 
 const {t} = useI18n()
@@ -63,10 +69,10 @@ const generateOptions = ref({
   outputDir: '',
   generateTypes: ['service', 'composable', 'page', 'drawer', 'router', 'locale'] as string[],
 })
-const routerModules = ref<(VueRouterModuleConfig | ReactRouterModuleConfig)[]>([])
+const routerModules = ref<(VueRouterModuleConfig | ReactRouterModuleConfig | VbenRouterModuleConfig)[]>([])
 
 // ==================== 生成结果 ====================
-const generatedFiles = ref<(VueGeneratedFile | ReactGeneratedFile)[]>([])
+const generatedFiles = ref<(VueGeneratedFile | ReactGeneratedFile | VbenGeneratedFile)[]>([])
 const selectedFileIndex = ref(0)
 
 const currentFileContent = ref('')
@@ -74,6 +80,7 @@ const currentFileContent = ref('')
 // ==================== 文件列表过滤 ====================
 const activeFileType = ref<string>('all')
 const fileTypeOptions = computed(() => {
+  const isVben = targetFramework.value === 'vue-vben'
   const isReact = targetFramework.value === 'react'
   return [
     {label: t('frontend.fileType.all'), value: 'all'},
@@ -86,7 +93,7 @@ const fileTypeOptions = computed(() => {
   ]
 })
 
-const filteredFiles = ref<(VueGeneratedFile | ReactGeneratedFile)[]>([])
+const filteredFiles = ref<(VueGeneratedFile | ReactGeneratedFile | VbenGeneratedFile)[]>([])
 
 function filterFiles() {
   if (activeFileType.value === 'all') {
@@ -264,6 +271,13 @@ function handlePreview() {
       serviceName: '',
       generateTypes: reactTypes,
       routerModules: reactTypes.includes('router') ? routerModules.value as ReactRouterModuleConfig[] : undefined,
+    })
+  } else if (targetFramework.value === 'vue-vben') {
+    generatedFiles.value = generateVbenAll({
+      services: selectedServices,
+      serviceName: '',
+      generateTypes: generateOptions.value.generateTypes as VbenGenerateFileType[],
+      routerModules: generateOptions.value.generateTypes.includes('router') ? routerModules.value as VbenRouterModuleConfig[] : undefined,
     })
   } else {
     // 其他框架暂未实现，生成占位提示
@@ -549,10 +563,10 @@ const previewLanguage = computed(() => {
               <a-button type="primary" @click="handleSelectOutputDir">{{ t('frontend.config.selectDir') }}</a-button>
             </a-input-group>
           </a-form-item>
-          <a-form-item v-if="targetFramework === 'vue-element' || targetFramework === 'react'" :label="t('frontend.config.generateTypes')">
+          <a-form-item v-if="targetFramework === 'vue-element' || targetFramework === 'react' || targetFramework === 'vue-vben'" :label="t('frontend.config.generateTypes')">
             <a-checkbox-group v-model:value="generateOptions.generateTypes">
               <a-checkbox value="service">{{ t('frontend.config.serviceLayer') }}</a-checkbox>
-              <a-checkbox v-if="targetFramework === 'vue-element'" value="composable">{{ t('frontend.config.composableLayer') }}</a-checkbox>
+              <a-checkbox v-if="targetFramework === 'vue-element' || targetFramework === 'vue-vben'" value="composable">{{ t('frontend.config.composableLayer') }}</a-checkbox>
               <a-checkbox v-if="targetFramework === 'react'" value="composable">React Query Hooks</a-checkbox>
               <a-checkbox value="page">{{ t('frontend.config.listPage') }}</a-checkbox>
               <a-checkbox value="drawer">{{ t('frontend.config.editDrawer') }}</a-checkbox>
@@ -562,7 +576,7 @@ const previewLanguage = computed(() => {
           </a-form-item>
         </a-form>
         <a-alert
-          v-if="targetFramework !== 'vue-element' && targetFramework !== 'react'"
+          v-if="targetFramework !== 'vue-element' && targetFramework !== 'react' && targetFramework !== 'vue-vben'"
           :message="t('frontend.config.notImplemented', {framework: getFrameworkLabel(targetFramework)})"
           type="warning"
           show-icon
