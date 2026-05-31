@@ -28,9 +28,11 @@ func (g *Generator) WriteDataPackageCode(
 		}
 
 		copyDataField := generators.DataField{
-			Name:    field.Name,
-			Type:    field.Type,
-			Comment: field.Comment,
+			Name:         field.Name,
+			Type:         field.Type,
+			Comment:      field.Comment,
+			Null:         field.Null,
+			IsPrimaryKey: field.IsPrimaryKey,
 		}
 		copyDataFields = append(copyDataFields, copyDataField)
 	}
