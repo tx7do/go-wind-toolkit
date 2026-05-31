@@ -403,6 +403,83 @@ export namespace detect {
 
 }
 
+export namespace devtools {
+	
+	export class AddServiceOptions {
+	    serviceName: string;
+	    servers: string[];
+	    dbClients: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AddServiceOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serviceName = source["serviceName"];
+	        this.servers = source["servers"];
+	        this.dbClients = source["dbClients"];
+	    }
+	}
+	export class CommandResult {
+	    success: boolean;
+	    output: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CommandResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.output = source["output"];
+	        this.error = source["error"];
+	    }
+	}
+	export class CreateProjectOptions {
+	    name: string;
+	    module: string;
+	    repoUrl: string;
+	    branch: string;
+	    parentDir: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateProjectOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.module = source["module"];
+	        this.repoUrl = source["repoUrl"];
+	        this.branch = source["branch"];
+	        this.parentDir = source["parentDir"];
+	    }
+	}
+	export class ServiceInfo {
+	    name: string;
+	    hasServer: boolean;
+	    hasConfig: boolean;
+	    hasEnt: boolean;
+	    entSchemas?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ServiceInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.hasServer = source["hasServer"];
+	        this.hasConfig = source["hasConfig"];
+	        this.hasEnt = source["hasEnt"];
+	        this.entSchemas = source["entSchemas"];
+	    }
+	}
+
+}
+
 export namespace generator {
 	
 	export class Option {

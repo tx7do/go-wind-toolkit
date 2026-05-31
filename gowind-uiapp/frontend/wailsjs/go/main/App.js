@@ -22,8 +22,36 @@ export function AIReviewCode(arg1) {
   return window['go']['main']['App']['AIReviewCode'](arg1);
 }
 
+export function AddService(arg1) {
+  return window['go']['main']['App']['AddService'](arg1);
+}
+
 export function CleanConfig() {
   return window['go']['main']['App']['CleanConfig']();
+}
+
+export function CreateProject(arg1) {
+  return window['go']['main']['App']['CreateProject'](arg1);
+}
+
+export function DevBufGenerate() {
+  return window['go']['main']['App']['DevBufGenerate']();
+}
+
+export function DevEntGenerate(arg1) {
+  return window['go']['main']['App']['DevEntGenerate'](arg1);
+}
+
+export function DevGoModTidy() {
+  return window['go']['main']['App']['DevGoModTidy']();
+}
+
+export function DevRunService(arg1) {
+  return window['go']['main']['App']['DevRunService'](arg1);
+}
+
+export function DevWireGenerate(arg1) {
+  return window['go']['main']['App']['DevWireGenerate'](arg1);
 }
 
 export function EditGeneratorOption(arg1) {
@@ -68,6 +96,10 @@ export function GetDBConfig() {
 
 export function GetDatabaseTables(arg1) {
   return window['go']['main']['App']['GetDatabaseTables'](arg1);
+}
+
+export function GetDevServices() {
+  return window['go']['main']['App']['GetDevServices']();
 }
 
 export function GetGeneratorOptions() {

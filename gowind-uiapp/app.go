@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	ddlparser "github.com/tx7do/go-utils/ddl_parser"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
+	"github.com/tx7do/go-utils/ddl_parser"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/ai"
 	ce "github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/configexporter"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/detect"
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/devtools"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
 )
 
@@ -478,6 +480,77 @@ func (a *App) ExportConfigToRemote(cfg ce.RemoteConfig) *ce.ExportResult {
 
 	runtime.EventsEmit(a.ctx, "config-exported")
 	return &ce.ExportResult{Success: true}
+}
+
+// ==================== 项目管理相关方法 ====================
+
+// GetDevServices 获取项目中的服务列表（详细信息）
+func (a *App) GetDevServices() ([]devtools.ServiceInfo, error) {
+	if a.projectInfo == nil {
+		return nil, fmt.Errorf("未打开项目")
+	}
+	return devtools.GetServices(a.projectInfo.Root)
+}
+
+// CreateProject 创建新项目
+func (a *App) CreateProject(opts devtools.CreateProjectOptions) *devtools.CommandResult {
+	return devtools.CreateProject(a.ctx, opts)
+}
+
+// AddService 向已有项目添加新服务
+func (a *App) AddService(opts devtools.AddServiceOptions) *devtools.CommandResult {
+	if a.projectInfo == nil {
+		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
+	}
+	return devtools.AddService(a.projectInfo.Root, opts)
+}
+
+// ==================== 开发工具相关方法 ====================
+
+// DevRunService 运行指定服务（在终端窗口中运行）
+func (a *App) DevRunService(serviceName string) *devtools.CommandResult {
+	if a.projectInfo == nil {
+		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
+	}
+	return devtools.RunServiceInTerminal(a.projectInfo.Root, serviceName)
+}
+
+// DevBufGenerate 运行 buf generate
+func (a *App) DevBufGenerate() *devtools.CommandResult {
+	if a.projectInfo == nil {
+		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
+	}
+	return devtools.RunBufGenerate(a.projectInfo.Root)
+}
+
+// DevEntGenerate 运行 ent generate
+func (a *App) DevEntGenerate(serviceName string) *devtools.CommandResult {
+	if a.projectInfo == nil {
+		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
+	}
+	if serviceName == "" {
+		return devtools.RunEntGenerateAll(a.projectInfo.Root)
+	}
+	return devtools.RunEntGenerate(a.projectInfo.Root, serviceName)
+}
+
+// DevWireGenerate 运行 wire
+func (a *App) DevWireGenerate(serviceName string) *devtools.CommandResult {
+	if a.projectInfo == nil {
+		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
+	}
+	if serviceName == "" {
+		return devtools.RunWireAll(a.projectInfo.Root)
+	}
+	return devtools.RunWire(a.projectInfo.Root, serviceName)
+}
+
+// DevGoModTidy 运行 go mod tidy
+func (a *App) DevGoModTidy() *devtools.CommandResult {
+	if a.projectInfo == nil {
+		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
+	}
+	return devtools.RunGoModTidy(a.projectInfo.Root)
 }
 
 // ExportOneServiceConfig 导出单个服务的配置到远程配置中心
