@@ -119,13 +119,22 @@ func convertTable(fnc fieldTypeFunc, table *schema.Table) (*TableData, error) {
 		}
 	}
 
+	// 构建主键集合
+	pkSet := make(map[string]bool)
+	if table.PrimaryKey != nil {
+		for _, part := range table.PrimaryKey.Parts {
+			pkSet[part.C.Name] = true
+		}
+	}
+
 	for _, column := range table.Columns {
 		//log.Println(column.Name)
 
 		fieldData := FieldData{
-			Name: column.Name,
-			Type: fnc(column.Type.Raw),
-			Null: column.Type.Null,
+			Name:         column.Name,
+			Type:         fnc(column.Type.Raw),
+			Null:         column.Type.Null,
+			IsPrimaryKey: pkSet[column.Name],
 		}
 
 		if fieldData.Type == "" {

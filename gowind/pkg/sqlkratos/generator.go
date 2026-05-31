@@ -305,7 +305,8 @@ func (g *Generator) generateDataPackageCode(
 				Name: field.Name,
 				Type: field.Type,
 				//Null:    field.Null,
-				Comment: field.Comment,
+				Comment:      field.Comment,
+				IsPrimaryKey: field.IsPrimaryKey,
 			}
 			dataFields = append(dataFields, dataField)
 		}

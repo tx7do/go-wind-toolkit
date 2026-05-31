@@ -1,4 +1,4 @@
-﻿package data
+package data
 
 import (
 	"context"
@@ -138,8 +138,10 @@ func (r *{{.ClassName}}) Create(ctx context.Context, req *{{.ApiPackage}}.Create
 	}
 
 	builder := r.entClient.Client().{{pascal .Model}}.Create()
-
-	builder{{range .Fields}}.{{newline}}		{{.EntSetNillableFunc}}
+{{- range .Fields}}
+{{- if not .IsPrimaryKey}}
+	builder.{{.EntSetNillableFunc}}
+{{- end}}
 {{- end}}
 
 	if ret, err := builder.Save(ctx); err != nil {
@@ -170,8 +172,11 @@ func (r *{{.ClassName}}) Update(ctx context.Context, req *{{.ApiPackage}}.Update
 	builder := r.entClient.Client().{{pascal .Model}}.UpdateOneID(req.Data.GetId())
 	result, err := r.repository.UpdateOne(ctx, builder, req.Data, req.GetUpdateMask(),
 		func(dto *{{.ApiPackage}}.{{pascal .Model}}) {
-            builder{{range .Fields}}.{{newline}}		{{.EntSetNillableFunc}}
-        {{- end}}
+{{- range .Fields}}
+{{- if not .IsPrimaryKey}}
+			builder.{{.EntSetNillableFunc}}
+{{- end}}
+{{- end}}
 		},
 	)
 

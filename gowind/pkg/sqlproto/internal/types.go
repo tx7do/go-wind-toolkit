@@ -6,10 +6,11 @@ import (
 
 // FieldData 字段数据
 type FieldData struct {
-	Name    string // 字段名
-	Type    string // 字段类型
-	Null    bool   // 是否允许为 NULL
-	Comment string // 字段注释
+	Name         string // 字段名
+	Type         string // 字段类型
+	Null         bool   // 是否允许为 NULL
+	Comment      string // 字段注释
+	IsPrimaryKey bool   // 是否为主键
 }
 
 // TableData 表数据

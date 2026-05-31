@@ -17,9 +17,10 @@ type ProtoField struct {
 
 // DataField 数据库字段定义
 type DataField struct {
-	Name    string // 字段名
-	Type    string // 字段类型
-	Comment string // 字段注释
+	Name         string // 字段名
+	Type         string // 字段类型
+	Comment      string // 字段注释
+	IsPrimaryKey bool   // 是否为主键
 }
 
 type DataFieldArray []DataField
