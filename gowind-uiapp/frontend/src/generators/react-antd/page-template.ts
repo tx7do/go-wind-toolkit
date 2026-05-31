@@ -3,7 +3,7 @@
  * 生成 ProTable 列表页 index.tsx 和 DrawerForm 编辑抽屉组件
  */
 import type { ParsedService, ParsedField } from '../../utils/openapi-parser'
-import { toPascalCase, toCamelCase, getCrudPaths } from '../../utils/openapi-parser'
+import { toPascalCase, getCrudPaths } from '../../utils/openapi-parser'
 
 export interface ReactPageTemplateOptions {
   service: ParsedService
@@ -28,7 +28,7 @@ function getSearchFields(fields: ParsedField[]): ParsedField[] {
 /**
  * 根据 OpenAPI 字段生成 ProTable 列定义
  */
-function generateColumns(service: ParsedService, modelPascal: string, fileName: string, tagLower: string): string {
+function generateColumns(service: ParsedService, modelPascal: string, _fileName: string): string {
   const tableFields = service.fields.filter(f => !['id'].includes(f.name) && !f.isArray)
   const lines: string[] = []
 
@@ -192,9 +192,7 @@ export function generatePageCode(options: ReactPageTemplateOptions): string {
   } = options
 
   const modelPascal = toPascalCase(service.modelName)
-  const modelCamel = toCamelCase(service.modelName)
   const fileName = service.kebabName.replace(/-/g, '')
-  const tagLower = fileName
   const crudPaths = getCrudPaths(service)
   const hasList = !!crudPaths.list
 
@@ -202,7 +200,7 @@ export function generatePageCode(options: ReactPageTemplateOptions): string {
 
   const hasStatusEnum = service.fields.some(f => f.isEnum && f.name.toLowerCase().includes('status'))
 
-  const columnsCode = generateColumns(service, modelPascal, fileName, tagLower)
+  const columnsCode = generateColumns(service, modelPascal, fileName)
 
   let code = `import { useRef, useState } from 'react';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
@@ -211,7 +209,7 @@ import { Button, Popconfirm, Tag, App } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import type { ${tagLower}_${modelPascal} as ${modelPascal} } from '@/api/generated/${serviceName}/service/v1';
+import type { ${fileName}_${modelPascal} as ${modelPascal} } from '@/api/generated/${serviceName}/service/v1';
 import { PaginationQuery } from '@/core';
 import { TABLE } from '@/config/constants';
 import { fetchList${modelPascal}s, useDelete${modelPascal} } from '@/api/hooks/${fileName}';
@@ -398,13 +396,11 @@ function getFieldFormComponent(field: ParsedField): {
 export function generateDrawerCode(options: ReactPageTemplateOptions): string {
   const {
     service,
-    modulePath = service.kebabName,
     serviceName = 'admin',
   } = options
 
   const modelPascal = toPascalCase(service.modelName)
   const fileName = service.kebabName.replace(/-/g, '')
-  const tagLower = fileName
   const crudPaths = getCrudPaths(service)
   const hasCreate = !!crudPaths.create
   const hasUpdate = !!crudPaths.update
@@ -468,8 +464,8 @@ ${Array.from(formComponents).map(c => `  ${c},`).join('\n')}
 import { App } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import type { ${tagLower}_${modelPascal} as ${modelPascal} } from '@/api/generated/${serviceName}/service/v1';
-${hasStatusEnum ? `` : ''}import { useCreate${modelPascal}, useUpdate${modelPascal} } from '@/api/hooks/${fileName}';
+import type { ${fileName}_${modelPascal} as ${modelPascal} } from '@/api/generated/${serviceName}/service/v1';
+import { useCreate${modelPascal}, useUpdate${modelPascal} } from '@/api/hooks/${fileName}';
 ${hasStatusEnum ? `import { getStatusOptions } from '../constants';\n` : ''}
 interface ${modelPascal}DrawerProps {
   open: boolean;
