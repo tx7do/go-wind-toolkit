@@ -135,7 +135,12 @@ func (a *App) ImportSqlTables(sqlContent string) string {
 		tableNames = append(tableNames, t.Name)
 	}
 
-	//runtime.LogInfof(a.ctx, "导入的表名列表: [%v]", tableNames)
+	// 设置数据库配置，使用 SQL 内容作为数据源
+	a.dbConfig = &database.DBConfig{
+		Type:       "mysql",
+		UseDSN:     false,
+		SQLContent: sqlContent,
+	}
 
 	a.generator.CleanOptions()
 	for _, tableName := range tableNames {

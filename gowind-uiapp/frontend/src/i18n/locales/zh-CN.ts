@@ -113,6 +113,7 @@ export default {
       selectService: '选择服务',
       quickSelect: '一键全选',
       exclude: '排除',
+      assignServiceFirst: '请为所有未排除的表分配所属服务',
     },
     // 生成配置
     generate: {

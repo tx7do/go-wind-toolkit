@@ -100,6 +100,7 @@ export default {
       selectService: 'Select service',
       quickSelect: 'Quick Select',
       exclude: 'Exclude',
+      assignServiceFirst: 'Please assign a service to all non-excluded tables',
     },
     generate: {
       title: 'Generate Targets',

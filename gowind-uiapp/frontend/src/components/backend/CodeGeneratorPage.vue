@@ -422,12 +422,26 @@ async function handleGenerate() {
 
 // ==================== 步骤流转 ====================
 function handleNextFromImport() {
+  if (!projectInfo.value) {
+    message.warning(t('backend.project.clickToOpen'))
+    return
+  }
   if (tableData.value.length === 0) {
-    message.warning(t('backend.import.importSchemaFirst'));
-    return;
+    message.warning(t('backend.import.importSchemaFirst'))
+    return
   }
   updateTableStats();
   currentStep.value = 1;
+}
+
+function handleNextFromTableConfig() {
+  // 检查是否有未排除但未分配服务的表
+  const unassigned = tableData.value.filter(r => !r.exclude && !r.service)
+  if (unassigned.length > 0) {
+    message.warning(t('backend.table.assignServiceFirst'))
+    return
+  }
+  currentStep.value = 2;
 }
 
 // ==================== 事件监听 ====================
@@ -441,7 +455,7 @@ EventsOn('project-opened', () => {
 EventsOn('table-imported', () => {
   refreshTableData().then(() => {
     updateTableStats();
-    if (tableData.value.length > 0) {
+    if (tableData.value.length > 0 && projectInfo.value) {
       currentStep.value = 1;
     }
   });
@@ -633,7 +647,7 @@ EventsOn('table-imported', () => {
       </a-card>
 
       <div class="step-footer" style="justify-content: flex-end">
-        <a-button type="primary" @click="handleNextFromImport" :disabled="tableData.length === 0">
+        <a-button type="primary" @click="handleNextFromImport" :disabled="!projectInfo || tableData.length === 0">
           <RightOutlined style="margin-right: 4px"/> {{ t('backend.import.nextStepConfig') }}
         </a-button>
       </div>
@@ -697,7 +711,7 @@ EventsOn('table-imported', () => {
 
       <div class="step-footer">
         <a-button @click="currentStep = 0">{{ t('common.prevStep') }}</a-button>
-        <a-button type="primary" @click="currentStep = 2">
+        <a-button type="primary" @click="handleNextFromTableConfig">
           {{ t('backend.generate.nextStepGenerate') }}
         </a-button>
       </div>
