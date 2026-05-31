@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	ddlparser "github.com/tx7do/go-utils/ddl_parser"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/ai"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/detect"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
@@ -20,6 +22,7 @@ type App struct {
 
 	projectDetector *detect.ProjectDetector
 	generator       *generator.Generator
+	aiService       *ai.Service
 }
 
 // NewApp creates a new App application struct
@@ -27,6 +30,7 @@ func NewApp() *App {
 	return &App{
 		projectDetector: detect.NewProjectDetector(),
 		generator:       generator.NewGenerator(),
+		aiService:       ai.NewService(),
 	}
 }
 
@@ -285,4 +289,147 @@ func (a *App) GenerateFrontendCode(serviceName string, frontendType string) stri
 
 	runtime.LogErrorf(a.ctx, "前端代码生成功能尚未实现")
 	return "前端代码生成功能尚未实现"
+}
+
+// ==================== AI 助手相关方法 ====================
+
+// GetAIConfig 获取 AI 配置
+func (a *App) GetAIConfig() *ai.Config {
+	return a.aiService.GetConfig()
+}
+
+// SetAIConfig 设置 AI 配置
+func (a *App) SetAIConfig(config ai.Config) {
+	a.aiService.SetConfig(&config)
+}
+
+// GetAIProviderPresets 获取 AI 服务商预设列表
+func (a *App) GetAIProviderPresets() []ai.AIProviderPreset {
+	return ai.GetProviderPresets()
+}
+
+// TestAIConnection 测试 AI 连接
+func (a *App) TestAIConnection() *ai.StepResult {
+	result, err := a.aiService.TestConnection()
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "AI 连接测试失败: %v", err)
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+	return result
+}
+
+// AIGenerateDDL 根据需求文档使用 AI 生成 DDL
+func (a *App) AIGenerateDDL(requirements string) *ai.StepResult {
+	if requirements == "" {
+		runtime.LogErrorf(a.ctx, "需求文档不能为空")
+		return &ai.StepResult{Success: false, Error: "需求文档不能为空"}
+	}
+
+	result, err := a.aiService.GenerateDDL(requirements)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "AI 生成 DDL 失败: %v", err)
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+
+	runtime.EventsEmit(a.ctx, "ai-ddl-generated")
+	return result
+}
+
+// AIPartitionMicroservices 根据 DDL 使用 AI 建议微服务划分
+func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
+	if ddl == "" {
+		runtime.LogErrorf(a.ctx, "DDL 不能为空")
+		return &ai.PartitionResult{Success: false, Error: "DDL 不能为空"}
+	}
+
+	partitions, err := a.aiService.PartitionMicroservices(ddl)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "AI 微服务划分失败: %v", err)
+		return &ai.PartitionResult{Success: false, Error: err.Error()}
+	}
+
+	return &ai.PartitionResult{Success: true, Partitions: partitions}
+}
+
+// AIGenerateBackendCode AI 辅助生成后端代码
+func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.MicroservicePartition) string {
+	if a.projectInfo == nil {
+		runtime.LogErrorf(a.ctx, "未打开项目，无法生成代码")
+		return "未打开项目，无法生成代码"
+	}
+
+	if ddl == "" {
+		runtime.LogErrorf(a.ctx, "DDL 不能为空")
+		return "DDL 不能为空"
+	}
+
+	// 设置数据库配置，使用 SQL 内容作为数据源
+	a.dbConfig = &database.DBConfig{
+		Type:       "mysql",
+		UseDSN:     false,
+		SQLContent: ddl,
+	}
+
+	// 清空并设置生成器选项
+	a.generator.CleanOptions()
+	for _, p := range partitions {
+		for _, tableName := range p.Tables {
+			opt := &generator.Option{
+				TableName: tableName,
+				Service:   p.ServiceName,
+			}
+			a.generator.AddOption(opt)
+		}
+	}
+
+	// 生成 gRPC 代码
+	if err := a.generator.GenerateGrpcCode(
+		a.ctx,
+		*a.dbConfig,
+		ormType,
+		a.projectInfo.Root,
+		a.projectInfo.ModPath,
+	); err != nil {
+		runtime.LogErrorf(a.ctx, "AI 辅助生成后端代码失败: %v", err)
+		return fmt.Sprintf("生成后端代码失败: %v", err)
+	}
+
+	runtime.EventsEmit(a.ctx, "ai-backend-generated")
+	return ""
+}
+
+// AIFindOpenAPIFiles 在项目中查找 OpenAPI 文件
+func (a *App) AIFindOpenAPIFiles() *ai.OpenAPIResult {
+	if a.projectInfo == nil {
+		runtime.LogErrorf(a.ctx, "未打开项目")
+		return &ai.OpenAPIResult{Success: false, Error: "未打开项目"}
+	}
+
+	files, err := ai.FindOpenAPIFiles(a.projectInfo.Root)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "查找 OpenAPI 文件失败: %v", err)
+		return &ai.OpenAPIResult{Success: false, Error: err.Error()}
+	}
+
+	if len(files) == 0 {
+		return &ai.OpenAPIResult{Success: true, Files: files, Message: "未找到 OpenAPI 文件"}
+	}
+
+	return &ai.OpenAPIResult{Success: true, Files: files}
+}
+
+// AIReviewCode 使用 AI 审查项目代码
+func (a *App) AIReviewCode(fileContents map[string]string) *ai.StepResult {
+	if len(fileContents) == 0 {
+		runtime.LogErrorf(a.ctx, "没有可审查的代码文件")
+		return &ai.StepResult{Success: false, Error: "没有可审查的代码文件"}
+	}
+
+	result, err := a.aiService.ReviewCode(fileContents)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "AI 代码审查失败: %v", err)
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+
+	return result
 }
