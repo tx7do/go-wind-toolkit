@@ -30,6 +30,14 @@ export function EditGeneratorOption(arg1) {
   return window['go']['main']['App']['EditGeneratorOption'](arg1);
 }
 
+export function ExportConfigToRemote(arg1) {
+  return window['go']['main']['App']['ExportConfigToRemote'](arg1);
+}
+
+export function ExportOneServiceConfig(arg1, arg2) {
+  return window['go']['main']['App']['ExportOneServiceConfig'](arg1, arg2);
+}
+
 export function GenerateFrontendCode(arg1, arg2) {
   return window['go']['main']['App']['GenerateFrontendCode'](arg1, arg2);
 }
@@ -50,6 +58,10 @@ export function GetAIProviderPresets() {
   return window['go']['main']['App']['GetAIProviderPresets']();
 }
 
+export function GetConfigServices() {
+  return window['go']['main']['App']['GetConfigServices']();
+}
+
 export function GetDBConfig() {
   return window['go']['main']['App']['GetDBConfig']();
 }
@@ -64,6 +76,10 @@ export function GetGeneratorOptions() {
 
 export function GetProjectInfo() {
   return window['go']['main']['App']['GetProjectInfo']();
+}
+
+export function GetRemoteConfigTypes() {
+  return window['go']['main']['App']['GetRemoteConfigTypes']();
 }
 
 export function GetTableColumns(arg1, arg2) {

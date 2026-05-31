@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/ai"
+	ce "github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/configexporter"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/detect"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
@@ -432,4 +433,80 @@ func (a *App) AIReviewCode(fileContents map[string]string) *ai.StepResult {
 	}
 
 	return result
+}
+
+// ==================== 远程配置相关方法 ====================
+
+// GetRemoteConfigTypes 获取支持的远程配置中心类型
+func (a *App) GetRemoteConfigTypes() []map[string]string {
+	return ce.GetSupportedTypes()
+}
+
+// GetConfigServices 获取项目中的服务配置信息
+func (a *App) GetConfigServices() ([]ce.ServiceInfo, error) {
+	if a.projectInfo == nil {
+		return nil, fmt.Errorf("未打开项目")
+	}
+	return ce.GetServiceList(a.projectInfo.Root)
+}
+
+// ExportConfigToRemote 导出所有服务配置到远程配置中心
+func (a *App) ExportConfigToRemote(cfg ce.RemoteConfig) *ce.ExportResult {
+	if a.projectInfo == nil {
+		runtime.LogErrorf(a.ctx, "未打开项目")
+		return &ce.ExportResult{Success: false, Error: "未打开项目"}
+	}
+
+	if errMsg := cfg.Validate(); errMsg != "" {
+		runtime.LogErrorf(a.ctx, "配置验证失败: %s", errMsg)
+		return &ce.ExportResult{Success: false, Error: errMsg}
+	}
+
+	err := ce.ExportAll(
+		string(cfg.Type),
+		cfg.Endpoint,
+		cfg.ProjectName,
+		a.projectInfo.Root,
+		cfg.Group,
+		cfg.Env,
+		cfg.NamespaceId,
+	)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "导出配置失败: %v", err)
+		return &ce.ExportResult{Success: false, Error: err.Error()}
+	}
+
+	runtime.EventsEmit(a.ctx, "config-exported")
+	return &ce.ExportResult{Success: true}
+}
+
+// ExportOneServiceConfig 导出单个服务的配置到远程配置中心
+func (a *App) ExportOneServiceConfig(cfg ce.RemoteConfig, serviceName string) *ce.ExportResult {
+	if a.projectInfo == nil {
+		runtime.LogErrorf(a.ctx, "未打开项目")
+		return &ce.ExportResult{Success: false, Error: "未打开项目"}
+	}
+
+	if errMsg := cfg.Validate(); errMsg != "" {
+		runtime.LogErrorf(a.ctx, "配置验证失败: %s", errMsg)
+		return &ce.ExportResult{Success: false, Error: errMsg}
+	}
+
+	err := ce.ExportOne(
+		string(cfg.Type),
+		cfg.Endpoint,
+		cfg.ProjectName,
+		a.projectInfo.Root,
+		cfg.Group,
+		cfg.Env,
+		cfg.NamespaceId,
+		serviceName,
+	)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "导出服务 %s 配置失败: %v", serviceName, err)
+		return &ce.ExportResult{Success: false, Error: err.Error(), Service: serviceName}
+	}
+
+	runtime.EventsEmit(a.ctx, "config-exported")
+	return &ce.ExportResult{Success: true, Service: serviceName}
 }

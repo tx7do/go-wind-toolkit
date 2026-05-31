@@ -206,7 +206,47 @@ export default {
       comingSoon: 'Coming soon...',
     },
   },
-  // AI Assistant page
+  // Remote Config page
+  remoteConfig: {
+    project: {
+      selectProject: 'Select Project',
+      switchProject: 'Switch Project',
+      noProject: 'No project open',
+      openFirst: 'Please open a project first',
+    },
+    config: {
+      title: 'Remote Config Center',
+      type: 'Config Center Type',
+      endpoint: 'Server Address',
+      endpointPlaceholder: 'e.g.: 127.0.0.1:8500',
+      projectName: 'Project Name',
+      projectNamePlaceholder: 'e.g.: my-project',
+      group: 'Group (Nacos)',
+      groupPlaceholder: 'e.g.: DEFAULT_GROUP',
+      env: 'Environment (Nacos)',
+      envPlaceholder: 'e.g.: dev',
+      namespaceId: 'Namespace (Nacos)',
+      namespaceIdPlaceholder: 'e.g.: public',
+      validateError: 'Config validation failed: {msg}',
+    },
+    service: {
+      title: 'Service List',
+      name: 'Service Name',
+      files: 'Config Files',
+      fileCount: '{count} file(s)',
+      noServices: 'No exportable service configs found. Ensure the project has an app/ directory with service configs.',
+      loadFailed: 'Failed to load service list',
+      loadSuccess: 'Loaded {count} service(s)',
+    },
+    export: {
+      exportAll: 'Export All',
+      exportOne: 'Export',
+      exporting: 'Exporting...',
+      success: 'Config exported successfully',
+      failed: 'Config export failed: {msg}',
+      noServices: 'No services to export',
+    },
+  },
   ai: {
     steps: {
       aiConfig: 'AI Config',

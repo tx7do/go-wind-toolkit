@@ -125,6 +125,67 @@ export namespace ai {
 
 }
 
+export namespace configexporter {
+	
+	export class ExportResult {
+	    success: boolean;
+	    error?: string;
+	    service?: string;
+	    filesCount?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.error = source["error"];
+	        this.service = source["service"];
+	        this.filesCount = source["filesCount"];
+	    }
+	}
+	export class RemoteConfig {
+	    type: string;
+	    endpoint: string;
+	    projectName: string;
+	    group: string;
+	    env: string;
+	    namespaceId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.endpoint = source["endpoint"];
+	        this.projectName = source["projectName"];
+	        this.group = source["group"];
+	        this.env = source["env"];
+	        this.namespaceId = source["namespaceId"];
+	    }
+	}
+	export class ServiceInfo {
+	    name: string;
+	    configFiles: string[];
+	    configFolder: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServiceInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.configFiles = source["configFiles"];
+	        this.configFolder = source["configFolder"];
+	    }
+	}
+
+}
+
 export namespace database {
 	
 	export class ColumnInfo {

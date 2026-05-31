@@ -233,7 +233,47 @@ export default {
       comingSoon: '敬请期待...',
     },
   },
-  // AI 助手页面
+  // 远程配置页面
+  remoteConfig: {
+    project: {
+      selectProject: '选择项目目录',
+      switchProject: '切换项目',
+      noProject: '未打开项目',
+      openFirst: '请先打开项目',
+    },
+    config: {
+      title: '远程配置中心',
+      type: '配置中心类型',
+      endpoint: '服务器地址',
+      endpointPlaceholder: '例如: 127.0.0.1:8500',
+      projectName: '项目名称',
+      projectNamePlaceholder: '例如: my-project',
+      group: '分组 (Nacos)',
+      groupPlaceholder: '例如: DEFAULT_GROUP',
+      env: '环境 (Nacos)',
+      envPlaceholder: '例如: dev',
+      namespaceId: '命名空间 (Nacos)',
+      namespaceIdPlaceholder: '例如: public',
+      validateError: '配置验证失败: {msg}',
+    },
+    service: {
+      title: '服务列表',
+      name: '服务名',
+      files: '配置文件',
+      fileCount: '{count} 个文件',
+      noServices: '未找到可导出的服务配置，请确保项目 app/ 目录下存在服务配置',
+      loadFailed: '加载服务列表失败',
+      loadSuccess: '加载到 {count} 个服务',
+    },
+    export: {
+      exportAll: '全部导出',
+      exportOne: '导出',
+      exporting: '正在导出...',
+      success: '配置导出成功',
+      failed: '配置导出失败: {msg}',
+      noServices: '没有可导出的服务',
+    },
+  },
   ai: {
     steps: {
       aiConfig: 'AI 配置',
