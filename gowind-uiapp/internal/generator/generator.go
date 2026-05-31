@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/labstack/gommon/log"
-	sqlkratos "github.com/tx7do/go-wind-toolkit/sql-kratos"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
+	sqlkratos "github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlkratos"
 )
 
 type Generator struct {

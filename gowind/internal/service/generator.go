@@ -10,8 +10,8 @@ import (
 	"github.com/tx7do/go-utils/code_generator"
 	"github.com/tx7do/go-utils/stringcase"
 
-	"github.com/tx7do/go-wind-toolkit/generators"
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/generators"
 )
 
 func Generate(ctx context.Context, opts GeneratorOptions) error {

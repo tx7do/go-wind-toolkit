@@ -2,12 +2,9 @@ module github.com/tx7do/go-wind-toolkit/gowind-uiapp
 
 go 1.25.6
 
-replace (
-	github.com/tx7do/go-wind-toolkit/generators => ../generators
-	github.com/tx7do/go-wind-toolkit/sql-kratos => ../sql-kratos
-	github.com/tx7do/go-wind-toolkit/sql-orm => ../sql-orm
-	github.com/tx7do/go-wind-toolkit/sql-proto => ../sql-proto
-)
+require github.com/tx7do/go-wind-toolkit/gowind v0.0.0
+
+replace github.com/tx7do/go-wind-toolkit/gowind => ../gowind
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3
@@ -15,7 +12,6 @@ require (
 	github.com/labstack/gommon v0.5.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/tx7do/go-utils/ddl_parser v0.0.5
-	github.com/tx7do/go-wind-toolkit/sql-kratos v0.1.0
 	github.com/wailsapp/wails/v2 v2.12.0
 	modernc.org/sqlite v1.49.1
 )
@@ -82,9 +78,6 @@ require (
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
 	github.com/tx7do/go-utils v1.1.37 // indirect
 	github.com/tx7do/go-utils/code_generator v0.0.1 // indirect
-	github.com/tx7do/go-wind-toolkit/generators v0.1.0 // indirect
-	github.com/tx7do/go-wind-toolkit/sql-orm v0.1.0 // indirect
-	github.com/tx7do/go-wind-toolkit/sql-proto v0.1.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.23 // indirect
@@ -102,6 +95,7 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/datatypes v1.2.7 // indirect
