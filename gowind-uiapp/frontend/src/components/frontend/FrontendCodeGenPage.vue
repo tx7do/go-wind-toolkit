@@ -8,11 +8,17 @@ import {SelectFolder} from "../../../wailsjs/go/main/App";
 
 import {parseOpenApiYaml, extractServices, type ParsedService, type OpenApiSpec} from "../../utils/openapi-parser";
 import {
-  generateAll,
-  type GeneratedFile,
-  type GenerateFileType,
-  type RouterModuleConfig,
+  generateAll as generateVueAll,
+  type GeneratedFile as VueGeneratedFile,
+  type GenerateFileType as VueGenerateFileType,
+  type RouterModuleConfig as VueRouterModuleConfig,
 } from "../../generators/vue-element";
+import {
+  generateAll as generateReactAll,
+  type ReactGeneratedFile,
+  type ReactGenerateFileType,
+  type ReactRouterModuleConfig,
+} from "../../generators/react-antd";
 import MonacoEditor from "../backend/MonacoEditor.vue";
 
 const {t} = useI18n()
@@ -55,29 +61,32 @@ const selectedServiceKeys = ref<string[]>([])
 // ==================== 生成选项 ====================
 const generateOptions = ref({
   outputDir: '',
-  generateTypes: ['service', 'composable', 'page', 'drawer', 'router', 'locale'] as GenerateFileType[],
+  generateTypes: ['service', 'composable', 'page', 'drawer', 'router', 'locale'] as string[],
 })
-const routerModules = ref<RouterModuleConfig[]>([])
+const routerModules = ref<(VueRouterModuleConfig | ReactRouterModuleConfig)[]>([])
 
 // ==================== 生成结果 ====================
-const generatedFiles = ref<GeneratedFile[]>([])
+const generatedFiles = ref<(VueGeneratedFile | ReactGeneratedFile)[]>([])
 const selectedFileIndex = ref(0)
 
 const currentFileContent = ref('')
 
 // ==================== 文件列表过滤 ====================
 const activeFileType = ref<string>('all')
-const fileTypeOptions = computed(() => [
-  {label: t('frontend.fileType.all'), value: 'all'},
-  {label: 'Service', value: 'service'},
-  {label: 'Composable', value: 'composable'},
-  {label: t('frontend.fileType.page'), value: 'page'},
-  {label: t('frontend.fileType.drawer'), value: 'drawer'},
-  {label: t('frontend.fileType.router'), value: 'router'},
-  {label: t('frontend.fileType.locale'), value: 'locale'},
-])
+const fileTypeOptions = computed(() => {
+  const isReact = targetFramework.value === 'react'
+  return [
+    {label: t('frontend.fileType.all'), value: 'all'},
+    {label: 'Service', value: 'service'},
+    {label: isReact ? 'Hooks' : 'Composable', value: isReact ? 'hooks' : 'composable'},
+    {label: t('frontend.fileType.page'), value: 'page'},
+    {label: t('frontend.fileType.drawer'), value: 'drawer'},
+    {label: t('frontend.fileType.router'), value: 'router'},
+    {label: t('frontend.fileType.locale'), value: 'locale'},
+  ]
+})
 
-const filteredFiles = ref<GeneratedFile[]>([])
+const filteredFiles = ref<(VueGeneratedFile | ReactGeneratedFile)[]>([])
 
 function filterFiles() {
   if (activeFileType.value === 'all') {
@@ -238,18 +247,30 @@ function handlePreview() {
   if (selectedServices.length === 0) return
 
   if (targetFramework.value === 'vue-element') {
-    generatedFiles.value = generateAll({
+    generatedFiles.value = generateVueAll({
       services: selectedServices,
       serviceName: '',
-      generateTypes: generateOptions.value.generateTypes,
-      routerModules: generateOptions.value.generateTypes.includes('router') ? routerModules.value : undefined,
+      generateTypes: generateOptions.value.generateTypes as VueGenerateFileType[],
+      routerModules: generateOptions.value.generateTypes.includes('router') ? routerModules.value as VueRouterModuleConfig[] : undefined,
+    })
+  } else if (targetFramework.value === 'react') {
+    // React 使用 hooks 而不是 composable
+    const reactTypes = generateOptions.value.generateTypes.map(t =>
+      t === 'composable' ? 'hooks' : t
+    ) as ReactGenerateFileType[]
+
+    generatedFiles.value = generateReactAll({
+      services: selectedServices,
+      serviceName: '',
+      generateTypes: reactTypes,
+      routerModules: reactTypes.includes('router') ? routerModules.value as ReactRouterModuleConfig[] : undefined,
     })
   } else {
     // 其他框架暂未实现，生成占位提示
     generatedFiles.value = selectedServices.map(s => ({
       path: `${targetFramework.value}/${s.tagName}/placeholder.txt`,
       content: `[${frameworkOptions.find(f => f.value === targetFramework.value)?.label}] ${t('frontend.placeholder.notImplemented')}\n\n${t('frontend.placeholder.service')}: ${s.modelName}\n${t('frontend.placeholder.description')}: ${s.description}\n${t('frontend.placeholder.fields')}: ${s.fields.length}\n${t('frontend.placeholder.operations')}: ${s.operations.map(o => o.type).join(', ')}\n\n${t('frontend.placeholder.comingSoon')}`,
-      type: 'service' as GenerateFileType,
+      type: 'service' as const,
       description: `${s.modelName} - ${t('frontend.placeholder.notImplemented')}`,
       serviceName: s.tagName,
     }))
@@ -379,7 +400,7 @@ function getOperationTag(type: string) {
 
 function getFileTypeColor(type: string) {
   const map: Record<string, string> = {
-    service: 'green', composable: 'cyan', page: 'blue',
+    service: 'green', composable: 'cyan', hooks: 'cyan', page: 'blue',
     drawer: 'purple', router: 'geekblue', locale: 'gold',
   }
   return map[type] || 'default'
@@ -528,10 +549,11 @@ const previewLanguage = computed(() => {
               <a-button type="primary" @click="handleSelectOutputDir">{{ t('frontend.config.selectDir') }}</a-button>
             </a-input-group>
           </a-form-item>
-          <a-form-item v-if="targetFramework === 'vue-element'" :label="t('frontend.config.generateTypes')">
+          <a-form-item v-if="targetFramework === 'vue-element' || targetFramework === 'react'" :label="t('frontend.config.generateTypes')">
             <a-checkbox-group v-model:value="generateOptions.generateTypes">
               <a-checkbox value="service">{{ t('frontend.config.serviceLayer') }}</a-checkbox>
-              <a-checkbox value="composable">{{ t('frontend.config.composableLayer') }}</a-checkbox>
+              <a-checkbox v-if="targetFramework === 'vue-element'" value="composable">{{ t('frontend.config.composableLayer') }}</a-checkbox>
+              <a-checkbox v-if="targetFramework === 'react'" value="composable">React Query Hooks</a-checkbox>
               <a-checkbox value="page">{{ t('frontend.config.listPage') }}</a-checkbox>
               <a-checkbox value="drawer">{{ t('frontend.config.editDrawer') }}</a-checkbox>
               <a-checkbox value="router">{{ t('frontend.config.routerConfig') }}</a-checkbox>
@@ -540,7 +562,7 @@ const previewLanguage = computed(() => {
           </a-form-item>
         </a-form>
         <a-alert
-          v-if="targetFramework !== 'vue-element'"
+          v-if="targetFramework !== 'vue-element' && targetFramework !== 'react'"
           :message="t('frontend.config.notImplemented', {framework: getFrameworkLabel(targetFramework)})"
           type="warning"
           show-icon
