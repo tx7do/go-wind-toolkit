@@ -3,6 +3,7 @@
  * 从 OpenAPI.yaml 中提取服务、模型、API端点等元数据
  */
 import yaml from 'js-yaml'
+import { toCamelCase, toPascalCase, toKebabCase } from './case-convert'
 
 // ==============================
 // 类型定义
@@ -421,23 +422,10 @@ function resolveProperty(prop: OpenApiSchemaProperty): {
 }
 
 // ==============================
-// 命名工具函数
+// 命名工具函数（re-export from case-convert）
 // ==============================
 
-export function toCamelCase(str: string): string {
-  return str.charAt(0).toLowerCase() + str.slice(1)
-}
-
-export function toPascalCase(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1)
-}
-
-export function toKebabCase(str: string): string {
-  return str
-    .replace(/([A-Z])/g, '-$1')
-    .toLowerCase()
-    .replace(/^-/, '')
-}
+export { toCamelCase, toPascalCase, toKebabCase } from './case-convert'
 
 /**
  * 将 OpenAPI 中的 service tag 名转换为文件名

@@ -3,7 +3,7 @@
  * 统一入口，根据 OpenAPI 规范生成完整的前端代码
  */
 import type { ParsedService } from '../../utils/openapi-parser'
-import { serviceToFileName } from '../../utils/openapi-parser'
+import { serviceToFileName, toPascalCase } from '../../utils/openapi-parser'
 import { generateServiceCode } from './service-template'
 import { generateHooksCode } from './hooks-template'
 import { generatePageCode, generateDrawerCode, generateConstantsCode } from './page-template'
@@ -176,6 +176,3 @@ export function generateAll(options: ReactAntdGeneratorOptions): ReactGeneratedF
   return files
 }
 
-function toPascalCase(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1)
-}
