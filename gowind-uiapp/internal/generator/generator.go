@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/devtools"
 	sqlkratos "github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlkratos"
 )
 
@@ -115,7 +116,11 @@ func (g *Generator) GenerateGrpcCode(
 		mapOpts[opt.Service] = append(mapOpts[opt.Service], opt)
 	}
 
+	var serviceNames []string
+
 	for serviceName, serviceOpts := range mapOpts {
+		serviceNames = append(serviceNames, serviceName)
+
 		var options sqlkratos.GeneratorOptions
 
 		log.Info("开始为服务生成代码: ", serviceName)
@@ -165,6 +170,42 @@ func (g *Generator) GenerateGrpcCode(
 		if err := sqlkratos.Generate(ctx, options); err != nil {
 			runtime.LogErrorf(ctx, "生成代码失败: %v", err)
 			return err
+		}
+	}
+
+	// === 后处理步骤 ===
+
+	// 1. go mod tidy
+	log.Info("运行 go mod tidy...")
+	if result := devtools.RunGoModTidy(rootPath); !result.Success {
+		runtime.LogErrorf(ctx, "go mod tidy 失败: %s", result.Error)
+		return fmt.Errorf("go mod tidy 失败: %s", result.Error)
+	}
+
+	// 2. buf generate（生成 protobuf 代码）
+	log.Info("运行 buf generate...")
+	if result := devtools.RunBufGenerate(rootPath); !result.Success {
+		runtime.LogErrorf(ctx, "buf generate 失败: %s", result.Error)
+		return fmt.Errorf("buf generate 失败: %s", result.Error)
+	}
+
+	// 3. 如果是 ent ORM，执行 ent generate
+	if ormType == "ent" {
+		for _, svcName := range serviceNames {
+			log.Info("运行 ent generate: ", svcName)
+			if result := devtools.RunEntGenerate(rootPath, svcName); !result.Success {
+				runtime.LogErrorf(ctx, "ent generate 失败 (%s): %s", svcName, result.Error)
+				return fmt.Errorf("ent generate 失败 (%s): %s", svcName, result.Error)
+			}
+		}
+	}
+
+	// 4. wire generate（依赖注入代码生成）
+	for _, svcName := range serviceNames {
+		log.Info("运行 wire generate: ", svcName)
+		if result := devtools.RunWire(rootPath, svcName); !result.Success {
+			runtime.LogErrorf(ctx, "wire 生成失败 (%s): %s", svcName, result.Error)
+			return fmt.Errorf("wire 生成失败 (%s): %s", svcName, result.Error)
 		}
 	}
 
