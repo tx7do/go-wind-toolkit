@@ -3,6 +3,9 @@ package entimport
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"ariga.io/atlas/sql/schema"
 
@@ -69,7 +72,10 @@ func WriteSchema(mutations []schemast.Mutator, opts ...ImportOption) error {
 	if err = schemast.Mutate(ctx, mutations...); err != nil {
 		return err
 	}
-	return ctx.Print(i.schemaPath, schemast.Header(header))
+	if err = ctx.Print(i.schemaPath, schemast.Header(header)); err != nil {
+		return err
+	}
+	return formatSchemaFiles(i.schemaPath)
 }
 
 // entEdge creates an edge based on the given params and direction.
@@ -397,4 +403,98 @@ func upsertOneToX(mutations map[string]schemast.Mutator, table *schema.Table) {
 		}
 		upsertRelation(parentNode, childNode, opts)
 	}
+}
+
+// formatSchemaFiles 后处理 schema 文件，将 Fields() 方法中的字段断行显示
+func formatSchemaFiles(schemaPath string) error {
+	entries, err := os.ReadDir(schemaPath)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
+		}
+		filePath := filepath.Join(schemaPath, entry.Name())
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return err
+		}
+		formatted := formatFieldsContent(string(content))
+		if formatted != string(content) {
+			if err := os.WriteFile(filePath, []byte(formatted), 0644); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// fieldListRe 匹配 return []ent.Field{...}
+var fieldListRe = regexp.MustCompile(`(?s)(\treturn \[\]ent\.Field\{)(.+?)(\}\n)`)
+
+// formatFieldsContent 将 []ent.Field{...} 中的字段按行断开
+func formatFieldsContent(content string) string {
+	return fieldListRe.ReplaceAllStringFunc(content, func(match string) string {
+		sub := fieldListRe.FindStringSubmatch(match)
+		if len(sub) < 4 {
+			return match
+		}
+		prefix := sub[1] // "\treturn []ent.Field{"
+		inner := sub[2]  // "field.Int(\"id\"), field.String(\"name\")"
+		suffix := sub[3] // "}\n"
+
+		fields := splitTopLevelFields(inner)
+		if len(fields) <= 1 {
+			return match // 单个字段不需要断行
+		}
+
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		sb.WriteByte('\n')
+		for _, f := range fields {
+			sb.WriteString("\t\t")
+			sb.WriteString(strings.TrimSpace(f))
+			sb.WriteString(",\n")
+		}
+		sb.WriteString("\t")
+		sb.WriteString(suffix)
+		return sb.String()
+	})
+}
+
+// splitTopLevelFields 按顶层逗号分割字段（忽略括号内的逗号）
+func splitTopLevelFields(s string) []string {
+	var fields []string
+	var current strings.Builder
+	depth := 0
+	for _, ch := range s {
+		switch ch {
+		case '(', '[':
+			depth++
+			current.WriteRune(ch)
+		case ')', ']':
+			depth--
+			current.WriteRune(ch)
+		case ',':
+			if depth == 0 {
+				f := strings.TrimSpace(current.String())
+				if f != "" {
+					fields = append(fields, f)
+				}
+				current.Reset()
+			} else {
+				current.WriteRune(ch)
+			}
+		default:
+			current.WriteRune(ch)
+		}
+	}
+	if current.Len() > 0 {
+		f := strings.TrimSpace(current.String())
+		if f != "" {
+			fields = append(fields, f)
+		}
+	}
+	return fields
 }
