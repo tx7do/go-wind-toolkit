@@ -23,6 +23,7 @@ func WriteServiceProto(
 	tableName string,
 	tableComment string,
 	protoFields ProtoFieldArray,
+	customPkg string,
 ) error {
 	modelName := inflection.Singular(tableName)
 
@@ -33,8 +34,12 @@ func WriteServiceProto(
 		// 按服务分包：所有表共用服务名作为 proto module
 		protoModule = strings.ToLower(targetModuleName)
 	case "custom":
-		// 自定义：先尝试用表名单数，后续可由调用方覆盖
-		protoModule = strings.ToLower(modelName)
+		// 自定义：使用调用方传入的自定义包名，未指定则回退到表名单数
+		if customPkg != "" {
+			protoModule = strings.ToLower(customPkg)
+		} else {
+			protoModule = strings.ToLower(modelName)
+		}
 	default:
 		// per-table（默认）：每表独立包，用表名单数
 		protoModule = strings.ToLower(modelName)
@@ -74,6 +79,7 @@ func WriteServicesProto(
 	strategy string,
 	targetModuleName, sourceModuleName, moduleVersion string,
 	tables TableDataArray,
+	customPackages map[string]string,
 ) error {
 	var protoFields ProtoFieldArray
 
@@ -91,6 +97,12 @@ func WriteServicesProto(
 			})
 		}
 
+		// 获取该表的自定义包名
+		var customPkg string
+		if customPackages != nil {
+			customPkg = customPackages[table.Name]
+		}
+
 		if err := WriteServiceProto(
 			outputPath,
 			serviceType,
@@ -98,6 +110,7 @@ func WriteServicesProto(
 			targetModuleName, sourceModuleName, moduleVersion,
 			table.Name, table.Comment,
 			protoFields,
+			customPkg,
 		); err != nil {
 			return fmt.Errorf("failed to write proto for table %s: %w", table.Name, err)
 		}

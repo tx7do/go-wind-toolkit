@@ -149,8 +149,15 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 		case "by-service":
 			// 按服务分包：所有表共用服务名
 			moduleName = strings.ToLower(opts.ModuleName)
+		case "custom":
+			// 自定义包名：从 TableCustomPackages 获取用户指定的包名
+			if pkg, ok := opts.TableCustomPackages[table.Name]; ok && pkg != "" {
+				moduleName = strings.ToLower(pkg)
+			} else {
+				moduleName = strings.ToLower(name)
+			}
 		default:
-			// per-table（默认）/ custom：每表独立包
+			// per-table（默认）：每表独立包
 			moduleName = strings.ToLower(name)
 		}
 		servicePackageMap[name] = moduleName
@@ -280,6 +287,7 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 			&opts.ModuleVersion,
 			&server,
 			opts.ProtoPackageStrategy,
+			opts.TableCustomPackages,
 			opts.IncludedTables,
 			opts.ExcludedTables,
 			opts.GenerateProto,

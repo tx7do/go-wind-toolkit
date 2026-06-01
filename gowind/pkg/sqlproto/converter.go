@@ -20,6 +20,7 @@ func Convert(
 	moduleName, sourceModuleName, moduleVersion *string,
 	serviceType *string,
 	strategy string,
+	customPackages map[string]string,
 	includeTables, excludeTables []string,
 	exportProto bool,
 ) (TableDataArray, error) {
@@ -70,6 +71,7 @@ func Convert(
 			strategy,
 			*moduleName, *sourceModuleName, *moduleVersion,
 			tableDatas,
+			customPackages,
 		); err != nil {
 			return nil, fmt.Errorf("sqlproto: schema writing failed: %w", err)
 		}

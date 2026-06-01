@@ -17,8 +17,12 @@ type (
 		// ProtoPackageStrategy controls how proto packages are organized.
 		// "per-table" - each table gets its own proto package (e.g. user.service.v1)
 		// "by-service" - all tables under a service share one proto package (e.g. admin.service.v1)
-		// "custom" - use protoPackage from each table's option
+		// "custom" - use the package name from TableCustomPackages for each table
 		ProtoPackageStrategy string
+
+		// TableCustomPackages maps table name -> custom proto package name.
+		// Only used when ProtoPackageStrategy is "custom".
+		TableCustomPackages map[string]string
 
 		OrmType string // ORM type, e.g., "gorm", "sqlx", "ent"
 

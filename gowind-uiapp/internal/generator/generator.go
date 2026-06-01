@@ -167,6 +167,12 @@ func (g *Generator) GenerateGrpcCode(
 
 		for _, opt := range serviceOpts {
 			options.IncludedTables = append(options.IncludedTables, opt.TableName)
+			if opt.ProtoPackage != "" {
+				if options.TableCustomPackages == nil {
+					options.TableCustomPackages = make(map[string]string)
+				}
+				options.TableCustomPackages[opt.TableName] = opt.ProtoPackage
+			}
 		}
 
 		if err := sqlkratos.Generate(ctx, options); err != nil {
@@ -280,6 +286,12 @@ func (g *Generator) GenerateRestCode(
 
 		for _, opt := range serviceOpts {
 			options.IncludedTables = append(options.IncludedTables, opt.TableName)
+			if opt.ProtoPackage != "" {
+				if options.TableCustomPackages == nil {
+					options.TableCustomPackages = make(map[string]string)
+				}
+				options.TableCustomPackages[opt.TableName] = opt.ProtoPackage
+			}
 		}
 
 		if err := sqlkratos.Generate(ctx, options); err != nil {
