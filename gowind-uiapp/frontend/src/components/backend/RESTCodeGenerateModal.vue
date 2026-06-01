@@ -51,7 +51,7 @@ async function handleCommit() {
 
     confirmLoading.value = true
 
-    const res = await GenerateRestCode(formData.serviceName);
+    const res = await GenerateRestCode(formData.serviceName, "per-table");
     if (res == "") {
       message.success('代码生成成功');
 

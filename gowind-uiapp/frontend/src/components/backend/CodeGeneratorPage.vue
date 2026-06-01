@@ -2,6 +2,25 @@
 import {ref, reactive} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
+import {
+  FolderOpenOutlined,
+  CloseCircleOutlined,
+  CodeOutlined,
+  AppstoreOutlined,
+  ApiOutlined,
+  InboxOutlined,
+  DatabaseOutlined,
+  CloudDownloadOutlined,
+  EditOutlined,
+  LinkOutlined,
+  ImportOutlined,
+  PlusOutlined,
+  FileTextOutlined,
+  ThunderboltOutlined,
+  TableOutlined,
+  RocketOutlined,
+  RightOutlined,
+} from '@ant-design/icons-vue'
 
 import {
   EditGeneratorOption,
@@ -174,6 +193,10 @@ async function handleQuickSelectService(service: string) {
 
 async function handleServiceChange(row: generator.Option) {
   await EditGeneratorOption(row);
+}
+
+function filterServiceOption(input: string, option: { label: string; value: string }) {
+  return option.label?.toLowerCase().includes(input.toLowerCase()) ?? false
 }
 
 async function handleExcludeChange(row: generator.Option) {
@@ -361,9 +384,39 @@ const ormTypes = [
 ]
 
 const excludedCount = ref(0)
+const excludeAll = ref(false)
+const protoPackageAll = ref('')
+
+type ProtoPackageStrategy = 'per-table' | 'by-service' | 'custom'
+const protoPackageStrategy = ref<ProtoPackageStrategy>('per-table')
 
 function updateTableStats() {
   excludedCount.value = tableData.value.filter(r => r.exclude).length
+}
+
+async function handleExcludeAll(checked: boolean) {
+  for (const row of tableData.value) {
+    row.exclude = checked
+  }
+  const opts = await GetGeneratorOptions()
+  for (let i = 0; i < opts.length; i++) {
+    opts[i].exclude = checked
+  }
+  await SetGeneratorOption(opts)
+  updateTableStats()
+}
+
+async function handleProtoPackageAll() {
+  const val = protoPackageAll.value.trim()
+  if (!val) return
+  for (const row of tableData.value) {
+    row.protoPackage = val
+  }
+  const opts = await GetGeneratorOptions()
+  for (let i = 0; i < opts.length; i++) {
+    opts[i].protoPackage = val
+  }
+  await SetGeneratorOption(opts)
 }
 
 // ==================== 生成代码 ====================
@@ -378,7 +431,7 @@ async function handleGenerate() {
   confirmLoading.value = true
   try {
     if (generateConfig.generateGrpc) {
-      const res = await GenerateGrpcCode(generateConfig.ormType);
+      const res = await GenerateGrpcCode(generateConfig.ormType, protoPackageStrategy.value);
       if (res !== '') {
         message.error(t('backend.generate.grpcFailed', {msg: res}));
         return;
@@ -387,7 +440,7 @@ async function handleGenerate() {
     }
 
     if (generateConfig.generateBff) {
-      const res = await GenerateRestCode(generateConfig.bffServiceName);
+      const res = await GenerateRestCode(generateConfig.bffServiceName, protoPackageStrategy.value);
       if (res !== '') {
         message.error(t('backend.generate.bffFailed', {msg: res}));
         return;
@@ -403,12 +456,26 @@ async function handleGenerate() {
 
 // ==================== 步骤流转 ====================
 function handleNextFromImport() {
+  if (!projectInfo.value) {
+    message.warning(t('backend.project.clickToOpen'))
+    return
+  }
   if (tableData.value.length === 0) {
-    message.warning(t('backend.import.importSchemaFirst'));
-    return;
+    message.warning(t('backend.import.importSchemaFirst'))
+    return
   }
   updateTableStats();
   currentStep.value = 1;
+}
+
+function handleNextFromTableConfig() {
+  // 检查是否有未排除但未分配服务的表
+  const unassigned = tableData.value.filter(r => !r.exclude && !r.service)
+  if (unassigned.length > 0) {
+    message.warning(t('backend.table.assignServiceFirst'))
+    return
+  }
+  currentStep.value = 2;
 }
 
 // ==================== 事件监听 ====================
@@ -422,7 +489,7 @@ EventsOn('project-opened', () => {
 EventsOn('table-imported', () => {
   refreshTableData().then(() => {
     updateTableStats();
-    if (tableData.value.length > 0) {
+    if (tableData.value.length > 0 && projectInfo.value) {
       currentStep.value = 1;
     }
   });
@@ -443,11 +510,7 @@ EventsOn('table-imported', () => {
       <!-- 打开项目 - 空状态 -->
       <div v-if="!projectInfo && !projectError" class="project-empty-card" @click="handleOpenProject">
         <div class="project-empty-icon">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#1890ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            <line x1="12" y1="11" x2="12" y2="17"/>
-            <line x1="9" y1="14" x2="15" y2="14"/>
-          </svg>
+          <FolderOpenOutlined style="font-size: 40px; color: #1890ff"/>
         </div>
         <div v-if="projectLoading" style="font-weight: 500; color: #1890ff">
           <a-spin size="small"/> {{ t('backend.project.identifying') }}
@@ -463,7 +526,7 @@ EventsOn('table-imported', () => {
         <div class="project-error-left">
           <div class="project-error-indicator">
             <span class="project-error-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4d4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              <CloseCircleOutlined style="font-size: 16px; color: #ff4d4f"/>
             </span>
             <span class="project-error-label">{{ t('backend.project.failed') }}</span>
           </div>
@@ -483,17 +546,17 @@ EventsOn('table-imported', () => {
           <div class="project-opened-name">{{ projectInfo.ModPath }}</div>
           <div class="project-opened-meta">
             <span class="meta-item">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              <CodeOutlined style="font-size: 14px"/>
               Go {{ projectInfo.GoVersion }}
             </span>
             <span class="meta-divider">|</span>
             <span class="meta-item">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <AppstoreOutlined style="font-size: 14px"/>
               {{ t('backend.project.services', {count: projectInfo.Services?.length ?? 0}) }}
             </span>
             <span class="meta-divider">|</span>
             <span class="meta-item">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <ApiOutlined style="font-size: 14px"/>
               {{ projectInfo.HasApi ? t('backend.project.apiDefined') : t('backend.project.apiNotDefined') }}
             </span>
           </div>
@@ -504,10 +567,10 @@ EventsOn('table-imported', () => {
       <!-- 导入方式 -->
       <a-card :title="t('backend.import.title')" size="small">
         <a-radio-group v-model:value="importSource" style="margin-bottom: 16px">
-          <a-radio-button value="database">{{ t('backend.import.database') }}</a-radio-button>
-          <a-radio-button value="file">{{ t('backend.import.file') }}</a-radio-button>
-          <a-radio-button value="remote">{{ t('backend.import.remote') }}</a-radio-button>
-          <a-radio-button value="editor">{{ t('backend.import.editor') }}</a-radio-button>
+          <a-radio-button value="database"><DatabaseOutlined style="margin-right: 4px"/> {{ t('backend.import.database') }}</a-radio-button>
+          <a-radio-button value="file"><FileTextOutlined style="margin-right: 4px"/> {{ t('backend.import.file') }}</a-radio-button>
+          <a-radio-button value="remote"><CloudDownloadOutlined style="margin-right: 4px"/> {{ t('backend.import.remote') }}</a-radio-button>
+          <a-radio-button value="editor"><EditOutlined style="margin-right: 4px"/> {{ t('backend.import.editor') }}</a-radio-button>
         </a-radio-group>
 
         <!-- 数据库导入 -->
@@ -539,11 +602,11 @@ EventsOn('table-imported', () => {
               </a-col>
             </a-row>
             <div style="display: flex; gap: 8px">
-              <a-button @click="handleTestConnection" :loading="dbTestLoading">
+              <a-button type="default" @click="handleTestConnection" :loading="dbTestLoading">
                 {{ t('backend.import.testConnection') }}
               </a-button>
               <a-button type="primary" @click="handleDatabaseImport" :loading="dbLoading">
-                {{ t('backend.import.importTables') }}
+                <ImportOutlined style="margin-right: 4px"/> {{ t('backend.import.importTables') }}
               </a-button>
             </div>
           </a-form>
@@ -567,7 +630,7 @@ EventsOn('table-imported', () => {
             @drop="handleFileDrop"
           >
             <div class="drop-zone-content">
-              <div style="font-size: 32px; color: #1890ff; margin-bottom: 8px">&#128196;</div>
+              <div style="font-size: 32px; color: #1890ff; margin-bottom: 8px"><InboxOutlined/></div>
               <div v-if="fileLoading" style="font-weight: 500">
                 <a-spin size="small"/> {{ t('common.importing') }}
               </div>
@@ -602,10 +665,10 @@ EventsOn('table-imported', () => {
           />
           <div style="display: flex; gap: 8px">
             <a-button type="primary" @click="handleSqlImport" :disabled="!sqlContent.trim()">
-              {{ t('backend.import.importSql') }}
+              <ImportOutlined style="margin-right: 4px"/> {{ t('backend.import.importSql') }}
             </a-button>
-            <a-button @click="handleOpenSqlEditor">
-              {{ t('backend.import.openAdvancedEditor') }}
+            <a-button type="default" @click="handleOpenSqlEditor">
+              <EditOutlined style="margin-right: 4px"/> {{ t('backend.import.openAdvancedEditor') }}
             </a-button>
           </div>
         </div>
@@ -617,23 +680,48 @@ EventsOn('table-imported', () => {
         </div>
       </a-card>
 
-      <div style="text-align: right; margin-top: 16px">
-        <a-button type="primary" @click="handleNextFromImport" :disabled="tableData.length === 0">
-          {{ t('backend.import.nextStepConfig') }}
+      <div class="step-footer" style="justify-content: flex-end">
+        <a-button type="primary" @click="handleNextFromImport" :disabled="!projectInfo || tableData.length === 0">
+          <RightOutlined style="margin-right: 4px"/> {{ t('backend.import.nextStepConfig') }}
         </a-button>
       </div>
     </div>
 
     <!-- ====== 步骤 1: 表配置 ====== -->
     <div v-if="currentStep === 1" class="step-content">
+      <!-- Proto 包策略 -->
+      <div class="proto-strategy-bar">
+        <span class="proto-strategy-label">{{ t('backend.table.protoPackageStrategy') }}</span>
+        <a-radio-group v-model:value="protoPackageStrategy" size="small" class="proto-strategy-group">
+          <a-tooltip :title="t('backend.table.protoStrategyPerTableTip')">
+            <a-radio-button value="per-table">
+              <TableOutlined style="margin-right: 4px"/>
+              {{ t('backend.table.protoStrategyPerTable') }}
+            </a-radio-button>
+          </a-tooltip>
+          <a-tooltip :title="t('backend.table.protoStrategyByServiceTip')">
+            <a-radio-button value="by-service">
+              <AppstoreOutlined style="margin-right: 4px"/>
+              {{ t('backend.table.protoStrategyByService') }}
+            </a-radio-button>
+          </a-tooltip>
+          <a-tooltip :title="t('backend.table.protoStrategyCustomTip')">
+            <a-radio-button value="custom">
+              <EditOutlined style="margin-right: 4px"/>
+              {{ t('backend.table.protoStrategyCustom') }}
+            </a-radio-button>
+          </a-tooltip>
+        </a-radio-group>
+      </div>
+
       <a-card size="small">
         <template #title>
           <span>{{ t('backend.table.tableCount', {total: tableData.length, excluded: excludedCount}) }}</span>
         </template>
         <template #extra>
           <a-space>
-            <a-button size="small" @click="openDatabaseImporter = true">{{ t('backend.table.appendImport') }}</a-button>
-            <a-button size="small" @click="openSqlImporter = true">{{ t('backend.table.sqlImport') }}</a-button>
+            <a-button size="small" type="primary" ghost @click="openDatabaseImporter = true"><PlusOutlined style="margin-right: 4px"/>{{ t('backend.table.appendImport') }}</a-button>
+            <a-button size="small" @click="openSqlImporter = true"><EditOutlined style="margin-right: 4px"/>{{ t('backend.table.sqlImport') }}</a-button>
           </a-space>
         </template>
 
@@ -644,6 +732,29 @@ EventsOn('table-imported', () => {
           class="table-content"
         >
           <vxe-column field="tableName" :title="t('backend.table.tableName')" min-width="200"/>
+          <vxe-column v-if="protoPackageStrategy === 'custom'" field="protoPackage" :title="t('backend.table.protoPackage')" min-width="200">
+            <template #header>
+              <div class="service-header">
+                <span>{{ t('backend.table.protoPackage') }}</span>
+                <a-input
+                  v-model:value="protoPackageAll"
+                  :placeholder="t('backend.table.protoPackageAllPlaceholder')"
+                  style="width: 140px; margin-left: 8px"
+                  size="small"
+                  allow-clear
+                  @pressEnter="handleProtoPackageAll"
+                />
+              </div>
+            </template>
+            <template #default="{ row }">
+              <a-input
+                v-model:value="row.protoPackage"
+                :placeholder="t('backend.table.protoPackagePlaceholder')"
+                size="small"
+                @change="handleServiceChange(row)"
+              />
+            </template>
+          </vxe-column>
           <vxe-column field="service" :title="t('backend.table.service')" min-width="180">
             <template #header>
               <div class="service-header">
@@ -659,16 +770,26 @@ EventsOn('table-imported', () => {
               </div>
             </template>
             <template #default="{ row }">
-              <a-select
+              <a-auto-complete
                 v-model:value="row.service"
                 :options="serviceOptions"
                 :placeholder="t('backend.table.selectService')"
                 style="width: 100%"
                 @change="handleServiceChange(row)"
+                allow-clear
+                :filter-option="filterServiceOption"
               />
             </template>
           </vxe-column>
-          <vxe-column field="exclude" :title="t('backend.table.exclude')" width="80" align="center">
+          <vxe-column field="exclude" :title="t('backend.table.exclude')" width="100" align="center">
+            <template #header>
+              <a-switch
+                v-model:checked="excludeAll"
+                size="small"
+                :style="{ backgroundColor: excludeAll ? '#ff4d4f' : undefined }"
+                @change="handleExcludeAll"
+              />
+            </template>
             <template #default="{ row }">
               <a-switch
                 v-model:checked="row.exclude"
@@ -680,9 +801,9 @@ EventsOn('table-imported', () => {
         </vxe-table>
       </a-card>
 
-      <div style="display: flex; justify-content: space-between; margin-top: 16px">
+      <div class="step-footer">
         <a-button @click="currentStep = 0">{{ t('common.prevStep') }}</a-button>
-        <a-button type="primary" @click="currentStep = 2">
+        <a-button type="primary" @click="handleNextFromTableConfig">
           {{ t('backend.generate.nextStepGenerate') }}
         </a-button>
       </div>
@@ -743,16 +864,16 @@ EventsOn('table-imported', () => {
         </a-descriptions>
       </a-card>
 
-      <div style="display: flex; justify-content: space-between; margin-top: 16px">
+      <div class="step-footer">
         <a-button @click="currentStep = 1">{{ t('common.prevStep') }}</a-button>
-        <a-button
+          <a-button
           type="primary"
           danger
           :loading="confirmLoading"
           :disabled="!generateConfig.generateGrpc && !generateConfig.generateBff"
           @click="handleGenerate"
         >
-          {{ t('backend.generate.startGenerate') }}
+          <RocketOutlined style="margin-right: 4px"/> {{ t('backend.generate.startGenerate') }}
         </a-button>
       </div>
     </div>
@@ -1010,5 +1131,47 @@ EventsOn('table-imported', () => {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #f0f0f0;
+}
+
+/* Proto 包策略栏 */
+.proto-strategy-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #f6f8fc 0%, #eef2f9 100%);
+  border: 1px solid #d9e3f0;
+  border-radius: 8px;
+}
+
+.proto-strategy-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.proto-strategy-group :deep(.ant-radio-button-wrapper) {
+  border-radius: 6px !important;
+  border: 1px solid #d9d9d9 !important;
+  margin-right: 6px;
+  padding: 0 14px;
+  height: 30px;
+  line-height: 28px;
+  font-size: 12px;
+  transition: all 0.25s;
+}
+
+.proto-strategy-group :deep(.ant-radio-button-wrapper-checked) {
+  border-color: #1890ff !important;
+  background: #1890ff !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.35);
+}
+
+.proto-strategy-group :deep(.ant-radio-button-wrapper:not(:first-child)::before) {
+  display: none;
 }
 </style>

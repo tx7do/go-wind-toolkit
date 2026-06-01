@@ -75,9 +75,54 @@ gow run
 gow run admin
 ```
 
-### 4. 代码生成
+### 4. 数据库驱动代码生成
 
-#### Ent 代码生成
+从现有数据库生成完整的 CRUD 微服务代码（proto、ORM、service、server、wire、config）：
+
+```shell
+# 交互式（会提示输入 DSN 和 service name）
+gow generate
+
+# 完整命令行
+gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user
+
+# 指定 ORM 和表
+gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" \
+  --service user --orm ent --servers grpc --tables users,roles
+
+# 仅生成 proto 文件
+gow generate --dsn "postgres://user:pass@localhost:5432/dbname" --service admin --proto-only
+
+# 生成 REST 服务（从 gRPC 服务代理）
+gow generate --dsn "mysql://..." --service user-admin \
+  --servers rest --source-module user --skip-orm
+
+# 使用别名
+gow gen --dsn "..." --service user
+```
+
+### 5. 微服务演进（提取拆分）
+
+从一个已有服务中提取业务模块到另一个服务，实现渐进式微服务拆分：
+
+```shell
+# 从 admin 服务提取 role 模块到 user 服务
+# 目标服务不存在时会自动创建
+# ORM 类型根据源服务目录结构自动侦测
+gow extract admin user --obj role
+
+# 提取多个实体（逗号分隔）
+gow extract admin user -o role,permission
+
+# 提取多个实体（重复 flag）
+gow extract admin user --obj role --obj permission
+
+# 保留源文件
+# gow extract admin user -o role --keep-source
+```
+
+### 6. 工具代码生成
+
 
 ```shell
 # 为所有服务生成 Ent
@@ -126,6 +171,61 @@ Flags:
   -s, --server strings   服务类型：grpc / rest（可多选）
   -d, --dao strings      数据访问层：gorm / ent / redis（可多选）
   -o, --orm string       ORM 类型：gorm / ent（默认：ent）
+```
+
+### `gow generate` — 数据库驱动代码生成
+
+从数据库 schema 生成完整的 Kratos 微服务代码（proto、ORM、service、server、wire、config）。
+
+```shell
+gow generate [flags]
+# 或者
+gow gen [flags]
+
+Flags:
+      --dsn string              Database source name, e.g. mysql://user:pass@tcp(localhost:3306)/dbname
+      --driver string           Database driver: mysql, postgres (default "mysql")
+      --service string          Service name (module name)
+      --orm string              ORM type: ent, gorm (default "ent")
+  -s, --servers strings         Server types: grpc, rest (default [grpc])
+  -t, --tables strings          Tables to include (default: all)
+      --exclude-tables strings  Tables to exclude
+      --module-version string   API module version (default "v1")
+      --proto-only              Only generate proto files
+      --skip-orm                Skip ORM code generation
+      --skip-config             Skip config file generation
+      --skip-makefile           Skip Makefile generation
+      --source-module string    Source module name for REST service
+```
+
+### `gow extract` — 微服务模块提取
+
+从一个已有服务中提取业务模块（schema、repo、service、wire、server）到目标服务，用于微服务的渐进式拆分与演进。目标服务不存在时会自动创建脚手架。ORM 类型根据源服务目录结构自动侦测。
+
+```shell
+gow extract <source-service> <target-service> -o <model> [-o <model>...] [flags]
+
+Flags:
+  -o, --obj stringArray   要提取的实体名称（支持逗号分隔或重复使用）
+      --orm string        ORM 类型覆盖：ent, gorm（默认自动侦测）
+      --keep-source       保留源文件（默认删除）
+```
+
+#### 示例
+
+```shell
+# 单个实体
+gow extract admin user -o role
+
+# 多个实体
+gow extract admin user -o role,permission
+gow extract admin user --obj role --obj permission
+
+# 手动指定 ORM 类型
+gow extract admin user -o role --orm gorm
+
+# 保留源文件
+# gow extract admin user -o role --keep-source
 ```
 
 ### `gow run` — 运行服务
@@ -187,8 +287,11 @@ myproject/
 
 - ✅ 一键创建 Kratos 标准项目
 - ✅ 一键添加多协议微服务（gRPC + REST）
+- ✅ 数据库驱动 CRUD 代码生成（proto、ORM、service、server、wire、config）
 - ✅ 自动生成 Ent / GORM 模型
 - ✅ 自动生成 Protobuf & API 定义
 - ✅ 自动生成 Wire 依赖注入
+- ✅ 微服务渐进式拆分与演进（模块提取）
 - ✅ 一键运行、热重载支持
 - ✅ 统一 CLI 入口，降低学习成本
+- ✅ 桌面 UI 可视化面板（Wails）

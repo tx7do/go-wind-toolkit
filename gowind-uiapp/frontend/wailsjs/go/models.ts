@@ -1,3 +1,191 @@
+export namespace ai {
+	
+	export class AIProviderPreset {
+	    name: string;
+	    value: string;
+	    baseUrl: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIProviderPreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.value = source["value"];
+	        this.baseUrl = source["baseUrl"];
+	    }
+	}
+	export class Config {
+	    provider: string;
+	    baseUrl: string;
+	    apiKey: string;
+	    model: string;
+	    temperature: number;
+	    maxTokens: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Config(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.baseUrl = source["baseUrl"];
+	        this.apiKey = source["apiKey"];
+	        this.model = source["model"];
+	        this.temperature = source["temperature"];
+	        this.maxTokens = source["maxTokens"];
+	    }
+	}
+	export class MicroservicePartition {
+	    serviceName: string;
+	    tables: string[];
+	    description: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MicroservicePartition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serviceName = source["serviceName"];
+	        this.tables = source["tables"];
+	        this.description = source["description"];
+	    }
+	}
+	export class OpenAPIResult {
+	    success: boolean;
+	    files: string[];
+	    message?: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OpenAPIResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.files = source["files"];
+	        this.message = source["message"];
+	        this.error = source["error"];
+	    }
+	}
+	export class PartitionResult {
+	    success: boolean;
+	    partitions: MicroservicePartition[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PartitionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.partitions = this.convertValues(source["partitions"], MicroservicePartition);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class StepResult {
+	    success: boolean;
+	    content: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StepResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.content = source["content"];
+	        this.error = source["error"];
+	    }
+	}
+
+}
+
+export namespace configexporter {
+	
+	export class ExportResult {
+	    success: boolean;
+	    error?: string;
+	    service?: string;
+	    filesCount?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.error = source["error"];
+	        this.service = source["service"];
+	        this.filesCount = source["filesCount"];
+	    }
+	}
+	export class RemoteConfig {
+	    type: string;
+	    endpoint: string;
+	    projectName: string;
+	    group: string;
+	    env: string;
+	    namespaceId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.endpoint = source["endpoint"];
+	        this.projectName = source["projectName"];
+	        this.group = source["group"];
+	        this.env = source["env"];
+	        this.namespaceId = source["namespaceId"];
+	    }
+	}
+	export class ServiceInfo {
+	    name: string;
+	    configFiles: string[];
+	    configFolder: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServiceInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.configFiles = source["configFiles"];
+	        this.configFolder = source["configFolder"];
+	    }
+	}
+
+}
+
 export namespace database {
 	
 	export class ColumnInfo {
@@ -215,6 +403,87 @@ export namespace detect {
 
 }
 
+export namespace devtools {
+	
+	export class AddServiceOptions {
+	    serviceName: string;
+	    servers: string[];
+	    dbClients: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AddServiceOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serviceName = source["serviceName"];
+	        this.servers = source["servers"];
+	        this.dbClients = source["dbClients"];
+	    }
+	}
+	export class CommandResult {
+	    success: boolean;
+	    output: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CommandResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.output = source["output"];
+	        this.error = source["error"];
+	    }
+	}
+	export class CreateProjectOptions {
+	    name: string;
+	    module: string;
+	    repoUrl: string;
+	    branch: string;
+	    parentDir: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateProjectOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.module = source["module"];
+	        this.repoUrl = source["repoUrl"];
+	        this.branch = source["branch"];
+	        this.parentDir = source["parentDir"];
+	    }
+	}
+	export class ServiceInfo {
+	    name: string;
+	    hasServer: boolean;
+	    hasConfig: boolean;
+	    hasEnt: boolean;
+	    entSchemas?: string[];
+	    hasGorm: boolean;
+	    gormModels?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ServiceInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.hasServer = source["hasServer"];
+	        this.hasConfig = source["hasConfig"];
+	        this.hasEnt = source["hasEnt"];
+	        this.entSchemas = source["entSchemas"];
+	        this.hasGorm = source["hasGorm"];
+	        this.gormModels = source["gormModels"];
+	    }
+	}
+
+}
+
 export namespace generator {
 	
 	export class Option {
@@ -222,6 +491,7 @@ export namespace generator {
 	    tableName: string;
 	    service: string;
 	    exclude: boolean;
+	    protoPackage: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Option(source);
@@ -233,6 +503,7 @@ export namespace generator {
 	        this.tableName = source["tableName"];
 	        this.service = source["service"];
 	        this.exclude = source["exclude"];
+	        this.protoPackage = source["protoPackage"];
 	    }
 	}
 

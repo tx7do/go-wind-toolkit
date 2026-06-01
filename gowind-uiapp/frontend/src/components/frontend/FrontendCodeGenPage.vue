@@ -2,17 +2,42 @@
 import {ref, computed} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
+import {
+  InboxOutlined,
+  CloudDownloadOutlined,
+  FileTextOutlined,
+  SettingOutlined,
+  FolderOpenOutlined,
+  EyeOutlined,
+  CheckSquareOutlined,
+  FilterOutlined,
+  SendOutlined,
+  UndoOutlined,
+  RightOutlined,
+} from '@ant-design/icons-vue'
 
 import {GenerateFrontendCode} from "../../../wailsjs/go/main/App";
 import {SelectFolder} from "../../../wailsjs/go/main/App";
 
 import {parseOpenApiYaml, extractServices, type ParsedService, type OpenApiSpec} from "../../utils/openapi-parser";
 import {
-  generateAll,
-  type GeneratedFile,
-  type GenerateFileType,
-  type RouterModuleConfig,
+  generateAll as generateVueAll,
+  type GeneratedFile as VueGeneratedFile,
+  type GenerateFileType as VueGenerateFileType,
+  type RouterModuleConfig as VueRouterModuleConfig,
 } from "../../generators/vue-element";
+import {
+  generateAll as generateReactAll,
+  type ReactGeneratedFile,
+  type ReactGenerateFileType,
+  type ReactRouterModuleConfig,
+} from "../../generators/react-antd";
+import {
+  generateAll as generateVbenAll,
+  type VbenGeneratedFile,
+  type VbenGenerateFileType,
+  type VbenRouterModuleConfig,
+} from "../../generators/vue-vben";
 import MonacoEditor from "../backend/MonacoEditor.vue";
 
 const {t} = useI18n()
@@ -55,29 +80,33 @@ const selectedServiceKeys = ref<string[]>([])
 // ==================== 生成选项 ====================
 const generateOptions = ref({
   outputDir: '',
-  generateTypes: ['service', 'composable', 'page', 'drawer', 'router', 'locale'] as GenerateFileType[],
+  generateTypes: ['service', 'composable', 'page', 'drawer', 'router', 'locale'] as string[],
 })
-const routerModules = ref<RouterModuleConfig[]>([])
+const routerModules = ref<(VueRouterModuleConfig | ReactRouterModuleConfig | VbenRouterModuleConfig)[]>([])
 
 // ==================== 生成结果 ====================
-const generatedFiles = ref<GeneratedFile[]>([])
+const generatedFiles = ref<(VueGeneratedFile | ReactGeneratedFile | VbenGeneratedFile)[]>([])
 const selectedFileIndex = ref(0)
 
 const currentFileContent = ref('')
 
 // ==================== 文件列表过滤 ====================
 const activeFileType = ref<string>('all')
-const fileTypeOptions = computed(() => [
-  {label: t('frontend.fileType.all'), value: 'all'},
-  {label: 'Service', value: 'service'},
-  {label: 'Composable', value: 'composable'},
-  {label: t('frontend.fileType.page'), value: 'page'},
-  {label: t('frontend.fileType.drawer'), value: 'drawer'},
-  {label: t('frontend.fileType.router'), value: 'router'},
-  {label: t('frontend.fileType.locale'), value: 'locale'},
-])
+const fileTypeOptions = computed(() => {
+  const isVben = targetFramework.value === 'vue-vben'
+  const isReact = targetFramework.value === 'react'
+  return [
+    {label: t('frontend.fileType.all'), value: 'all'},
+    {label: 'Service', value: 'service'},
+    {label: isReact ? 'Hooks' : 'Composable', value: isReact ? 'hooks' : 'composable'},
+    {label: t('frontend.fileType.page'), value: 'page'},
+    {label: t('frontend.fileType.drawer'), value: 'drawer'},
+    {label: t('frontend.fileType.router'), value: 'router'},
+    {label: t('frontend.fileType.locale'), value: 'locale'},
+  ]
+})
 
-const filteredFiles = ref<GeneratedFile[]>([])
+const filteredFiles = ref<(VueGeneratedFile | ReactGeneratedFile | VbenGeneratedFile)[]>([])
 
 function filterFiles() {
   if (activeFileType.value === 'all') {
@@ -238,18 +267,37 @@ function handlePreview() {
   if (selectedServices.length === 0) return
 
   if (targetFramework.value === 'vue-element') {
-    generatedFiles.value = generateAll({
+    generatedFiles.value = generateVueAll({
       services: selectedServices,
       serviceName: '',
-      generateTypes: generateOptions.value.generateTypes,
-      routerModules: generateOptions.value.generateTypes.includes('router') ? routerModules.value : undefined,
+      generateTypes: generateOptions.value.generateTypes as VueGenerateFileType[],
+      routerModules: generateOptions.value.generateTypes.includes('router') ? routerModules.value as VueRouterModuleConfig[] : undefined,
+    })
+  } else if (targetFramework.value === 'react') {
+    // React 使用 hooks 而不是 composable
+    const reactTypes = generateOptions.value.generateTypes.map(t =>
+      t === 'composable' ? 'hooks' : t
+    ) as ReactGenerateFileType[]
+
+    generatedFiles.value = generateReactAll({
+      services: selectedServices,
+      serviceName: '',
+      generateTypes: reactTypes,
+      routerModules: reactTypes.includes('router') ? routerModules.value as ReactRouterModuleConfig[] : undefined,
+    })
+  } else if (targetFramework.value === 'vue-vben') {
+    generatedFiles.value = generateVbenAll({
+      services: selectedServices,
+      serviceName: '',
+      generateTypes: generateOptions.value.generateTypes as VbenGenerateFileType[],
+      routerModules: generateOptions.value.generateTypes.includes('router') ? routerModules.value as VbenRouterModuleConfig[] : undefined,
     })
   } else {
     // 其他框架暂未实现，生成占位提示
     generatedFiles.value = selectedServices.map(s => ({
       path: `${targetFramework.value}/${s.tagName}/placeholder.txt`,
       content: `[${frameworkOptions.find(f => f.value === targetFramework.value)?.label}] ${t('frontend.placeholder.notImplemented')}\n\n${t('frontend.placeholder.service')}: ${s.modelName}\n${t('frontend.placeholder.description')}: ${s.description}\n${t('frontend.placeholder.fields')}: ${s.fields.length}\n${t('frontend.placeholder.operations')}: ${s.operations.map(o => o.type).join(', ')}\n\n${t('frontend.placeholder.comingSoon')}`,
-      type: 'service' as GenerateFileType,
+      type: 'service' as const,
       description: `${s.modelName} - ${t('frontend.placeholder.notImplemented')}`,
       serviceName: s.tagName,
     }))
@@ -283,6 +331,15 @@ function handleSelectCrud() {
   selectedServiceKeys.value = parsedServices.value
     .filter((s: ParsedService) => s.operations.some((op: { type: string }) => op.type === 'list'))
     .map(s => s.tagName)
+}
+
+function toggleServiceSelection(tagName: string) {
+  const idx = selectedServiceKeys.value.indexOf(tagName)
+  if (idx >= 0) {
+    selectedServiceKeys.value.splice(idx, 1)
+  } else {
+    selectedServiceKeys.value.push(tagName)
+  }
 }
 
 // ==================== 确认生成 ====================
@@ -379,7 +436,7 @@ function getOperationTag(type: string) {
 
 function getFileTypeColor(type: string) {
   const map: Record<string, string> = {
-    service: 'green', composable: 'cyan', page: 'blue',
+    service: 'green', composable: 'cyan', hooks: 'cyan', page: 'blue',
     drawer: 'purple', router: 'geekblue', locale: 'gold',
   }
   return map[type] || 'default'
@@ -465,7 +522,7 @@ const previewLanguage = computed(() => {
             @drop="handleFileDrop"
           >
             <div class="drop-zone-content">
-              <div style="font-size: 32px; color: #1890ff; margin-bottom: 8px">&#128196;</div>
+              <div style="font-size: 32px; color: #1890ff; margin-bottom: 8px"><InboxOutlined/></div>
               <div style="font-weight: 500; margin-bottom: 4px">
                 {{ selectedFileName || t('frontend.import.fileDropHint') }}
               </div>
@@ -498,9 +555,9 @@ const previewLanguage = computed(() => {
         </div>
       </a-card>
 
-      <div style="text-align: right; margin-top: 16px">
+      <div class="step-footer" style="justify-content: flex-end">
         <a-button type="primary" @click="handleParse" :disabled="!yamlContent.trim()">
-          {{ t('frontend.import.parseBtn') }}
+          <RightOutlined style="margin-right: 4px"/> {{ t('frontend.import.parseBtn') }}
         </a-button>
       </div>
     </div>
@@ -525,13 +582,14 @@ const previewLanguage = computed(() => {
                 style="width: calc(100% - 90px)"
                 read-only
               />
-              <a-button type="primary" @click="handleSelectOutputDir">{{ t('frontend.config.selectDir') }}</a-button>
+              <a-button size="small" type="primary" @click="handleSelectOutputDir"><FolderOpenOutlined style="margin-right: 4px"/> {{ t('frontend.config.selectDir') }}</a-button>
             </a-input-group>
           </a-form-item>
-          <a-form-item v-if="targetFramework === 'vue-element'" :label="t('frontend.config.generateTypes')">
+          <a-form-item v-if="targetFramework === 'vue-element' || targetFramework === 'react' || targetFramework === 'vue-vben'" :label="t('frontend.config.generateTypes')">
             <a-checkbox-group v-model:value="generateOptions.generateTypes">
               <a-checkbox value="service">{{ t('frontend.config.serviceLayer') }}</a-checkbox>
-              <a-checkbox value="composable">{{ t('frontend.config.composableLayer') }}</a-checkbox>
+              <a-checkbox v-if="targetFramework === 'vue-element' || targetFramework === 'vue-vben'" value="composable">{{ t('frontend.config.composableLayer') }}</a-checkbox>
+              <a-checkbox v-if="targetFramework === 'react'" value="composable">React Query Hooks</a-checkbox>
               <a-checkbox value="page">{{ t('frontend.config.listPage') }}</a-checkbox>
               <a-checkbox value="drawer">{{ t('frontend.config.editDrawer') }}</a-checkbox>
               <a-checkbox value="router">{{ t('frontend.config.routerConfig') }}</a-checkbox>
@@ -540,7 +598,7 @@ const previewLanguage = computed(() => {
           </a-form-item>
         </a-form>
         <a-alert
-          v-if="targetFramework !== 'vue-element'"
+          v-if="targetFramework !== 'vue-element' && targetFramework !== 'react' && targetFramework !== 'vue-vben'"
           :message="t('frontend.config.notImplemented', {framework: getFrameworkLabel(targetFramework)})"
           type="warning"
           show-icon
@@ -562,31 +620,54 @@ const previewLanguage = computed(() => {
           </div>
         </template>
 
-        <a-checkbox-group v-model:value="selectedServiceKeys" style="width: 100%">
-          <div v-for="service in parsedServices" :key="service.tagName"
-               style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center;">
-            <a-checkbox :value="service.tagName" style="margin-right: 12px"/>
-            <div style="flex: 1">
-              <div style="font-weight: 500; margin-bottom: 4px;">
-                {{ service.modelName }}
-                <span style="color: #999; font-weight: normal; margin-left: 8px; font-size: 12px;">{{ service.description }}</span>
-              </div>
-              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                <a-tag v-for="op in service.operations" :key="op.operationId"
-                       :color="getOperationTag(op.type).color" size="small">
-                  {{ getOperationTag(op.type).text }}
-                </a-tag>
-                <span style="color: #999; font-size: 12px; margin-left: 8px;">{{ t('frontend.service.fields', {count: service.fields.length}) }}</span>
-              </div>
-            </div>
-          </div>
-        </a-checkbox-group>
+        <a-list
+          :data-source="parsedServices"
+          size="small"
+          :split="true"
+          class="service-select-list"
+        >
+          <template #renderItem="{ item: service }">
+            <a-list-item
+              class="service-list-item"
+              :class="{ selected: selectedServiceKeys.includes(service.tagName) }"
+              @click="toggleServiceSelection(service.tagName)"
+            >
+              <a-list-item-meta>
+                <template #title>
+                  <div class="service-item-title">
+                    <span class="service-model-name">{{ service.modelName }}</span>
+                    <a-tag v-if="selectedServiceKeys.includes(service.tagName)" color="blue" size="small" style="margin-left: 6px">{{ t('frontend.service.selected') || 'Selected' }}</a-tag>
+                  </div>
+                </template>
+                <template #description>
+                  <div class="service-item-desc">
+                    <span class="service-desc-text">{{ service.description }}</span>
+                    <div class="service-meta-row">
+                      <a-tag v-for="op in service.operations" :key="op.operationId"
+                             :color="getOperationTag(op.type).color" size="small">
+                        {{ getOperationTag(op.type).text }}
+                      </a-tag>
+                      <span class="service-field-count">{{ t('frontend.service.fields', {count: service.fields.length}) }}</span>
+                    </div>
+                  </div>
+                </template>
+                <template #avatar>
+                  <a-checkbox
+                    :checked="selectedServiceKeys.includes(service.tagName)"
+                    @click.stop
+                    @change="toggleServiceSelection(service.tagName)"
+                  />
+                </template>
+              </a-list-item-meta>
+            </a-list-item>
+          </template>
+        </a-list>
       </a-card>
 
-      <div style="display: flex; justify-content: space-between; margin-top: 16px">
+      <div class="step-footer">
         <a-button @click="currentStep = 0">{{ t('common.prevStep') }}</a-button>
         <a-button type="primary" @click="handlePreview" :disabled="selectedServiceKeys.length === 0">
-          {{ t('frontend.preview.previewBtn') }}
+          <EyeOutlined style="margin-right: 4px"/> {{ t('frontend.preview.previewBtn') }}
         </a-button>
       </div>
     </div>
@@ -629,12 +710,12 @@ const previewLanguage = computed(() => {
         </div>
       </div>
 
-      <div style="display: flex; justify-content: space-between; margin-top: 16px">
+      <div class="step-footer">
         <a-button @click="currentStep = 1">{{ t('common.prevStep') }}</a-button>
         <a-space>
-          <a-button @click="currentStep = 0; resetState()">{{ t('frontend.preview.resetBtn') }}</a-button>
+          <a-button @click="currentStep = 0; resetState()"><UndoOutlined style="margin-right: 4px"/> {{ t('frontend.preview.resetBtn') }}</a-button>
           <a-button type="primary" :loading="confirmLoading" @click="handleCommit">
-            {{ t('frontend.preview.confirmBtn') }}
+            <SendOutlined style="margin-right: 4px"/> {{ t('frontend.preview.confirmBtn') }}
           </a-button>
         </a-space>
       </div>
@@ -764,5 +845,62 @@ const previewLanguage = computed(() => {
   left: 0;
   right: 0;
   bottom: 0;
+}
+
+/* 服务选择列表 */
+.service-select-list {
+  max-height: calc(100vh - 420px);
+  overflow-y: auto;
+}
+
+.service-list-item {
+  cursor: pointer;
+  padding: 10px 16px !important;
+  transition: background 0.15s, border-color 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.service-list-item:hover {
+  background: #f5f7fa;
+}
+
+.service-list-item.selected {
+  background: #f0f7ff;
+  border-left-color: #1890ff;
+}
+
+.service-item-title {
+  display: flex;
+  align-items: center;
+}
+
+.service-model-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #262626;
+}
+
+.service-item-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.service-desc-text {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.service-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.service-field-count {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-left: 4px;
 }
 </style>

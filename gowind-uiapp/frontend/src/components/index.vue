@@ -6,6 +6,8 @@ import Header from "./Header.vue";
 import CodeGeneratorPage from "./backend/CodeGeneratorPage.vue";
 import FrontendCodeGenPage from "./frontend/FrontendCodeGenPage.vue";
 import RemoteConfigPage from "./remote-config/RemoteConfigPage.vue";
+import AIAssistantPage from "./ai/AIAssistantPage.vue";
+import DevToolsPage from "./devtools/DevToolsPage.vue";
 
 const {t} = useI18n()
 
@@ -28,6 +30,16 @@ const settingList = [
     key: '3',
     nameKey: 'tabs.remoteConfig' as const,
     component: RemoteConfigPage,
+  },
+  {
+    key: '4',
+    nameKey: 'tabs.aiAssistant' as const,
+    component: AIAssistantPage,
+  },
+  {
+    key: '5',
+    nameKey: 'tabs.devTools' as const,
+    component: DevToolsPage,
   },
 ];
 </script>

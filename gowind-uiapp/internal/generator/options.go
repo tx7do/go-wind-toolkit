@@ -1,10 +1,11 @@
 package generator
 
 type Option struct {
-	ID        uint32 `json:"id"`
-	TableName string `json:"tableName"`
-	Service   string `json:"service"`
-	Exclude   bool   `json:"exclude"`
+	ID           uint32 `json:"id"`
+	TableName    string `json:"tableName"`
+	Service      string `json:"service"`
+	Exclude      bool   `json:"exclude"`
+	ProtoPackage string `json:"protoPackage"`
 }
 
 type GeneratorOptions []*Option
