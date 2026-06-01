@@ -288,6 +288,21 @@ func (g *Generator) generateDataPackageCode(
 		return nil
 	}
 
+	// 先生成 client 代码（只生成一次）
+	switch orm {
+	case "ent":
+		if err := g.writeEntClientCode(outputPath, projectName, serviceName); err != nil {
+			return err
+		}
+	case "gorm":
+		if err := g.writeGormClientCode(outputPath, projectName, serviceName); err != nil {
+			return err
+		}
+	}
+
+	// 收集所有模型名
+	var modelNames []string
+
 	var dataFields []generators.DataField
 	for _, table := range tables {
 		if len(table.Fields) == 0 {
@@ -295,6 +310,7 @@ func (g *Generator) generateDataPackageCode(
 		}
 
 		name := inflection.Singular(table.Name)
+		modelNames = append(modelNames, name)
 
 		dataFields = make([]generators.DataField, 0)
 		for _, field := range table.Fields {
@@ -313,13 +329,22 @@ func (g *Generator) generateDataPackageCode(
 			dataFields = append(dataFields, dataField)
 		}
 
-		if err := g.WriteDataPackageCode(
-			outputPath,
-			orm,
-			projectName, serviceName, name,
-			moduleName, moduleVersion,
-			dataFields,
-		); err != nil {
+		// 生成 repo 代码
+		switch orm {
+		case "ent":
+			if err := g.writeEntRepoCode(outputPath, projectName, serviceName, name, moduleName, moduleVersion, dataFields); err != nil {
+				return err
+			}
+		case "gorm":
+			if err := g.writeGormRepoCode(outputPath, projectName, serviceName, name, moduleName, moduleVersion, dataFields); err != nil {
+				return err
+			}
+		}
+	}
+
+	// gorm_init 在所有模型收集完后生成
+	if orm == "gorm" {
+		if err := g.writeGormInitCode(outputPath, projectName, serviceName, modelNames); err != nil {
 			return err
 		}
 	}

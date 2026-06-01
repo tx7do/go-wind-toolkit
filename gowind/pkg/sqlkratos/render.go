@@ -83,33 +83,36 @@ func (g *Generator) writeGormClientCode(
 	serviceName string,
 ) error {
 	clientPath := path.Join(outputPath, "client")
-	gormPath := path.Join(outputPath, "gorm")
 
-	opts1 := code_generator.Options{
+	opts := code_generator.Options{
 		OutDir: clientPath,
 		Module: projectModule,
 		Vars: map[string]any{
 			"Service": serviceName,
 		},
 	}
-	_, err := g.goGenerator.GenerateGormClient(context.Background(), opts1)
-	if err != nil {
-		return err
-	}
+	_, err := g.goGenerator.GenerateGormClient(context.Background(), opts)
+	return err
+}
 
-	opts2 := code_generator.Options{
+func (g *Generator) writeGormInitCode(
+	outputPath string,
+	projectModule string,
+	serviceName string,
+	models []string,
+) error {
+	gormPath := path.Join(outputPath, "gorm")
+
+	opts := code_generator.Options{
 		OutDir: gormPath,
 		Module: projectModule,
 		Vars: map[string]any{
 			"Service": serviceName,
+			"Models":  models,
 		},
 	}
-	_, err = g.goGenerator.GenerateGormInit(context.Background(), opts2)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := g.goGenerator.GenerateGormInit(context.Background(), opts)
+	return err
 }
 
 func (g *Generator) writeEntRepoCode(

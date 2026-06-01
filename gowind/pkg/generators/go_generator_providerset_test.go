@@ -275,3 +275,73 @@ func indexOf(s, substr string) int {
 	}
 	return -1
 }
+
+// TestEnsureImport_WithCommentsInFile 测试 EnsureImport 在带注释（含括号）的文件中正确插入 import
+func TestEnsureImport_WithCommentsInFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "wire_set.go")
+
+	// 模拟真实的 wire_set.go 文件，注释中包含括号（如 (e.g. `wire_gen.go`)）
+	initialContent := `//go:build wireinject
+// +build wireinject
+
+//go:generate go run github.com/google/wire/cmd/wire
+
+// This file defines the dependency injection ProviderSet for the data layer and contains no business logic.
+// The build tag "wireinject" excludes this source from normal "go build" and final binaries.
+// Run "go generate ./..." or "go run github.com/google/wire/cmd/wire" to regenerate the Wire output (e.g. "wire_gen.go"), which will be included in final builds.
+// Keep provider constructors here only; avoid init-time side effects or runtime logic in this file.
+
+package providers
+
+import (
+	"github.com/google/wire"
+
+	"my-project/app/admin/service/internal/data"
+)
+
+// ProviderSet is the Wire provider set for data layer.
+var ProviderSet = wire.NewSet(
+	client.NewEntClient,
+
+	data.NewGameRepo,
+)
+`
+
+	err := os.WriteFile(testFile, []byte(initialContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	g := NewGoGenerator()
+
+	// 添加新 import
+	err = g.EnsureImport(testFile, "my-project/app/admin/service/internal/data/client")
+	if err != nil {
+		t.Fatalf("EnsureImport failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(testFile)
+	contentStr := string(content)
+
+	t.Logf("Final content:\n%s", contentStr)
+
+	// 验证新 import 已被添加
+	if !strings.Contains(contentStr, "\"my-project/app/admin/service/internal/data/client\"") {
+		t.Error("expected new import to be added")
+	}
+
+	// 验证注释没有被破坏
+	if !strings.Contains(contentStr, "(e.g. \"wire_gen.go\")") {
+		t.Error("comment was corrupted - bracket in comment was modified")
+	}
+
+	// 验证 import 在正确位置（在 import 块内，而不是注释中）
+	importBlockStart := strings.Index(contentStr, "import (")
+	importBlockEnd := strings.Index(contentStr[importBlockStart:], ")") + importBlockStart
+	newImportPos := strings.Index(contentStr, "\"my-project/app/admin/service/internal/data/client\"")
+
+	if newImportPos < importBlockStart || newImportPos > importBlockEnd {
+		t.Errorf("new import was inserted outside the import block: pos=%d, block=[%d,%d]", newImportPos, importBlockStart, importBlockEnd)
+	}
+}

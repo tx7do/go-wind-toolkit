@@ -144,6 +144,25 @@ func (g *GoGenerator) GenerateGormInit(ctx context.Context, opts code_generator.
 	if g.CodeGenerator == nil {
 		return "", os.ErrInvalid
 	}
+
+	if opts.OutputName == "" {
+		opts.OutputName = "gorm_init.go"
+	}
+
+	outputPath = filepath.Join(opts.OutDir, opts.OutputName)
+
+	// 如果文件已存在，使用 Upsert 追加新模型
+	if _, statErr := os.Stat(outputPath); statErr == nil {
+		var models []string
+		if v, ok := opts.Vars["Models"]; ok {
+			models, _ = v.([]string)
+		}
+		if err = g.UpsertMigrateModels(outputPath, models); err != nil {
+			return "", fmt.Errorf("failed to upsert migrate models: %w", err)
+		}
+		return outputPath, nil
+	}
+
 	return g.Generate(ctx, opts, "gorm_init.tpl")
 }
 
@@ -413,7 +432,8 @@ func (g *GoGenerator) EnsureImport(filePath string, importPath string) error {
 
 	// 在 ) 前插入新的 import
 	newImport := "\t\"" + importPath + "\"\n"
-	newContent := strings.Replace(fileContent, matches[2], newImport+matches[2], 1)
+	// 使用正则替换精确替换 import 块内的 )，避免替换注释中的 )
+	newContent := importPattern.ReplaceAllString(fileContent, "${1}"+newImport+"${2}")
 
 	err = os.WriteFile(filePath, []byte(newContent), 0644)
 	if err != nil {
@@ -444,4 +464,57 @@ func (g *GoGenerator) CheckProviderSetFunctionExists(filePath string, functionCa
 	// 检查函数是否存在
 	funcPattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(functionCall) + `\b`)
 	return funcPattern.MatchString(existingFuncs), nil
+}
+
+// UpsertMigrateModels 向 gorm_init.go 的 RegisterMigrateModels 中追加新模型
+// models: 模型名列表（单数形式，如 "game"），会被转为 PascalCase
+func (g *GoGenerator) UpsertMigrateModels(filePath string, models []string) error {
+	if len(models) == 0 {
+		return nil
+	}
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	fileContent := string(content)
+
+	// 查找 RegisterMigrateModels 调用中的参数区域
+	// 匹配: gormCurd.RegisterMigrateModels(...)
+	pattern := regexp.MustCompile("(gormCurd\\.RegisterMigrateModels\\s*\\(\\s*\\n?)([\\s\\S]*?)(\\s*\\))")
+	matches := pattern.FindStringSubmatch(fileContent)
+	if matches == nil {
+		return fmt.Errorf("RegisterMigrateModels call not found in file")
+	}
+
+	prefix := matches[1]
+	existingContent := matches[2]
+	suffix := matches[3]
+
+	// 追加不存在的模型
+	var newEntries string
+	for _, model := range models {
+		pascalName := stringcase.ToPascalCase(model)
+		entry := "&models." + pascalName + "{},"
+		// 检查是否已存在
+		if strings.Contains(existingContent, entry) {
+			continue
+		}
+		newEntries += "\t\t" + entry + "\n"
+	}
+
+	if newEntries == "" {
+		return nil // 没有新模型需要添加
+	}
+
+	// 在 ) 前插入新条目
+	newContent := strings.Replace(fileContent, matches[0], prefix+existingContent+newEntries+suffix, 1)
+
+	err = os.WriteFile(filePath, []byte(newContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
 }

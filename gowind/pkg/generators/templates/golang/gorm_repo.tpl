@@ -12,7 +12,7 @@ import (
 	"github.com/tx7do/go-utils/mapper"
 
 	pagination "github.com/tx7do/go-crud/api/gen/go/pagination/v1"
-	gormCurd "github.com/tx7do/go-crud/gorm"
+	gormCrud "github.com/tx7do/go-crud/gorm"
 
 	"{{.Module}}/app/{{lower .Service}}/service/internal/data/gorm/models"
 
@@ -24,7 +24,7 @@ type {{.ClassName}} struct {
 	log  *log.Helper
 
 	mapper     *mapper.CopierMapper[{{.ApiPackage}}.{{pascal .Model}}, models.{{pascal .Model}}]
-	repository *gormCurd.Repository[{{.ApiPackage}}.{{pascal .Model}}, models.{{pascal .Model}}]
+	repository *gormCrud.Repository[{{.ApiPackage}}.{{pascal .Model}}, models.{{pascal .Model}}]
 }
 
 func New{{.ClassName}}(ctx *bootstrap.Context, gormClient *gormCrud.Client) *{{.ClassName}} {
@@ -40,7 +40,7 @@ func New{{.ClassName}}(ctx *bootstrap.Context, gormClient *gormCrud.Client) *{{.
 }
 
 func (r *{{.ClassName}}) init() {
-    r.repository = gormCurd.NewRepository[{{.ApiPackage}}.{{pascal .Model}}, models.{{pascal .Model}}](
+    r.repository = gormCrud.NewRepository[{{.ApiPackage}}.{{pascal .Model}}, models.{{pascal .Model}}](
         r.mapper,
     )
 
@@ -53,7 +53,7 @@ func (r *{{.ClassName}}) List(ctx context.Context, req *pagination.PagingRequest
 		return nil, errors.New("request is nil")
 	}
 
-	ret, err := r.repository.ListWithPaging(ctx, r.gormClient, req)
+	ret, err := r.repository.ListWithPaging(ctx, r.gormClient.DB, req)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (r *{{.ClassName}}) Create(ctx context.Context, req *{{.ApiPackage}}.Create
 		return nil, errors.New("request is nil")
 	}
 
-	result, err := r.repository.Create(ctx, r.gormClient, req.Data, nil)
+	result, err := r.repository.Create(ctx, r.gormClient.DB, req.Data, nil)
 
 	return result, err
 }
@@ -119,7 +119,7 @@ func (r *{{.ClassName}}) Upsert(ctx context.Context, req *{{.ApiPackage}}.Update
 
 	var err error
 
-	result, err := r.repository.Upsert(ctx, r.gormClient, req.Data, req.GetUpdateMask())
+	result, err := r.repository.Upsert(ctx, r.gormClient.DB, req.Data, req.GetUpdateMask())
 
 	return result, err
 }
