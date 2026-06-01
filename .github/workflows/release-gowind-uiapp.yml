@@ -139,10 +139,15 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=4096"
         run: wails build -ldflags "-s -w"
 
-      - name: Zip macOS app
+      - name: Zip macOS build
         working-directory: gowind-uiapp/build/bin
         run: |
-          zip -r gowind-toolkit-darwin-amd64.zip gowind-toolkit.app
+          ls -la
+          if [ -d "gowind-toolkit.app" ]; then
+            zip -r gowind-toolkit-darwin-amd64.zip gowind-toolkit.app
+          else
+            zip gowind-toolkit-darwin-amd64.zip gowind-toolkit
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
