@@ -154,38 +154,73 @@ func (g *ServiceGenerator) generateServiceLayer() error {
 
 func (g *ServiceGenerator) generateData() error {
 	dataPath := filepath.Join(g.outputPath, "app", g.serviceName, "service", "internal", "data")
-	o := code_generator.Options{
-		OutDir: dataPath,
-		Module: g.projectModule,
-		Vars: map[string]any{
-			"Service": g.serviceName,
-		},
-	}
 
-	var functions []string
+	// 生成 client 文件到 data/client/
+	clientPath := filepath.Join(dataPath, "client")
 	for _, dbClient := range g.dbClients {
+		o := code_generator.Options{
+			OutDir: clientPath,
+			Module: g.projectModule,
+			Vars: map[string]any{
+				"Service": g.serviceName,
+			},
+		}
 		switch strings.ToLower(dbClient) {
 		case "redis":
-			o.Vars["HasRedis"] = true
+			if _, err := g.goGenerator.GenerateRedisClient(context.Background(), o); err != nil {
+				return fmt.Errorf("生成 Redis client 失败: %w", err)
+			}
 		case "gorm":
-			o.Vars["HasGorm"] = true
+			if _, err := g.goGenerator.GenerateGormClient(context.Background(), o); err != nil {
+				return fmt.Errorf("生成 GORM client 失败: %w", err)
+			}
 		case "ent", "entgo":
-			o.Vars["HasEnt"] = true
+			if _, err := g.goGenerator.GenerateEntClient(context.Background(), o); err != nil {
+				return fmt.Errorf("生成 Ent client 失败: %w", err)
+			}
 		}
-		functions = append(functions, "New"+stringcase.UpperCamelCase(dbClient)+"Client")
+	}
+
+	// 生成 wire_set（data/providers），client 用 client. 前缀
+	var functions []string
+	for _, dbClient := range g.dbClients {
+		functions = append(functions, "client.New"+stringcase.UpperCamelCase(dbClient)+"Client")
+	}
+
+	providersPath := filepath.Join(dataPath, "providers")
+	wireSetFile := filepath.Join(providersPath, "wire_set.go")
+
+	// 构建带有 client import 的 opts
+	var extraImports []string
+	if len(g.dbClients) > 0 {
+		extraImports = append(extraImports, "data/client")
 	}
 
 	opts := code_generator.Options{
-		OutDir: filepath.Join(dataPath, "providers"),
+		OutDir: providersPath,
 		Module: g.projectModule,
 		Vars: map[string]any{
 			"Service":      g.serviceName,
 			"Package":      "data",
 			"NewFunctions": functions,
+			"ExtraImports": extraImports,
 		},
 	}
-	_, err := g.goGenerator.GenerateWireSet(context.Background(), opts)
-	return err
+	if _, err := g.goGenerator.GenerateWireSet(context.Background(), opts); err != nil {
+		return fmt.Errorf("生成 data wire_set 失败: %w", err)
+	}
+
+	// 确保 import 存在（Upsert 场景）
+	if _, statErr := os.Stat(wireSetFile); statErr == nil {
+		for _, imp := range extraImports {
+			importPath := fmt.Sprintf("%s/app/%s/service/internal/%s", g.projectModule, strings.ToLower(g.serviceName), imp)
+			if ensureErr := g.goGenerator.EnsureImport(wireSetFile, importPath); ensureErr != nil {
+				return ensureErr
+			}
+		}
+	}
+
+	return nil
 }
 
 func (g *ServiceGenerator) generateMain() error {

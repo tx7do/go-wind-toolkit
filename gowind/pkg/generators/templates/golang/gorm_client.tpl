@@ -1,4 +1,4 @@
-package data
+package client
 
 import (
 	gormCrud "github.com/tx7do/go-crud/gorm"

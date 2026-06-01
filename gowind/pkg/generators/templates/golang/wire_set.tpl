@@ -1,4 +1,4 @@
-﻿//go:build wireinject
+//go:build wireinject
 // +build wireinject
 
 //go:generate go run github.com/google/wire/cmd/wire
@@ -14,6 +14,9 @@ import (
 	"github.com/google/wire"
 
 	"{{.Module}}/app/{{lower .Service}}/service/internal/{{lower .Package}}"
+{{- range .ExtraImports}}
+	"{{$.Module}}/app/{{lower $.Service}}/service/internal/{{.}}"
+{{- end}}
 )
 
 // ProviderSet is the Wire provider set for {{lower .Package}} layer.

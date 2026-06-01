@@ -12,6 +12,7 @@ var TemplateMap = map[string][]byte{
 	"gorm_client.tpl":  GormClientTemplate,
 	"gorm_init.tpl":    GormInitTemplate,
 	"redis_client.tpl": RedisClientTemplate,
+	"grpc_client.tpl":  GrpcClientTemplate,
 	"ent_repo.tpl":     EntRepoTemplate,
 	"gorm_repo.tpl":    GormRepoTemplate,
 	"service.tpl":      ServiceTemplate,
@@ -44,6 +45,9 @@ var GormInitTemplate []byte
 
 //go:embed redis_client.tpl
 var RedisClientTemplate []byte
+
+//go:embed grpc_client.tpl
+var GrpcClientTemplate []byte
 
 //go:embed ent_repo.tpl
 var EntRepoTemplate []byte

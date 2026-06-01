@@ -3,7 +3,10 @@ package sqlkratos
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -61,8 +64,9 @@ func (g *Generator) writeEntClientCode(
 	projectModule string,
 	serviceName string,
 ) error {
+	clientPath := path.Join(outputPath, "client")
 	opts := code_generator.Options{
-		OutDir: outputPath,
+		OutDir: clientPath,
 		Module: projectModule,
 		Vars: map[string]any{
 			"Service": serviceName,
@@ -78,8 +82,11 @@ func (g *Generator) writeGormClientCode(
 	projectModule string,
 	serviceName string,
 ) error {
+	clientPath := path.Join(outputPath, "client")
+	gormPath := path.Join(outputPath, "gorm")
+
 	opts1 := code_generator.Options{
-		OutDir: outputPath,
+		OutDir: clientPath,
 		Module: projectModule,
 		Vars: map[string]any{
 			"Service": serviceName,
@@ -91,7 +98,7 @@ func (g *Generator) writeGormClientCode(
 	}
 
 	opts2 := code_generator.Options{
-		OutDir: outputPath,
+		OutDir: gormPath,
 		Module: projectModule,
 		Vars: map[string]any{
 			"Service": serviceName,
@@ -267,6 +274,54 @@ func (g *Generator) WriteWireSetCode(
 	}
 	_, err := g.goGenerator.GenerateWireSet(context.Background(), opts)
 	return err
+}
+
+// WriteDataWireSetCode 生成 data 层的 wire_set，支持 client 和 data 两个包的函数
+func (g *Generator) WriteDataWireSetCode(
+	outputPath string,
+	projectModule string,
+	serviceName string,
+	allFunctions []string,
+) error {
+	providersPath := filepath.Join(outputPath, "providers")
+	wireSetFile := filepath.Join(providersPath, "wire_set.go")
+
+	// 检查是否有 client. 前缀的函数
+	var extraImports []string
+	for _, fn := range allFunctions {
+		if strings.HasPrefix(fn, "client.") {
+			extraImports = append(extraImports, "data/client")
+			break
+		}
+	}
+
+	opts := code_generator.Options{
+		OutDir: providersPath,
+		Module: projectModule,
+		Vars: map[string]any{
+			"Service":      serviceName,
+			"Package":      "data",
+			"NewFunctions": allFunctions,
+			"ExtraImports": extraImports,
+		},
+	}
+
+	_, err := g.goGenerator.GenerateWireSet(context.Background(), opts)
+	if err != nil {
+		return err
+	}
+
+	// 如果文件已存在（Upsert），确保 import 也被添加
+	if _, statErr := os.Stat(wireSetFile); statErr == nil {
+		for _, imp := range extraImports {
+			importPath := fmt.Sprintf("%s/app/%s/service/internal/%s", projectModule, strings.ToLower(serviceName), imp)
+			if ensureErr := g.goGenerator.EnsureImport(wireSetFile, importPath); ensureErr != nil {
+				return ensureErr
+			}
+		}
+	}
+
+	return nil
 }
 
 func (g *Generator) WriteWireCode(

@@ -8,6 +8,7 @@ import (
 
 	"github.com/jinzhu/inflection"
 	"github.com/tx7do/go-utils/code_generator"
+	"github.com/tx7do/go-utils/stringcase"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/generators"
 
 	sqlorm "github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlorm"
@@ -203,7 +204,7 @@ func (g *Generator) generateOrmCode(
 	case "ent":
 		schemaPath = path.Join(serviceRootPath, "/data/ent/schema")
 	case "gorm":
-		schemaPath = path.Join(serviceRootPath, "/data/gorm/schema")
+		schemaPath = path.Join(serviceRootPath, "/data/gorm/models")
 		daoPath = path.Join(serviceRootPath, "/data/gorm/dao")
 	}
 
@@ -323,14 +324,23 @@ func (g *Generator) generateDataPackageCode(
 		}
 	}
 
+	// 生成 data 层 wire_set（client 用 client. 前缀，repo 用 data. 前缀）
+	var clientFunctions []string
 	switch orm {
 	case "ent":
-		_ = g.WriteWireSetCode(outputPath, projectName, serviceName, "data", "Client", []string{"Ent"})
+		clientFunctions = append(clientFunctions, "client.NewEntClient")
 	case "gorm":
-		_ = g.WriteWireSetCode(outputPath, projectName, serviceName, "data", "Client", []string{"Gorm"})
+		clientFunctions = append(clientFunctions, "client.NewGormClient")
 	}
 
-	return g.WriteWireSetCode(outputPath, projectName, serviceName, "data", "Repo", services)
+	// 合并 client 和 repo 函数到一个 wire_set
+	var allFunctions []string
+	allFunctions = append(allFunctions, clientFunctions...)
+	for _, svc := range services {
+		allFunctions = append(allFunctions, fmt.Sprintf("data.New%sRepo", stringcase.UpperCamelCase(svc)))
+	}
+
+	return g.WriteDataWireSetCode(outputPath, projectName, serviceName, allFunctions)
 }
 
 func (g *Generator) generateMainPackageCode(

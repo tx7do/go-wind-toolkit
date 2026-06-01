@@ -63,7 +63,7 @@ func TestGoGenerator_Template_EntClient(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: "./output/client",
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",
@@ -97,7 +97,7 @@ func TestGoGenerator_Template_GormClient(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: "./output/client",
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",
@@ -113,7 +113,7 @@ func TestGoGenerator_Template_GormInit(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir:     "./output",
+		OutDir:     "./output/gorm",
 		OutputName: "gorm_init.go",
 		Module:     "github.com/example/myproject",
 		Vars: map[string]any{
@@ -199,7 +199,7 @@ func TestGoGenerator_Template_RedisClient(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: "./output/client",
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",

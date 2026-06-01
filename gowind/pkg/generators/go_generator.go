@@ -60,7 +60,12 @@ func (g *GoGenerator) GenerateWireSet(ctx context.Context, opts code_generator.O
 	if _, ok := opts.Vars["NewFunctions"]; ok && packageName != "" {
 		newFunctions, _ := opts.Vars["NewFunctions"].([]string)
 		for _, fn := range newFunctions {
-			fullFunctionCalls = append(fullFunctionCalls, fmt.Sprintf("%s.%s", packageName, fn))
+			if strings.Contains(fn, ".") {
+				// 已包含包前缀（如 client.NewEntClient），直接使用
+				fullFunctionCalls = append(fullFunctionCalls, fn)
+			} else {
+				fullFunctionCalls = append(fullFunctionCalls, fmt.Sprintf("%s.%s", packageName, fn))
+			}
 		}
 	}
 
@@ -187,6 +192,30 @@ func (g *GoGenerator) GenerateRedisClient(ctx context.Context, opts code_generat
 	return g.Generate(ctx, opts, "redis_client.tpl")
 }
 
+func (g *GoGenerator) GenerateGrpcClient(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {
+	if g.CodeGenerator == nil {
+		return "", os.ErrInvalid
+	}
+
+	var modelName string
+	if v, ok := opts.Vars["Model"]; ok {
+		modelName, _ = v.(string)
+	}
+
+	if _, ok := opts.Vars["ApiPackageVersion"]; !ok {
+		opts.Vars["ApiPackageVersion"] = "v1"
+	}
+	if _, ok := opts.Vars["ApiPackage"]; !ok {
+		opts.Vars["ApiPackage"] = stringcase.LowerCamelCase(opts.Vars["SourceApiPackageName"].(string)) + stringcase.UpperCamelCase(opts.Vars["ApiPackageVersion"].(string))
+	}
+
+	if opts.OutputName == "" {
+		opts.OutputName = stringcase.ToSnakeCase(modelName) + "_grpc_client.go"
+	}
+
+	return g.Generate(ctx, opts, "grpc_client.tpl")
+}
+
 func (g *GoGenerator) GenerateRestServer(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {
 	if g.CodeGenerator == nil {
 		return "", os.ErrInvalid
@@ -303,7 +332,7 @@ func (g *GoGenerator) UpsertProviderSetFunction(filePath string, functionCall st
 
 	// 查找 ProviderSet 定义
 	// 匹配 var ProviderSet = wire.NewSet(...) 的模式
-	providerSetPattern := regexp.MustCompile(`(var\s+ProviderSet\s*=\s*wire\.NewSet\s*\(\s*)((?:[^)]+|\n)+)(\s*\))`)
+	providerSetPattern := regexp.MustCompile(`(var\s+ProviderSet\s*=\s*wire\.NewSet\s*\(\s*)((?:[^)]|\n)*)(\s*\))`)
 
 	matches := providerSetPattern.FindStringSubmatch(fileContent)
 	if matches == nil {
@@ -361,6 +390,39 @@ func (g *GoGenerator) UpsertProviderSetFunctions(filePath string, functionCalls 
 	return nil
 }
 
+// EnsureImport 确保文件中包含指定的 import 路径，不存在则添加
+func (g *GoGenerator) EnsureImport(filePath string, importPath string) error {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	fileContent := string(content)
+
+	// 检查 import 是否已存在
+	if strings.Contains(fileContent, "\""+importPath+"\"") {
+		return nil
+	}
+
+	// 在 import 块中追加
+	importPattern := regexp.MustCompile(`(import\s*\((?:[^)]+\n)+)(\))`)
+	matches := importPattern.FindStringSubmatch(fileContent)
+	if matches == nil {
+		return fmt.Errorf("import block not found in file")
+	}
+
+	// 在 ) 前插入新的 import
+	newImport := "\t\"" + importPath + "\"\n"
+	newContent := strings.Replace(fileContent, matches[2], newImport+matches[2], 1)
+
+	err = os.WriteFile(filePath, []byte(newContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
 // CheckProviderSetFunctionExists 检查 ProviderSet 中是否存在指定函数
 func (g *GoGenerator) CheckProviderSetFunctionExists(filePath string, functionCall string) (bool, error) {
 	content, err := os.ReadFile(filePath)
@@ -371,7 +433,7 @@ func (g *GoGenerator) CheckProviderSetFunctionExists(filePath string, functionCa
 	fileContent := string(content)
 
 	// 查找 ProviderSet 定义
-	providerSetPattern := regexp.MustCompile(`var\s+ProviderSet\s*=\s*wire\.NewSet\s*\(\s*((?:[^)]+|\n)+)\s*\)`)
+	providerSetPattern := regexp.MustCompile(`var\s+ProviderSet\s*=\s*wire\.NewSet\s*\(\s*((?:[^)]|\n)*)\s*\)`)
 	matches := providerSetPattern.FindStringSubmatch(fileContent)
 	if matches == nil {
 		return false, fmt.Errorf("ProviderSet definition not found in file")
