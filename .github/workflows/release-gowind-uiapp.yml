@@ -48,6 +48,8 @@ jobs:
 
       - name: Build Windows
         working-directory: gowind-uiapp
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: wails build -ldflags "-s -w" -o gowind-toolkit.exe
 
       - name: Upload artifact
@@ -92,7 +94,9 @@ jobs:
 
       - name: Build Linux
         working-directory: gowind-uiapp
-        run: wails build -ldflags "-s -w"
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: wails build -tags webkit2_41 -ldflags "-s -w"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -131,6 +135,8 @@ jobs:
 
       - name: Build macOS
         working-directory: gowind-uiapp
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: wails build -ldflags "-s -w"
 
       - name: Zip macOS app
