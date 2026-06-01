@@ -111,6 +111,7 @@ export default {
       protoStrategyCustomTip: 'Manually specify the proto package name for each table',
       protoPackage: 'Proto Package',
       protoPackagePlaceholder: 'Enter package name',
+      protoPackageAllPlaceholder: 'Enter to set all',
     },
     generate: {
       title: 'Generate Targets',

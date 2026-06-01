@@ -491,6 +491,7 @@ export namespace generator {
 	    tableName: string;
 	    service: string;
 	    exclude: boolean;
+	    protoPackage: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Option(source);
@@ -502,6 +503,7 @@ export namespace generator {
 	        this.tableName = source["tableName"];
 	        this.service = source["service"];
 	        this.exclude = source["exclude"];
+	        this.protoPackage = source["protoPackage"];
 	    }
 	}
 

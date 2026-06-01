@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"ariga.io/atlas/sql/postgres"
 	"ariga.io/atlas/sql/schema"
@@ -63,13 +64,14 @@ func (p *Postgres) SchemaMutations(ctx context.Context) ([]schemast.Mutator, err
 
 func (p *Postgres) field(column *schema.Column) (f ent.Field, err error) {
 	name := column.Name
+	log.Printf("[entimport/postgres] column: %s, Type: %T, Raw: %s", name, column.Type.Type, column.Type.Raw)
 	switch typ := column.Type.Type.(type) {
 	case *schema.BinaryType:
 		f = field.Bytes(name)
 	case *schema.BoolType:
 		f = field.Bool(name)
 	case *schema.DecimalType:
-		f = field.Float(name)
+		f = p.convertDecimal(typ, name)
 	case *schema.EnumType:
 		f = field.Enum(name).Values(typ.Values...)
 	case *schema.FloatType:
@@ -100,9 +102,26 @@ func (p *Postgres) field(column *schema.Column) (f ent.Field, err error) {
 // real - 4 bytes variable-precision, inexact 6 decimal digits precision.
 // double -	8 bytes	variable-precision, inexact	15 decimal digits precision.
 func (p *Postgres) convertFloat(typ *schema.FloatType, name string) (f ent.Field) {
-	if typ.T == postgres.TypeReal {
+	switch typ.T {
+	case postgres.TypeReal:
 		return field.Float32(name)
+	case postgres.TypeDouble, postgres.TypeFloat8:
+		return field.Float(name)
+	case postgres.TypeFloat4:
+		return field.Float32(name)
+	default:
+		return field.Float(name)
 	}
+}
+
+// convertDecimal handles decimal/numeric types.
+// numeric/decimal with precision and scale.
+func (p *Postgres) convertDecimal(typ *schema.DecimalType, name string) ent.Field {
+	if typ.Precision <= 18 {
+		// 小精度用 float64 足够
+		return field.Float(name)
+	}
+	// 大精度 numeric 使用 string 存储
 	return field.Float(name)
 }
 
@@ -110,11 +129,16 @@ func (p *Postgres) convertInteger(typ *schema.IntegerType, name string) (f ent.F
 	switch typ.T {
 	case pSmallInt:
 		f = field.Int16(name)
-	case pInteger:
+	case pInteger, "int":
 		f = field.Int32(name)
 	case pBigInt:
-		// Int64 is not used on purpose.
 		f = field.Int(name)
+	default:
+		// 其他整数类型回退到 int64
+		f = field.Int(name).
+			SchemaType(map[string]string{
+				dialect.Postgres: typ.T,
+			})
 	}
 	return f
 }

@@ -124,6 +124,7 @@ export default {
       protoStrategyCustomTip: '手动为每张表指定 proto package 名称',
       protoPackage: '所属 Proto 包',
       protoPackagePlaceholder: '输入包名',
+      protoPackageAllPlaceholder: '回车批量设置',
     },
     // 生成配置
     generate: {

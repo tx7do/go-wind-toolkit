@@ -260,13 +260,14 @@ func (t *Text) SchemaMutations(ctx context.Context) ([]schemast.Mutator, error) 
 
 func (t *Text) field(column *schema.Column) (f ent.Field, err error) {
 	name := column.Name
+	log.Printf("[entimport/text] column: %s, Type: %T, Raw: %s", name, column.Type.Type, column.Type.Raw)
 	switch typ := column.Type.Type.(type) {
 	case *schema.BinaryType:
 		f = field.Bytes(name)
 	case *schema.BoolType:
 		f = field.Bool(name)
 	case *schema.DecimalType:
-		f = field.Float(name)
+		f = t.convertDecimal(typ, name)
 	case *schema.EnumType:
 		f = field.Enum(name).Values(typ.Values...)
 	case *schema.FloatType:
@@ -351,6 +352,8 @@ func (t *Text) convertInteger(typ *schema.IntegerType, name string) (f ent.Field
 			f = field.Uint32(name)
 		case mBigInt:
 			f = field.Uint64(name)
+		default:
+			f = field.Uint64(name)
 		}
 		return f
 	}
@@ -362,17 +365,22 @@ func (t *Text) convertInteger(typ *schema.IntegerType, name string) (f ent.Field
 		f = field.Int16(name)
 	case mMediumInt:
 		f = field.Int32(name)
-	case mInt:
+	case mInt, pInteger:
 		f = field.Int32(name)
 	case mBigInt:
-		// Int64 is not used on purpose.
 		f = field.Int(name)
-
-	case pInteger:
-		f = field.Int32(name)
+	default:
+		f = field.Int(name).
+			SchemaType(map[string]string{
+				dialect.Postgres: typ.T,
+			})
 	}
 
 	return f
+}
+
+func (t *Text) convertDecimal(typ *schema.DecimalType, name string) ent.Field {
+	return field.Float(name)
 }
 
 // smallserial- 2 bytes - small autoincrementing integer 1 to 32767

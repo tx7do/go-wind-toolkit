@@ -384,12 +384,39 @@ const ormTypes = [
 ]
 
 const excludedCount = ref(0)
+const excludeAll = ref(false)
+const protoPackageAll = ref('')
 
 type ProtoPackageStrategy = 'per-table' | 'by-service' | 'custom'
 const protoPackageStrategy = ref<ProtoPackageStrategy>('per-table')
 
 function updateTableStats() {
   excludedCount.value = tableData.value.filter(r => r.exclude).length
+}
+
+async function handleExcludeAll(checked: boolean) {
+  for (const row of tableData.value) {
+    row.exclude = checked
+  }
+  const opts = await GetGeneratorOptions()
+  for (let i = 0; i < opts.length; i++) {
+    opts[i].exclude = checked
+  }
+  await SetGeneratorOption(opts)
+  updateTableStats()
+}
+
+async function handleProtoPackageAll() {
+  const val = protoPackageAll.value.trim()
+  if (!val) return
+  for (const row of tableData.value) {
+    row.protoPackage = val
+  }
+  const opts = await GetGeneratorOptions()
+  for (let i = 0; i < opts.length; i++) {
+    opts[i].protoPackage = val
+  }
+  await SetGeneratorOption(opts)
 }
 
 // ==================== 生成代码 ====================
@@ -705,7 +732,20 @@ EventsOn('table-imported', () => {
           class="table-content"
         >
           <vxe-column field="tableName" :title="t('backend.table.tableName')" min-width="200"/>
-          <vxe-column v-if="protoPackageStrategy === 'custom'" field="protoPackage" :title="t('backend.table.protoPackage')" min-width="160">
+          <vxe-column v-if="protoPackageStrategy === 'custom'" field="protoPackage" :title="t('backend.table.protoPackage')" min-width="200">
+            <template #header>
+              <div class="service-header">
+                <span>{{ t('backend.table.protoPackage') }}</span>
+                <a-input
+                  v-model:value="protoPackageAll"
+                  :placeholder="t('backend.table.protoPackageAllPlaceholder')"
+                  style="width: 140px; margin-left: 8px"
+                  size="small"
+                  allow-clear
+                  @pressEnter="handleProtoPackageAll"
+                />
+              </div>
+            </template>
             <template #default="{ row }">
               <a-input
                 v-model:value="row.protoPackage"
@@ -742,7 +782,15 @@ EventsOn('table-imported', () => {
               />
             </template>
           </vxe-column>
-          <vxe-column field="exclude" :title="t('backend.table.exclude')" width="80" align="center">
+          <vxe-column field="exclude" :title="t('backend.table.exclude')" width="100" align="center">
+            <template #header>
+              <a-switch
+                v-model:checked="excludeAll"
+                size="small"
+                :style="{ backgroundColor: excludeAll ? '#ff4d4f' : undefined }"
+                @change="handleExcludeAll"
+              />
+            </template>
             <template #default="{ row }">
               <a-switch
                 v-model:checked="row.exclude"
