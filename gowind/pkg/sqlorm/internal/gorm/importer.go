@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"gorm.io/gen"
+	"gorm.io/gorm"
 )
 
 func Importer(_ context.Context, drv, dsn, schemaPath, daoPath *string, tables, _ []string) error {
@@ -19,16 +21,27 @@ func Importer(_ context.Context, drv, dsn, schemaPath, daoPath *string, tables, 
 	if dsn == nil {
 		return errors.New("gormimport: dsn is nil")
 	}
-	if drv == nil {
-		return errors.New("gormimport: drv is nil")
-	}
 
 	_ = os.MkdirAll(*schemaPath, os.ModePerm)
 	_ = os.MkdirAll(*daoPath, os.ModePerm)
 
-	db, err := NewGormClient(*drv, *dsn)
-	if err != nil {
-		return fmt.Errorf("gormimport: failed to create gorm client: %w", err)
+	// 判断是 SQL 文本还是数据库连接串
+	// SQL 文本包含 CREATE TABLE 语句，而 DSN 包含 :// 协议头
+	var db *gorm.DB
+	var err error
+	if isSQLText(*dsn) {
+		db, err = NewRawSqlClient(*dsn)
+		if err != nil {
+			return fmt.Errorf("gormimport: failed to create rawsql client: %w", err)
+		}
+	} else {
+		if drv == nil {
+			return errors.New("gormimport: drv is nil")
+		}
+		db, err = NewGormClient(*drv, *dsn)
+		if err != nil {
+			return fmt.Errorf("gormimport: failed to create gorm client: %w", err)
+		}
 	}
 	if db == nil {
 		return errors.New("gormimport: gorm client is nil, check database connection")
@@ -66,4 +79,11 @@ func Importer(_ context.Context, drv, dsn, schemaPath, daoPath *string, tables, 
 	g.Execute()
 
 	return nil
+}
+
+// isSQLText 判断 DSN 是否为 SQL 文本内容（而非数据库连接串）
+// SQL 文本通常包含 CREATE TABLE 关键字，且不包含 :// 协议头
+func isSQLText(dsn string) bool {
+	upper := strings.ToUpper(dsn)
+	return strings.Contains(upper, "CREATE TABLE") && !strings.Contains(dsn, "://")
 }
