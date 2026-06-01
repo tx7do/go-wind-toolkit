@@ -1,10 +1,9 @@
-﻿package main
+package main
 
 import (
 	"context"
 
 	"github.com/go-kratos/kratos/v2"
-	"github.com/go-kratos/kratos/v2/registry"
 
 {{renderImports .ServerImports}}
 

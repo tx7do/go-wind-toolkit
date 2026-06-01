@@ -162,6 +162,39 @@ func TestGoGenerator_Template_GrpcServer(t *testing.T) {
 	}
 }
 
+// 模拟 pkg/service 和 gowind-uiapp 的调用方式：只传 Service，不传 Packages/Services
+func TestGoGenerator_Template_GrpcServer_NoPackages(t *testing.T) {
+	g := NewGoGenerator()
+
+	opts := code_generator.Options{
+		OutDir: "./output",
+		Module: "github.com/example/myproject",
+		Vars: map[string]any{
+			"Service": "user",
+		},
+	}
+
+	if _, err := g.GenerateGrpcServer(t.Context(), opts); err != nil {
+		t.Fatalf("Generate grpc_server.go (no packages) failed: %v", err)
+	}
+}
+
+func TestGoGenerator_Template_RestServer_NoPackages(t *testing.T) {
+	g := NewGoGenerator()
+
+	opts := code_generator.Options{
+		OutDir: "./output",
+		Module: "github.com/example/myproject",
+		Vars: map[string]any{
+			"Service": "user",
+		},
+	}
+
+	if _, err := g.GenerateRestServer(t.Context(), opts); err != nil {
+		t.Fatalf("Generate rest_server.go (no packages) failed: %v", err)
+	}
+}
+
 func TestGoGenerator_Template_RedisClient(t *testing.T) {
 	g := NewGoGenerator()
 

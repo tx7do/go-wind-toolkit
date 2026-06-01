@@ -178,15 +178,15 @@ func (g *Generator) GenerateGrpcCode(
 	// 1. go mod tidy
 	log.Info("运行 go mod tidy...")
 	if result := devtools.RunGoModTidy(rootPath); !result.Success {
-		runtime.LogErrorf(ctx, "go mod tidy 失败: %s", result.Error)
-		return fmt.Errorf("go mod tidy 失败: %s", result.Error)
+		runtime.LogErrorf(ctx, "go mod tidy 失败: %s\n%s", result.Error, result.Output)
+		return fmt.Errorf("go mod tidy 失败: %s\n%s", result.Error, result.Output)
 	}
 
 	// 2. buf generate（生成 protobuf 代码）
 	log.Info("运行 buf generate...")
 	if result := devtools.RunBufGenerate(rootPath); !result.Success {
-		runtime.LogErrorf(ctx, "buf generate 失败: %s", result.Error)
-		return fmt.Errorf("buf generate 失败: %s", result.Error)
+		runtime.LogErrorf(ctx, "buf generate 失败: %s\n%s", result.Error, result.Output)
+		return fmt.Errorf("buf generate 失败: %s\n%s", result.Error, result.Output)
 	}
 
 	// 3. 如果是 ent ORM，执行 ent generate
@@ -194,8 +194,8 @@ func (g *Generator) GenerateGrpcCode(
 		for _, svcName := range serviceNames {
 			log.Info("运行 ent generate: ", svcName)
 			if result := devtools.RunEntGenerate(rootPath, svcName); !result.Success {
-				runtime.LogErrorf(ctx, "ent generate 失败 (%s): %s", svcName, result.Error)
-				return fmt.Errorf("ent generate 失败 (%s): %s", svcName, result.Error)
+				runtime.LogErrorf(ctx, "ent generate 失败 (%s): %s\n%s", svcName, result.Error, result.Output)
+				return fmt.Errorf("ent generate 失败 (%s): %s\n%s", svcName, result.Error, result.Output)
 			}
 		}
 	}
@@ -204,8 +204,8 @@ func (g *Generator) GenerateGrpcCode(
 	for _, svcName := range serviceNames {
 		log.Info("运行 wire generate: ", svcName)
 		if result := devtools.RunWire(rootPath, svcName); !result.Success {
-			runtime.LogErrorf(ctx, "wire 生成失败 (%s): %s", svcName, result.Error)
-			return fmt.Errorf("wire 生成失败 (%s): %s", svcName, result.Error)
+			runtime.LogErrorf(ctx, "wire 生成失败 (%s): %s\n%s", svcName, result.Error, result.Output)
+			return fmt.Errorf("wire 生成失败 (%s): %s\n%s", svcName, result.Error, result.Output)
 		}
 	}
 

@@ -230,7 +230,7 @@ func (a *App) GenerateGrpcCode(ormType string) string {
 		a.projectInfo.ModPath,
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "生成代码失败: %v", err)
-		return "生成代码失败"
+		return fmt.Sprintf("生成代码失败: %v", err)
 	}
 
 	runtime.EventsEmit(a.ctx, "code-generated")
@@ -266,7 +266,7 @@ func (a *App) GenerateRestCode(serviceName string) string {
 		a.projectInfo.ModPath,
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "生成代码失败: %v", err)
-		return "生成代码失败"
+		return fmt.Sprintf("生成代码失败: %v", err)
 	}
 
 	runtime.EventsEmit(a.ctx, "code-generated")
