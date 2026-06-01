@@ -2,6 +2,8 @@ package generators
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSnakeToPascal(t *testing.T) {
@@ -518,5 +520,215 @@ func BenchmarkServerImportPaths(b *testing.B) {
 	servers := []string{"grpc", "rest", "kafka", "mqtt"}
 	for i := 0; i < b.N; i++ {
 		ServerImportPaths(servers)
+	}
+}
+
+func TestApiPackageAlias(t *testing.T) {
+	tests := []struct {
+		name     string
+		pkgName  string
+		version  string
+		expected string
+	}{
+		{
+			name:     "user + v1",
+			pkgName:  "user",
+			version:  "v1",
+			expected: "userV1",
+		},
+		{
+			name:     "admin + v1",
+			pkgName:  "admin",
+			version:  "v1",
+			expected: "adminV1",
+		},
+		{
+			name:     "user_service + v2",
+			pkgName:  "user_service",
+			version:  "v2",
+			expected: "userServiceV2",
+		},
+		{
+			name:     "empty version",
+			pkgName:  "user",
+			version:  "",
+			expected: "user",
+		},
+		{
+			name:     "single char name + v1",
+			pkgName:  "a",
+			version:  "v1",
+			expected: "aV1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := apiPackageAlias(tt.pkgName, tt.version)
+			if result != tt.expected {
+				t.Errorf("apiPackageAlias(%q, %q) = %q, expected %q", tt.pkgName, tt.version, result, tt.expected)
+			}
+		})
+	}
+}
+
+// ==============================
+// renderImports
+// ==============================
+
+func TestRenderImports_Nil(t *testing.T) {
+	assert.Equal(t, "", renderImports(nil))
+}
+
+func TestRenderImports_String(t *testing.T) {
+	result := renderImports("github.com/example/pkg")
+	assert.Equal(t, "\tgithub.com/example/pkg\n", result)
+}
+
+func TestRenderImports_EmptyString(t *testing.T) {
+	assert.Equal(t, "", renderImports(""))
+}
+
+func TestRenderImports_StringSlice(t *testing.T) {
+	result := renderImports([]string{"github.com/example/pkg1", "github.com/example/pkg2"})
+	assert.Contains(t, result, "github.com/example/pkg1")
+	assert.Contains(t, result, "github.com/example/pkg2")
+}
+
+func TestRenderImports_StringSliceWithEmpty(t *testing.T) {
+	result := renderImports([]string{"", "github.com/example/pkg1", ""})
+	assert.Contains(t, result, "github.com/example/pkg1")
+	assert.NotContains(t, result, "\t\"\"\n")
+}
+
+func TestRenderImports_UnsupportedType(t *testing.T) {
+	assert.Equal(t, "", renderImports(42))
+}
+
+// ==============================
+// renderFormalParameters
+// ==============================
+
+func TestRenderFormalParameters_Nil(t *testing.T) {
+	assert.Equal(t, "", renderFormalParameters(nil))
+}
+
+func TestRenderFormalParameters_String(t *testing.T) {
+	result := renderFormalParameters("hs *http.Server")
+	assert.Contains(t, result, "hs *http.Server")
+	assert.Contains(t, result, ",")
+}
+
+func TestRenderFormalParameters_EmptyString(t *testing.T) {
+	assert.Equal(t, "", renderFormalParameters(""))
+}
+
+func TestRenderFormalParameters_StringSlice(t *testing.T) {
+	result := renderFormalParameters([]string{"hs *http.Server", "gs *grpc.Server"})
+	assert.Contains(t, result, "hs *http.Server")
+	assert.Contains(t, result, "gs *grpc.Server")
+}
+
+func TestRenderFormalParameters_AnySlice(t *testing.T) {
+	result := renderFormalParameters([]any{"hs *http.Server", 123})
+	assert.Contains(t, result, "hs *http.Server")
+	assert.Contains(t, result, "123")
+}
+
+func TestRenderFormalParameters_CustomTabs(t *testing.T) {
+	result := renderFormalParameters("hs *http.Server", 2)
+	assert.Contains(t, result, "hs *http.Server")
+}
+
+func TestRenderFormalParameters_UnsupportedType(t *testing.T) {
+	assert.Equal(t, "", renderFormalParameters(42))
+}
+
+// ==============================
+// renderInParameters
+// ==============================
+
+func TestRenderInParameters_Nil(t *testing.T) {
+	assert.Equal(t, "", renderInParameters(nil))
+}
+
+func TestRenderInParameters_String(t *testing.T) {
+	result := renderInParameters("hs")
+	assert.Contains(t, result, "hs")
+	assert.Contains(t, result, ",")
+}
+
+func TestRenderInParameters_EmptyString(t *testing.T) {
+	assert.Equal(t, "", renderInParameters(""))
+}
+
+func TestRenderInParameters_StringSlice(t *testing.T) {
+	result := renderInParameters([]string{"hs", "gs"})
+	assert.Contains(t, result, "hs,")
+	assert.Contains(t, result, "gs,")
+}
+
+func TestRenderInParameters_AnySlice(t *testing.T) {
+	result := renderInParameters([]any{"hs", 42})
+	assert.Contains(t, result, "hs")
+	assert.Contains(t, result, "42")
+}
+
+func TestRenderInParameters_UnsupportedType(t *testing.T) {
+	assert.Equal(t, "", renderInParameters(42))
+}
+
+// ==============================
+// renderServiceName / renderRepoName / renderServerName
+// ==============================
+
+func TestRenderServiceName(t *testing.T) {
+	tests := []struct {
+		input    any
+		expected string
+	}{
+		{"user", "UserService"},
+		{"user_role", "UserRoleService"},
+		{"", "Service"},
+		{nil, ""},
+		{42, ""},
+	}
+	for _, tt := range tests {
+		result := renderServiceName(tt.input)
+		assert.Equal(t, tt.expected, result)
+	}
+}
+
+func TestRenderRepoName(t *testing.T) {
+	tests := []struct {
+		input    any
+		expected string
+	}{
+		{"user", "UserRepo"},
+		{"user_role", "UserRoleRepo"},
+		{"", "Repo"},
+		{nil, ""},
+		{42, ""},
+	}
+	for _, tt := range tests {
+		result := renderRepoName(tt.input)
+		assert.Equal(t, tt.expected, result)
+	}
+}
+
+func TestRenderServerName(t *testing.T) {
+	tests := []struct {
+		input    any
+		expected string
+	}{
+		{"rest", "RestServer"},
+		{"grpc", "GrpcServer"},
+		{"", "Server"},
+		{nil, ""},
+		{42, ""},
+	}
+	for _, tt := range tests {
+		result := renderServerName(tt.input)
+		assert.Equal(t, tt.expected, result)
 	}
 }
