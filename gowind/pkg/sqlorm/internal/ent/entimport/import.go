@@ -405,7 +405,9 @@ func upsertOneToX(mutations map[string]schemast.Mutator, table *schema.Table) {
 	}
 }
 
-// formatSchemaFiles 后处理 schema 文件，将 Fields() 方法中的字段断行显示
+// formatSchemaFiles 后处理 schema 文件：
+// 1. 修正 goimports 可能选错的 import（gorm.io/gen/field → entgo.io/ent/schema/field）
+// 2. 将 Fields() 方法中的字段断行显示
 func formatSchemaFiles(schemaPath string) error {
 	entries, err := os.ReadDir(schemaPath)
 	if err != nil {
@@ -420,7 +422,11 @@ func formatSchemaFiles(schemaPath string) error {
 		if err != nil {
 			return err
 		}
-		formatted := formatFieldsContent(string(content))
+
+		// 修正 goimports 可能选错的 import
+		fixed := fixFieldImport(string(content))
+
+		formatted := formatFieldsContent(fixed)
 		if formatted != string(content) {
 			if err := os.WriteFile(filePath, []byte(formatted), 0644); err != nil {
 				return err
@@ -428,6 +434,14 @@ func formatSchemaFiles(schemaPath string) error {
 		}
 	}
 	return nil
+}
+
+// fixFieldImport 修正 goimports 可能将 entgo.io/ent/schema/field 误解析为 gorm.io/gen/field 的问题
+func fixFieldImport(content string) string {
+	return strings.ReplaceAll(content,
+		"\"gorm.io/gen/field\"",
+		"\"entgo.io/ent/schema/field\"",
+	)
 }
 
 // fieldListRe 匹配 return []ent.Field{...}

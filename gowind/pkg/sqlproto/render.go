@@ -2,7 +2,7 @@ package sqlproto
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -23,13 +23,18 @@ func WriteServiceProto(
 	tableComment string,
 	protoFields ProtoFieldArray,
 ) error {
+	modelName := inflection.Singular(tableName)
+
 	switch strings.TrimSpace(strings.ToLower(serviceType)) {
 	case "grpc":
+		// 每张表使用自己的模型名作为 proto module，生成独立的 proto package
+		// 例如表 sys_users → module=user → package=user.service.v1
+		protoModule := strings.ToLower(modelName)
 		data := render.GrpcProtoTemplateData{
-			Module:  targetModuleName,
+			Module:  protoModule,
 			Version: moduleVersion,
 
-			Name:    inflection.Singular(tableName),
+			Name:    modelName,
 			Comment: RemoveTableCommentSuffix(tableComment),
 			Fields:  render.ProtoFieldArray(protoFields),
 		}
@@ -41,7 +46,7 @@ func WriteServiceProto(
 			TargetModule: targetModuleName,
 			Version:      moduleVersion,
 
-			Name:    inflection.Singular(tableName),
+			Name:    modelName,
 			Comment: RemoveTableCommentSuffix(tableComment),
 		}
 		return render.WriteRestServiceProto(outputPath, data)
@@ -82,8 +87,7 @@ func WriteServicesProto(
 			table.Name, table.Comment,
 			protoFields,
 		); err != nil {
-			log.Fatal(err)
-			return err
+			return fmt.Errorf("failed to write proto for table %s: %w", table.Name, err)
 		}
 	}
 

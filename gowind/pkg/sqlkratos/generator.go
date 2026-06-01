@@ -142,7 +142,8 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 		name := inflection.Singular(table.Name)
 
 		services = append(services, name)
-		servicePackageMap[name] = opts.ModuleName
+		// 每表独立包：proto module 为表名单数，grpc_server/rest_server 使用此包名做 import
+		servicePackageMap[name] = strings.ToLower(name)
 	}
 
 	var useGrpc bool
@@ -169,9 +170,9 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			opts.OrmType,
 			opts.ProjectName,
 			opts.ServiceName,
-			opts.ModuleName, opts.ModuleVersion,
 			tables,
 			services,
+			opts.ModuleVersion,
 		); err != nil {
 			return err
 		}
@@ -186,10 +187,11 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			servicePackagePath,
 			opts.ProjectName,
 			opts.ServiceName,
-			opts.ModuleName, opts.SourceModuleName, opts.ModuleVersion,
+			opts.SourceModuleName, opts.ModuleVersion,
 			opts.UseRepo, useGrpc,
 			tables,
 			services,
+			servicePackageMap,
 		); err != nil {
 			return err
 		}
@@ -341,10 +343,11 @@ func (g *Generator) generateServerPackageCode(
 func (g *Generator) generateServicePackageCode(
 	outputPath string,
 	projectName, serviceName string,
-	targetModuleName, sourceModuleName, moduleVersion string,
+	sourceModuleName, moduleVersion string,
 	userRepo, isGrpcService bool,
 	tables sqlproto.TableDataArray,
 	services []string,
+	servicePackageMap map[string]string,
 ) error {
 
 	for _, table := range tables {
@@ -353,12 +356,14 @@ func (g *Generator) generateServicePackageCode(
 		}
 
 		name := inflection.Singular(table.Name)
+		// 每表独立包：targetModule 为表名单数
+		targetModule := strings.ToLower(name)
 
 		if err := g.WriteServicePackageCode(
 			outputPath,
 			projectName, serviceName,
 			name,
-			targetModuleName, sourceModuleName, moduleVersion,
+			targetModule, sourceModuleName, moduleVersion,
 			userRepo, isGrpcService,
 		); err != nil {
 			return err
@@ -372,9 +377,9 @@ func (g *Generator) generateDataPackageCode(
 	outputPath string,
 	orm string,
 	projectName string, serviceName string,
-	moduleName, moduleVersion string,
 	tables sqlproto.TableDataArray,
 	services []string,
+	moduleVersion string,
 ) error {
 	if len(tables) == 0 {
 		return nil
@@ -403,6 +408,9 @@ func (g *Generator) generateDataPackageCode(
 
 		name := inflection.Singular(table.Name)
 		modelNames = append(modelNames, name)
+
+		// 每表独立包：proto module 为表名单数
+		moduleName := strings.ToLower(name)
 
 		dataFields = make([]generators.DataField, 0)
 		for _, field := range table.Fields {

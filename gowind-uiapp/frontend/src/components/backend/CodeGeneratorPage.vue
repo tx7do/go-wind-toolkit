@@ -195,6 +195,10 @@ async function handleServiceChange(row: generator.Option) {
   await EditGeneratorOption(row);
 }
 
+function filterServiceOption(input: string, option: { label: string; value: string }) {
+  return option.label?.toLowerCase().includes(input.toLowerCase()) ?? false
+}
+
 async function handleExcludeChange(row: generator.Option) {
   await EditGeneratorOption(row);
 }
@@ -382,7 +386,7 @@ const ormTypes = [
 const excludedCount = ref(0)
 
 type ProtoPackageStrategy = 'per-table' | 'by-service' | 'custom'
-const protoPackageStrategy = ref<ProtoPackageStrategy>('by-service')
+const protoPackageStrategy = ref<ProtoPackageStrategy>('per-table')
 
 function updateTableStats() {
   excludedCount.value = tableData.value.filter(r => r.exclude).length
@@ -661,15 +665,24 @@ EventsOn('table-imported', () => {
       <!-- Proto 包策略 -->
       <div class="proto-strategy-bar">
         <span class="proto-strategy-label">{{ t('backend.table.protoPackageStrategy') }}</span>
-        <a-radio-group v-model:value="protoPackageStrategy" size="small">
+        <a-radio-group v-model:value="protoPackageStrategy" size="small" class="proto-strategy-group">
           <a-tooltip :title="t('backend.table.protoStrategyPerTableTip')">
-            <a-radio-button value="per-table">{{ t('backend.table.protoStrategyPerTable') }}</a-radio-button>
+            <a-radio-button value="per-table">
+              <TableOutlined style="margin-right: 4px"/>
+              {{ t('backend.table.protoStrategyPerTable') }}
+            </a-radio-button>
           </a-tooltip>
           <a-tooltip :title="t('backend.table.protoStrategyByServiceTip')">
-            <a-radio-button value="by-service">{{ t('backend.table.protoStrategyByService') }}</a-radio-button>
+            <a-radio-button value="by-service">
+              <AppstoreOutlined style="margin-right: 4px"/>
+              {{ t('backend.table.protoStrategyByService') }}
+            </a-radio-button>
           </a-tooltip>
           <a-tooltip :title="t('backend.table.protoStrategyCustomTip')">
-            <a-radio-button value="custom">{{ t('backend.table.protoStrategyCustom') }}</a-radio-button>
+            <a-radio-button value="custom">
+              <EditOutlined style="margin-right: 4px"/>
+              {{ t('backend.table.protoStrategyCustom') }}
+            </a-radio-button>
           </a-tooltip>
         </a-radio-group>
       </div>
@@ -723,6 +736,9 @@ EventsOn('table-imported', () => {
                 :placeholder="t('backend.table.selectService')"
                 style="width: 100%"
                 @change="handleServiceChange(row)"
+                show-search
+                allow-clear
+                :filter-option="filterServiceOption"
               />
             </template>
           </vxe-column>
@@ -1077,15 +1093,38 @@ EventsOn('table-imported', () => {
   gap: 12px;
   margin-bottom: 12px;
   padding: 10px 16px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
+  background: linear-gradient(135deg, #f6f8fc 0%, #eef2f9 100%);
+  border: 1px solid #d9e3f0;
   border-radius: 8px;
 }
 
 .proto-strategy-label {
   font-size: 13px;
-  font-weight: 500;
-  color: #595959;
+  font-weight: 600;
+  color: #4a5568;
   white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.proto-strategy-group :deep(.ant-radio-button-wrapper) {
+  border-radius: 6px !important;
+  border: 1px solid #d9d9d9 !important;
+  margin-right: 6px;
+  padding: 0 14px;
+  height: 30px;
+  line-height: 28px;
+  font-size: 12px;
+  transition: all 0.25s;
+}
+
+.proto-strategy-group :deep(.ant-radio-button-wrapper-checked) {
+  border-color: #1890ff !important;
+  background: #1890ff !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.35);
+}
+
+.proto-strategy-group :deep(.ant-radio-button-wrapper:not(:first-child)::before) {
+  display: none;
 }
 </style>
