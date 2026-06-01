@@ -1,4 +1,4 @@
-﻿package server
+package server
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	"{{.Module}}/app/{{lower .Service}}/service/cmd/server/assets"
 	"{{.Module}}/app/{{lower .Service}}/service/internal/service"
 
-	{{lower .Service}}V1 "{{.Module}}/api/gen/go/{{lower .Service}}/service/v1"
+	{{apiPackageAlias (lower .Service) .ApiPackageVersion}} "{{.Module}}/api/gen/go/{{lower .Service}}/service/{{lower .ApiPackageVersion}}"
 
 	"{{.Module}}/pkg/middleware/auth"
 )
@@ -72,7 +72,7 @@ func NewRestServer(
 		return nil, err
 	}
 {{range $key, $value := .Services}}
-    {{lower $value}}V1.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
+    {{apiPackageAlias (lower $value) $.ApiPackageVersion}}.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
 {{- end}}
 
 	if cfg.GetServer().GetRest().GetEnableSwagger() {

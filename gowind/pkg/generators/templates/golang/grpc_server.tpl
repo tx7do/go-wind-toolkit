@@ -1,4 +1,4 @@
-﻿package server
+package server
 
 import (
 	"github.com/go-kratos/kratos/v2/middleware"
@@ -10,7 +10,7 @@ import (
 
 	"{{.Module}}/app/{{lower .Service}}/service/internal/service"
 {{range $key, $value := .Packages}}
-    {{lower $value}}V1 "{{lower $.Module}}/api/gen/go/{{lower $value}}/service/v1"
+    {{apiPackageAlias (lower $value) $.ApiPackageVersion}} "{{lower $.Module}}/api/gen/go/{{lower $value}}/service/{{lower $.ApiPackageVersion}}"
 {{- end}}
 )
 
@@ -43,7 +43,7 @@ func NewGrpcServer(
 		return nil, err
 	}
 {{range $key, $value := .Services}}
-    {{lower $value}}V1.Register{{pascal $key}}ServiceServer(srv, {{lower $key}}Service)
+    {{apiPackageAlias (lower $value) $.ApiPackageVersion}}.Register{{pascal $key}}ServiceServer(srv, {{lower $key}}Service)
 {{- end}}
 
 	return srv, nil

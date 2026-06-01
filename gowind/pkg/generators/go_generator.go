@@ -172,6 +172,10 @@ func (g *GoGenerator) GenerateGrpcServer(ctx context.Context, opts code_generato
 		return "", os.ErrInvalid
 	}
 
+	if _, ok := opts.Vars["ApiPackageVersion"]; !ok {
+		opts.Vars["ApiPackageVersion"] = "v1"
+	}
+
 	return g.Generate(ctx, opts, "grpc_server.tpl")
 }
 
@@ -186,6 +190,10 @@ func (g *GoGenerator) GenerateRedisClient(ctx context.Context, opts code_generat
 func (g *GoGenerator) GenerateRestServer(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {
 	if g.CodeGenerator == nil {
 		return "", os.ErrInvalid
+	}
+
+	if _, ok := opts.Vars["ApiPackageVersion"]; !ok {
+		opts.Vars["ApiPackageVersion"] = "v1"
 	}
 
 	return g.Generate(ctx, opts, "rest_server.tpl")

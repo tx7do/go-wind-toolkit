@@ -152,8 +152,8 @@ func TestGoGenerator_Template_GrpcServer(t *testing.T) {
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service":  "user",
-			"Packages": []string{"user"},
-			"Services": map[string]string{"user": "userV1", "role": "userV1"},
+			"Packages": map[string]string{"user": "user"},
+			"Services": map[string]string{"user": "user", "role": "user"},
 		},
 	}
 
@@ -186,7 +186,7 @@ func TestGoGenerator_Template_RestServer(t *testing.T) {
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service":  "admin",
-			"Services": map[string]string{"user": "userV1", "role": "userV1"},
+			"Services": map[string]string{"user": "user", "role": "user"},
 		},
 	}
 

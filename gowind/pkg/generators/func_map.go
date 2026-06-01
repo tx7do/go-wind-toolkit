@@ -30,6 +30,7 @@ func init() {
 		"renderServiceName": renderServiceName,
 		"renderRepoName":    renderRepoName,
 		"renderServerName":  renderServerName,
+		"apiPackageAlias":   apiPackageAlias,
 	}
 }
 
@@ -221,4 +222,9 @@ func renderServerName(v any) string {
 	default:
 		return ""
 	}
+}
+
+// apiPackageAlias 根据 API 包名和版本号生成 import 别名，例如 "user" + "v1" → "userV1"
+func apiPackageAlias(name string, version string) string {
+	return stringcase.LowerCamelCase(name) + stringcase.UpperCamelCase(version)
 }
