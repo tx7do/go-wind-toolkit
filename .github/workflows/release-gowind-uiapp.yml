@@ -143,8 +143,9 @@ jobs:
         working-directory: gowind-uiapp/build/bin
         run: |
           ls -la
-          if [ -d "gowind-toolkit.app" ]; then
-            zip -r gowind-toolkit-darwin-amd64.zip gowind-toolkit.app
+          APP_NAME=$(ls -d *.app 2>/dev/null | head -1)
+          if [ -n "$APP_NAME" ]; then
+            zip -r gowind-toolkit-darwin-amd64.zip "$APP_NAME"
           else
             zip gowind-toolkit-darwin-amd64.zip gowind-toolkit
           fi
