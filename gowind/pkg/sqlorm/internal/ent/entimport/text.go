@@ -368,7 +368,7 @@ func (t *Text) convertInteger(typ *schema.IntegerType, name string) (f ent.Field
 	case mInt, pInteger:
 		f = field.Int32(name)
 	case mBigInt:
-		f = field.Int(name)
+		f = field.Int64(name)
 	default:
 		f = field.Int(name).
 			SchemaType(map[string]string{

@@ -38,7 +38,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLTableNameDoesNotUsePluralForm(),
 			expectedFields: map[string]string{
 				"pet": `func (Pet) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int8("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int8("age"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -57,7 +57,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLSingleTableFields(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int8("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int8("age"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -77,7 +77,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLTableFieldsWithAttributes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id").Comment("some id"), field.Int8("age").Optional(), field.String("name").Comment("first name"), field.String("last_name").Optional().Comment("family name")}
+	return []ent.Field{field.Int64("id").Comment("some id"), field.Int8("age").Optional(), field.String("name").Comment("first name"), field.String("last_name").Optional().Comment("family name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -97,7 +97,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLTableFieldsWithUniqueIndexes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int8("age").Unique(), field.String("last_name").Optional().Comment("not so boring"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int8("age").Unique(), field.String("last_name").Optional().Comment("not so boring"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -117,10 +117,10 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLMultiTableFields(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int8("age").Unique(), field.String("last_name").Optional().Comment("not so boring"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int8("age").Unique(), field.String("last_name").Optional().Comment("not so boring"), field.String("name")}
 }`,
 				"pet": `func (Pet) Fields() []ent.Field {
-	return []ent.Field{field.Int("id").Comment("pet id"), field.Int8("age").Optional(), field.String("name")}
+	return []ent.Field{field.Int64("id").Comment("pet id"), field.Int8("age").Optional(), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -166,10 +166,10 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLM2MTwoTypes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int("age"), field.String("name")}
 }`,
 				"group": `func (Group) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -195,7 +195,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLM2MSameType(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int("age"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -215,7 +215,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLM2MBidirectional(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int("age"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -235,10 +235,10 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLO2OTwoTypes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int("age"), field.String("name")}
 }`,
 				"card": `func (Card) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.String("number"), field.Int("user_card").Optional().Unique()}
+	return []ent.Field{field.Int64("id"), field.String("number"), field.Int("user_card").Optional().Unique()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -264,7 +264,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLO2OSameType(),
 			expectedFields: map[string]string{
 				"node": `func (Node) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("value"), field.Int("node_next").Optional().Unique()}
+	return []ent.Field{field.Int64("id"), field.Int("value"), field.Int("node_next").Optional().Unique()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -284,7 +284,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLO2OBidirectional(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name"), field.Int("user_spouse").Optional().Unique()}
+	return []ent.Field{field.Int64("id"), field.Int("age"), field.String("name"), field.Int("user_spouse").Optional().Unique()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -304,10 +304,10 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLO2MTwoTypes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int("age"), field.String("name")}
 }`,
 				"pet": `func (Pet) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.String("name"), field.Int("user_pets").Optional()}
+	return []ent.Field{field.Int64("id"), field.String("name"), field.Int("user_pets").Optional()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -333,7 +333,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLO2MSameType(),
 			expectedFields: map[string]string{
 				"node": `func (Node) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("value"), field.Int("node_children").Optional()}
+	return []ent.Field{field.Int64("id"), field.Int("value"), field.Int("node_children").Optional()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -353,7 +353,7 @@ func TestMySQL(t *testing.T) {
 			mock: MockMySQLO2XOtherSideIgnored(),
 			expectedFields: map[string]string{
 				"pet": `func (Pet) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.String("name"), field.Int("user_pets").Optional()}
+	return []ent.Field{field.Int64("id"), field.String("name"), field.Int("user_pets").Optional()}
 }`,
 			},
 			expectedEdges: map[string]string{

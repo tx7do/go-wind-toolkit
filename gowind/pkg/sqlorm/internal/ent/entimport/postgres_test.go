@@ -38,7 +38,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresSingleTableFields(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int16("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int16("age"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -54,7 +54,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresTableFieldsWithAttributes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id").Comment("some id"), field.Int16("age").Optional(), field.String("name").Comment("first name"), field.String("last_name").Optional().Comment("family name")}
+	return []ent.Field{field.Int64("id").Comment("some id"), field.Int16("age").Optional(), field.String("name").Comment("first name"), field.String("last_name").Optional().Comment("family name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -69,7 +69,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresTableFieldsWithUniqueIndexes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id").Comment("some id"), field.Int16("age").Unique(), field.String("name").Comment("first name"), field.String("last_name").Optional().Comment("family name")}
+	return []ent.Field{field.Int64("id").Comment("some id"), field.Int16("age").Unique(), field.String("name").Comment("first name"), field.String("last_name").Optional().Comment("family name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -84,10 +84,10 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresMultiTableFields(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int16("age").Unique(), field.String("name"), field.String("last_name").Optional().Comment("not so boring")}
+	return []ent.Field{field.Int64("id"), field.Int16("age").Unique(), field.String("name"), field.String("last_name").Optional().Comment("not so boring")}
 }`,
 				"pet": `func (Pet) Fields() []ent.Field {
-	return []ent.Field{field.Int("id").Comment("pet id"), field.Int16("age").Optional(), field.String("name")}
+	return []ent.Field{field.Int64("id").Comment("pet id"), field.Int16("age").Optional(), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -135,10 +135,10 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresM2MTwoTypes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int64("age"), field.String("name")}
 }`,
 				"group": `func (Group) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -156,7 +156,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresM2MSameType(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int64("age"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -171,7 +171,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresM2MBidirectional(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int64("age"), field.String("name")}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -186,10 +186,10 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresO2OTwoTypes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int64("age"), field.String("name")}
 }`,
 				"card": `func (Card) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Time("expired"), field.String("number"), field.Int("user_card").Optional().Unique()}
+	return []ent.Field{field.Int64("id"), field.Time("expired"), field.String("number"), field.Int64("user_card").Optional().Unique()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -207,7 +207,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresO2OSameType(),
 			expectedFields: map[string]string{
 				"node": `func (Node) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("value"), field.Int("node_next").Optional().Unique()}
+	return []ent.Field{field.Int64("id"), field.Int64("value"), field.Int64("node_next").Optional().Unique()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -222,7 +222,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresO2OBidirectional(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name"), field.Int("user_spouse").Optional().Unique()}
+	return []ent.Field{field.Int64("id"), field.Int64("age"), field.String("name"), field.Int64("user_spouse").Optional().Unique()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -237,10 +237,10 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresO2MTwoTypes(),
 			expectedFields: map[string]string{
 				"user": `func (User) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("age"), field.String("name")}
+	return []ent.Field{field.Int64("id"), field.Int64("age"), field.String("name")}
 }`,
 				"pet": `func (Pet) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.String("name"), field.Int("user_pets").Optional()}
+	return []ent.Field{field.Int64("id"), field.String("name"), field.Int64("user_pets").Optional()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -258,7 +258,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresO2MSameType(),
 			expectedFields: map[string]string{
 				"node": `func (Node) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.Int("value"), field.Int("node_children").Optional()}
+	return []ent.Field{field.Int64("id"), field.Int64("value"), field.Int64("node_children").Optional()}
 }`,
 			},
 			expectedEdges: map[string]string{
@@ -273,7 +273,7 @@ func TestPostgres(t *testing.T) {
 			mock: MockPostgresO2XOtherSideIgnored(),
 			expectedFields: map[string]string{
 				"pet": `func (Pet) Fields() []ent.Field {
-	return []ent.Field{field.Int("id"), field.String("name"), field.Int("user_pets").Optional()}
+	return []ent.Field{field.Int64("id"), field.String("name"), field.Int64("user_pets").Optional()}
 }`,
 			},
 			expectedEdges: map[string]string{

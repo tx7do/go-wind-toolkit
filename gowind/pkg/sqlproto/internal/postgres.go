@@ -147,5 +147,29 @@ func PostgresFieldType(sqlType string) (f string) {
 		return protoType
 	}
 
+	// 处理多词类型名，如 "TIMESTAMP WITHOUT TIME ZONE" -> "TIMESTAMP"
+	// "TIMESTAMP WITH TIME ZONE" -> "TIMESTAMPTZ"
+	// "CHARACTER VARYING" 已经在映射表中
+	firstWord := strings.SplitN(baseType, " ", 2)[0]
+	switch baseType {
+	case "TIMESTAMP WITHOUT TIME ZONE":
+		return postgresqlTypeMapping["TIMESTAMP"]
+	case "TIMESTAMP WITH TIME ZONE":
+		return postgresqlTypeMapping["TIMESTAMPTZ"]
+	case "TIME WITH TIME ZONE":
+		return postgresqlTypeMapping["TIMETZ"]
+	case "BIT VARYING":
+		return postgresqlTypeMapping["BIT VARYING"]
+	case "DOUBLE PRECISION":
+		return postgresqlTypeMapping["DOUBLE PRECISION"]
+	}
+
+	// 最后尝试只用第一个单词匹配
+	if firstWord != baseType {
+		if protoType, exists := postgresqlTypeMapping[firstWord]; exists {
+			return protoType
+		}
+	}
+
 	return ""
 }

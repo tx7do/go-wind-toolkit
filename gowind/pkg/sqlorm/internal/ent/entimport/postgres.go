@@ -132,7 +132,7 @@ func (p *Postgres) convertInteger(typ *schema.IntegerType, name string) (f ent.F
 	case pInteger, "int":
 		f = field.Int32(name)
 	case pBigInt:
-		f = field.Int(name)
+		f = field.Int64(name)
 	default:
 		// 其他整数类型回退到 int64
 		f = field.Int(name).
@@ -147,8 +147,16 @@ func (p *Postgres) convertInteger(typ *schema.IntegerType, name string) (f ent.F
 // serial - 4 bytes autoincrementing integer 1 to 2147483647
 // bigserial - 8 bytes large autoincrementing integer	1 to 9223372036854775807
 func (p *Postgres) convertSerial(typ *postgres.SerialType, name string) ent.Field {
-	return field.Uint(name).
-		SchemaType(map[string]string{
-			dialect.Postgres: typ.T, // Override Postgres.
-		})
+	switch typ.T {
+	case "bigserial":
+		return field.Int64(name).
+			SchemaType(map[string]string{
+				dialect.Postgres: typ.T, // Override Postgres.
+			})
+	default:
+		return field.Uint(name).
+			SchemaType(map[string]string{
+				dialect.Postgres: typ.T, // Override Postgres.
+			})
+	}
 }

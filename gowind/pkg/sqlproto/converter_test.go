@@ -20,6 +20,7 @@ func TestConverter(t *testing.T) {
 		&outputPath,
 		&moduleName, &sourceModuleName, &moduleVersion,
 		&serviceType,
+		"per-table",
 		nil, nil,
 		true,
 	)
