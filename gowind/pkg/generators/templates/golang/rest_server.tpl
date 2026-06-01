@@ -22,9 +22,9 @@ import (
 
 	"{{.Module}}/app/{{lower .Service}}/service/cmd/server/assets"
 	"{{.Module}}/app/{{lower .Service}}/service/internal/service"
-
-	{{apiPackageAlias (lower .Service) .ApiPackageVersion}} "{{.Module}}/api/gen/go/{{lower .Service}}/service/{{lower .ApiPackageVersion}}"
-
+{{range $key, $value := .Packages}}
+	{{apiPackageAlias (lower $value) $.ApiPackageVersion}} "{{$.Module}}/api/gen/go/{{lower $value}}/service/{{lower $.ApiPackageVersion}}"
+{{- end}}
 	"{{.Module}}/pkg/middleware/auth"
 )
 
