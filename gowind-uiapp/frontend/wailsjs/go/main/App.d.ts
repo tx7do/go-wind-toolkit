@@ -41,9 +41,9 @@ export function ExportOneServiceConfig(arg1:configexporter.RemoteConfig,arg2:str
 
 export function GenerateFrontendCode(arg1:string,arg2:string):Promise<string>;
 
-export function GenerateGrpcCode(arg1:string):Promise<string>;
+export function GenerateGrpcCode(arg1:string,arg2:string):Promise<string>;
 
-export function GenerateRestCode(arg1:string):Promise<string>;
+export function GenerateRestCode(arg1:string,arg2:string):Promise<string>;
 
 export function GetAIConfig():Promise<ai.Config>;
 

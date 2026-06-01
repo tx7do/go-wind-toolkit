@@ -18,6 +18,7 @@ type ProtoFieldArray []generators.ProtoField
 func WriteServiceProto(
 	outputPath string,
 	serviceType string,
+	strategy string,
 	targetModuleName, sourceModuleName, moduleVersion string,
 	tableName string,
 	tableComment string,
@@ -25,11 +26,22 @@ func WriteServiceProto(
 ) error {
 	modelName := inflection.Singular(tableName)
 
+	// 根据 strategy 决定 proto module 名称
+	var protoModule string
+	switch strategy {
+	case "by-service":
+		// 按服务分包：所有表共用服务名作为 proto module
+		protoModule = strings.ToLower(targetModuleName)
+	case "custom":
+		// 自定义：先尝试用表名单数，后续可由调用方覆盖
+		protoModule = strings.ToLower(modelName)
+	default:
+		// per-table（默认）：每表独立包，用表名单数
+		protoModule = strings.ToLower(modelName)
+	}
+
 	switch strings.TrimSpace(strings.ToLower(serviceType)) {
 	case "grpc":
-		// 每张表使用自己的模型名作为 proto module，生成独立的 proto package
-		// 例如表 sys_users → module=user → package=user.service.v1
-		protoModule := strings.ToLower(modelName)
 		data := render.GrpcProtoTemplateData{
 			Module:  protoModule,
 			Version: moduleVersion,
@@ -59,6 +71,7 @@ func WriteServiceProto(
 func WriteServicesProto(
 	outputPath string,
 	serviceType string,
+	strategy string,
 	targetModuleName, sourceModuleName, moduleVersion string,
 	tables TableDataArray,
 ) error {
@@ -78,11 +91,10 @@ func WriteServicesProto(
 			})
 		}
 
-		//log.Printf("Generating proto for table: [%s] [%s]", table.Name, table.Comment)
-
 		if err := WriteServiceProto(
 			outputPath,
 			serviceType,
+			strategy,
 			targetModuleName, sourceModuleName, moduleVersion,
 			table.Name, table.Comment,
 			protoFields,

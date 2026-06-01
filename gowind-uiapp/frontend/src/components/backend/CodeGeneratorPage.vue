@@ -431,7 +431,7 @@ async function handleGenerate() {
   confirmLoading.value = true
   try {
     if (generateConfig.generateGrpc) {
-      const res = await GenerateGrpcCode(generateConfig.ormType);
+      const res = await GenerateGrpcCode(generateConfig.ormType, protoPackageStrategy.value);
       if (res !== '') {
         message.error(t('backend.generate.grpcFailed', {msg: res}));
         return;
@@ -440,7 +440,7 @@ async function handleGenerate() {
     }
 
     if (generateConfig.generateBff) {
-      const res = await GenerateRestCode(generateConfig.bffServiceName);
+      const res = await GenerateRestCode(generateConfig.bffServiceName, protoPackageStrategy.value);
       if (res !== '') {
         message.error(t('backend.generate.bffFailed', {msg: res}));
         return;
@@ -770,13 +770,12 @@ EventsOn('table-imported', () => {
               </div>
             </template>
             <template #default="{ row }">
-              <a-select
+              <a-auto-complete
                 v-model:value="row.service"
                 :options="serviceOptions"
                 :placeholder="t('backend.table.selectService')"
                 style="width: 100%"
                 @change="handleServiceChange(row)"
-                show-search
                 allow-clear
                 :filter-option="filterServiceOption"
               />

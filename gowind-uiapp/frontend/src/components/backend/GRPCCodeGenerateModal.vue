@@ -56,7 +56,7 @@ async function handleCommit() {
 
     confirmLoading.value = true
 
-    const res = await GenerateGrpcCode(formData.ormType);
+    const res = await GenerateGrpcCode(formData.ormType, "per-table");
     if (res == "") {
       message.success('代码生成成功');
 

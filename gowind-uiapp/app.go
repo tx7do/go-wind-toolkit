@@ -204,7 +204,7 @@ func (a *App) CleanConfig() {
 }
 
 // GenerateGrpcCode 生成代码
-func (a *App) GenerateGrpcCode(ormType string) string {
+func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) string {
 	if ormType == "" {
 		runtime.LogErrorf(a.ctx, "ORM 类型不能为空")
 		return "ORM 类型不能为空"
@@ -220,12 +220,17 @@ func (a *App) GenerateGrpcCode(ormType string) string {
 		return "未配置数据库连接，无法生成代码"
 	}
 
-	runtime.LogDebugf(a.ctx, "生成代码，ORM 类型: %v", ormType)
+	if protoPackageStrategy == "" {
+		protoPackageStrategy = "per-table"
+	}
+
+	runtime.LogDebugf(a.ctx, "生成代码，ORM 类型: %v，Proto 包策略: %v", ormType, protoPackageStrategy)
 
 	if err := a.generator.GenerateGrpcCode(
 		a.ctx,
 		*a.dbConfig,
 		ormType,
+		protoPackageStrategy,
 		a.projectInfo.Root,
 		a.projectInfo.ModPath,
 	); err != nil {
@@ -239,7 +244,7 @@ func (a *App) GenerateGrpcCode(ormType string) string {
 }
 
 // GenerateRestCode 生成代码
-func (a *App) GenerateRestCode(serviceName string) string {
+func (a *App) GenerateRestCode(serviceName string, protoPackageStrategy string) string {
 	if len(serviceName) == 0 {
 		runtime.LogErrorf(a.ctx, "服务名称不能为空")
 		return "服务名称不能为空"
@@ -255,12 +260,17 @@ func (a *App) GenerateRestCode(serviceName string) string {
 		return "未配置数据库连接，无法生成代码"
 	}
 
-	runtime.LogDebugf(a.ctx, "生成代码，服务名称: %v", serviceName)
+	if protoPackageStrategy == "" {
+		protoPackageStrategy = "per-table"
+	}
+
+	runtime.LogDebugf(a.ctx, "生成代码，服务名称: %v，Proto 包策略: %v", serviceName, protoPackageStrategy)
 
 	if err := a.generator.GenerateRestCode(
 		a.ctx,
 		serviceName,
 		"", // REST服务不生成ORM代码
+		protoPackageStrategy,
 		*a.dbConfig,
 		a.projectInfo.Root,
 		a.projectInfo.ModPath,
@@ -395,6 +405,7 @@ func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.
 		a.ctx,
 		*a.dbConfig,
 		ormType,
+		"per-table", // AI 辅助生成默认使用每表独立包
 		a.projectInfo.Root,
 		a.projectInfo.ModPath,
 	); err != nil {

@@ -19,6 +19,7 @@ func Convert(
 	dsn, outputPath *string,
 	moduleName, sourceModuleName, moduleVersion *string,
 	serviceType *string,
+	strategy string,
 	includeTables, excludeTables []string,
 	exportProto bool,
 ) (TableDataArray, error) {
@@ -66,6 +67,7 @@ func Convert(
 		if err = WriteServicesProto(
 			*outputPath,
 			*serviceType,
+			strategy,
 			*moduleName, *sourceModuleName, *moduleVersion,
 			tableDatas,
 		); err != nil {

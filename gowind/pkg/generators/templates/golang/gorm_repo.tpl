@@ -1,4 +1,4 @@
-﻿package data
+package data
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 
 	"{{.Module}}/app/{{lower .Service}}/service/internal/data/gorm/models"
 
-	{{.ApiPackage}} "{{.Module}}/api/gen/go/{{lower .Service}}/service/{{.ApiPackageVersion}}"
+	{{.ApiPackage}} "{{.Module}}/api/gen/go/{{.ApiModuleName}}/service/{{.ApiPackageVersion}}"
 )
 
 type {{.ClassName}} struct {

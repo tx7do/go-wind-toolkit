@@ -23,7 +23,7 @@ import (
 	"{{.Module}}/app/{{lower .Service}}/service/internal/data/ent/predicate"
 	"{{.Module}}/app/{{lower .Service}}/service/internal/data/ent/{{lower .Model}}"
 
-	{{.ApiPackage}} "{{.Module}}/api/gen/go/{{lower .Service}}/service/{{.ApiPackageVersion}}"
+	{{.ApiPackage}} "{{.Module}}/api/gen/go/{{.ApiModuleName}}/service/{{.ApiPackageVersion}}"
 )
 
 type {{.ClassName}} struct {

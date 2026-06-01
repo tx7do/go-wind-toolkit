@@ -128,6 +128,8 @@ func (g *Generator) writeEntRepoCode(
 		Vars: map[string]any{
 			"Service":                     serviceName,
 			"ApiPackage":                  stringcase.LowerCamelCase(apiPackageName) + stringcase.UpperCamelCase(apiPackageVersion),
+			"ApiPackageVersion":           apiPackageVersion,
+			"ApiModuleName":               apiPackageName,
 			"Model":                       model,
 			"Fields":                      fields,
 			"HasTimeConversionField":      fields.HasTimeConversionField(),
@@ -152,10 +154,12 @@ func (g *Generator) writeGormRepoCode(
 		OutDir: outputPath,
 		Module: projectModule,
 		Vars: map[string]any{
-			"Service":    serviceName,
-			"ApiPackage": stringcase.LowerCamelCase(apiPackageName) + stringcase.UpperCamelCase(apiPackageVersion),
-			"Model":      model,
-			"Fields":     fields,
+			"Service":           serviceName,
+			"ApiPackage":        stringcase.LowerCamelCase(apiPackageName) + stringcase.UpperCamelCase(apiPackageVersion),
+			"ApiPackageVersion": apiPackageVersion,
+			"ApiModuleName":     apiPackageName,
+			"Model":             model,
+			"Fields":            fields,
 		},
 	}
 

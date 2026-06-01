@@ -70,12 +70,12 @@ export function GenerateFrontendCode(arg1, arg2) {
   return window['go']['main']['App']['GenerateFrontendCode'](arg1, arg2);
 }
 
-export function GenerateGrpcCode(arg1) {
-  return window['go']['main']['App']['GenerateGrpcCode'](arg1);
+export function GenerateGrpcCode(arg1, arg2) {
+  return window['go']['main']['App']['GenerateGrpcCode'](arg1, arg2);
 }
 
-export function GenerateRestCode(arg1) {
-  return window['go']['main']['App']['GenerateRestCode'](arg1);
+export function GenerateRestCode(arg1, arg2) {
+  return window['go']['main']['App']['GenerateRestCode'](arg1, arg2);
 }
 
 export function GetAIConfig() {

@@ -142,8 +142,18 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 		name := inflection.Singular(table.Name)
 
 		services = append(services, name)
-		// 每表独立包：proto module 为表名单数，grpc_server/rest_server 使用此包名做 import
-		servicePackageMap[name] = strings.ToLower(name)
+
+		// 根据 ProtoPackageStrategy 决定 proto module 名称
+		var moduleName string
+		switch opts.ProtoPackageStrategy {
+		case "by-service":
+			// 按服务分包：所有表共用服务名
+			moduleName = strings.ToLower(opts.ModuleName)
+		default:
+			// per-table（默认）/ custom：每表独立包
+			moduleName = strings.ToLower(name)
+		}
+		servicePackageMap[name] = moduleName
 	}
 
 	var useGrpc bool
@@ -173,6 +183,7 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			tables,
 			services,
 			opts.ModuleVersion,
+			servicePackageMap,
 		); err != nil {
 			return err
 		}
@@ -268,6 +279,7 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 			&opts.SourceModuleName,
 			&opts.ModuleVersion,
 			&server,
+			opts.ProtoPackageStrategy,
 			opts.IncludedTables,
 			opts.ExcludedTables,
 			opts.GenerateProto,
@@ -380,6 +392,7 @@ func (g *Generator) generateDataPackageCode(
 	tables sqlproto.TableDataArray,
 	services []string,
 	moduleVersion string,
+	servicePackageMap map[string]string,
 ) error {
 	if len(tables) == 0 {
 		return nil
@@ -409,8 +422,11 @@ func (g *Generator) generateDataPackageCode(
 		name := inflection.Singular(table.Name)
 		modelNames = append(modelNames, name)
 
-		// 每表独立包：proto module 为表名单数
-		moduleName := strings.ToLower(name)
+		// 从 servicePackageMap 获取策略决定的 proto module 名
+		moduleName := servicePackageMap[name]
+		if moduleName == "" {
+			moduleName = strings.ToLower(name)
+		}
 
 		dataFields = make([]generators.DataField, 0)
 		for _, field := range table.Fields {

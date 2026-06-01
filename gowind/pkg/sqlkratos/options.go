@@ -14,6 +14,12 @@ type (
 		ModuleName       string
 		ModuleVersion    string
 
+		// ProtoPackageStrategy controls how proto packages are organized.
+		// "per-table" - each table gets its own proto package (e.g. user.service.v1)
+		// "by-service" - all tables under a service share one proto package (e.g. admin.service.v1)
+		// "custom" - use protoPackage from each table's option
+		ProtoPackageStrategy string
+
 		OrmType string // ORM type, e.g., "gorm", "sqlx", "ent"
 
 		ProjectName string

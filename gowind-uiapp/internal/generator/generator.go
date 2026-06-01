@@ -102,6 +102,7 @@ func (g *Generator) GenerateGrpcCode(
 	ctx context.Context,
 	dbConfig database.DBConfig,
 	ormType string,
+	protoPackageStrategy string,
 	rootPath string,
 	projectName string,
 ) error {
@@ -160,6 +161,7 @@ func (g *Generator) GenerateGrpcCode(
 		options.SourceModuleName = serviceName
 		options.ModuleName = serviceName
 		options.ModuleVersion = "v1"
+		options.ProtoPackageStrategy = protoPackageStrategy
 
 		options.OutputPath = rootPath
 
@@ -216,6 +218,7 @@ func (g *Generator) GenerateRestCode(
 	ctx context.Context,
 	restServiceName string,
 	ormType string,
+	protoPackageStrategy string,
 	dbConfig database.DBConfig,
 	rootPath string,
 	projectName string,
@@ -271,6 +274,7 @@ func (g *Generator) GenerateRestCode(
 		options.SourceModuleName = serviceName
 		options.ModuleName = restServiceName
 		options.ModuleVersion = "v1"
+		options.ProtoPackageStrategy = protoPackageStrategy
 
 		options.OutputPath = rootPath
 
