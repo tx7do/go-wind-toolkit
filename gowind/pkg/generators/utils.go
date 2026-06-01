@@ -15,15 +15,27 @@ func SnakeToPascal(snake string) string {
 	return stringcase.ToPascalCase(snake)
 }
 
+// commonAcronyms lists acronyms that should be kept upper-cased in PascalCase names,
+// matching the same list used by entgo.io/ent code generation.
+var commonAcronyms = map[string]struct{}{
+	"ACL": {}, "API": {}, "ASCII": {}, "AWS": {}, "CPU": {}, "CSS": {}, "DNS": {}, "EOF": {},
+	"GB": {}, "GUID": {}, "HCL": {}, "HTML": {}, "HTTP": {}, "HTTPS": {}, "ID": {}, "IP": {},
+	"JSON": {}, "KB": {}, "LHS": {}, "MAC": {}, "MB": {}, "QPS": {}, "RAM": {}, "RHS": {},
+	"RPC": {}, "SLA": {}, "SMTP": {}, "SQL": {}, "SSH": {}, "SSO": {}, "TCP": {}, "TLS": {},
+	"TTL": {}, "UDP": {}, "UI": {}, "UID": {}, "URI": {}, "URL": {}, "UTF8": {}, "UUID": {},
+	"VM": {}, "XML": {}, "XMPP": {}, "XSRF": {}, "XSS": {},
+}
+
 func SnakeToPascalPlus(snake string) string {
 	parts := strings.Split(snake, "_")
-	titleCaser := cases.Title(language.Und)
 	for i := 0; i < len(parts); i++ {
-		part := titleCaser.String(parts[i])
-		if strings.ToLower(part) == "id" {
-			part = "ID"
+		upper := strings.ToUpper(parts[i])
+		if _, ok := commonAcronyms[upper]; ok {
+			parts[i] = upper
+		} else {
+			titleCaser := cases.Title(language.Und)
+			parts[i] = titleCaser.String(parts[i])
 		}
-		parts[i] = part
 	}
 	return strings.Join(parts, "")
 }
