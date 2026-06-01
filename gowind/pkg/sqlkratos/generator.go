@@ -376,8 +376,12 @@ func (g *Generator) generateServicePackageCode(
 		}
 
 		name := inflection.Singular(table.Name)
-		// 每表独立包：targetModule 为表名单数
-		targetModule := strings.ToLower(name)
+
+		// 从 servicePackageMap 获取策略决定的 proto module 名
+		targetModule := servicePackageMap[name]
+		if targetModule == "" {
+			targetModule = strings.ToLower(name)
+		}
 
 		if err := g.WriteServicePackageCode(
 			outputPath,
