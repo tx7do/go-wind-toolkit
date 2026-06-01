@@ -30,6 +30,7 @@ func (g *Generator) WriteDataPackageCode(
 		copyDataField := generators.DataField{
 			Name:         field.Name,
 			Type:         field.Type,
+			SqlType:      field.SqlType,
 			Comment:      field.Comment,
 			Null:         field.Null,
 			IsPrimaryKey: field.IsPrimaryKey,
@@ -117,11 +118,11 @@ func (g *Generator) writeEntRepoCode(
 		OutDir: outputPath,
 		Module: projectModule,
 		Vars: map[string]any{
-			"Service":           serviceName,
-			"ApiPackage":        stringcase.LowerCamelCase(apiPackageName) + stringcase.UpperCamelCase(apiPackageVersion),
-			"Model":             model,
-			"Fields":            fields,
-			"HasTimestampField": fields.HasTimestampField(),
+			"Service":                serviceName,
+			"ApiPackage":             stringcase.LowerCamelCase(apiPackageName) + stringcase.UpperCamelCase(apiPackageVersion),
+			"Model":                  model,
+			"Fields":                 fields,
+			"HasTimeConversionField": fields.HasTimeConversionField(),
 		},
 	}
 

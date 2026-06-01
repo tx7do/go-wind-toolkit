@@ -18,7 +18,8 @@ type ProtoField struct {
 // DataField 数据库字段定义
 type DataField struct {
 	Name         string // 字段名
-	Type         string // 字段类型
+	Type         string // 字段类型（Proto类型）
+	SqlType      string // 原始SQL类型（大写，如 DATE, TIMESTAMP, VARCHAR 等）
 	Comment      string // 字段注释
 	Null         bool   // 是否允许为 NULL
 	IsPrimaryKey bool   // 是否为主键
@@ -26,10 +27,10 @@ type DataField struct {
 
 type DataFieldArray []DataField
 
-// HasTimestampField 检查字段数组中是否包含 Timestamp 类型的字段
-func (f DataFieldArray) HasTimestampField() bool {
+// HasTimeConversionField 检查字段数组中是否有需要 timeutil 转换的字段（Timestamp 或 Date）
+func (f DataFieldArray) HasTimeConversionField() bool {
 	for _, field := range f {
-		if field.IsTimestampType() {
+		if field.NeedsTimeConversion() {
 			return true
 		}
 	}
@@ -55,6 +56,9 @@ func (f DataField) EntPascalName() string {
 const (
 	// ProtoTypeTimestamp 表示 google.protobuf.Timestamp 类型
 	ProtoTypeTimestamp = "google.protobuf.Timestamp"
+
+	// SqlTypeDate DATE 类型（proto string, ent time.Time）
+	SqlTypeDate = "DATE"
 )
 
 // IsTimestampType 判断字段是否为 Timestamp 类型
@@ -62,24 +66,48 @@ func (f DataField) IsTimestampType() bool {
 	return f.Type == ProtoTypeTimestamp
 }
 
+// IsDateType 判断字段是否为 SQL DATE 类型（proto string, ent time.Time）
+func (f DataField) IsDateType() bool {
+	return f.SqlType == SqlTypeDate
+}
+
+// NeedsTimeConversion 判断字段是否需要 timeutil 转换
+func (f DataField) NeedsTimeConversion() bool {
+	return f.IsTimestampType() || f.IsDateType()
+}
+
+// TimeConvertFunc 返回时间转换函数名
+func (f DataField) TimeConvertFunc() string {
+	switch {
+	case f.IsTimestampType():
+		return "timeutil.TimestamppbToTime"
+	case f.IsDateType():
+		return "timeutil.StringDateToTime"
+	default:
+		return ""
+	}
+}
+
 func (f DataField) EntSetNillableFunc() string {
-	if f.IsTimestampType() {
-		return MakeEntSetNillableFuncWithTransfer(f.Name, "timeutil.TimestamppbToTime")
+	if f.NeedsTimeConversion() {
+		return MakeEntSetNillableFuncWithTransfer(f.Name, f.TimeConvertFunc())
 	}
 	return MakeEntSetNillableFunc(f.Name)
 }
 
 // EntCreateSetFunc 根据字段是否可为 NULL 以及类型选择合适的 setter：
 // NOT NULL + Timestamp → SetXxx(timeutil.TimestamppbToTime(req.Data.GetXxx()))
+// NOT NULL + Date     → SetXxx(timeutil.StringDateToTime(req.Data.GetXxx()))
 // NOT NULL             → SetXxx(req.Data.GetXxx())
 // NULL     + Timestamp → SetNillableXxx(timeutil.TimestamppbToTime(req.Data.Xxx))
+// NULL     + Date     → SetNillableXxx(timeutil.StringDateToTime(req.Data.Xxx))
 // NULL                 → SetNillableXxx(req.Data.Xxx)
 func (f DataField) EntCreateSetFunc() string {
 	if f.Null {
 		return f.EntSetNillableFunc()
 	}
-	if f.IsTimestampType() {
-		return MakeEntSetFuncWithTransfer(f.Name, "timeutil.TimestamppbToTime")
+	if f.NeedsTimeConversion() {
+		return MakeEntSetFuncWithTransfer(f.Name, f.TimeConvertFunc())
 	}
 	return MakeEntSetFunc(f.Name)
 }

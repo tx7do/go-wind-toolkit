@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -133,6 +134,7 @@ func convertTable(fnc fieldTypeFunc, table *schema.Table) (*TableData, error) {
 		fieldData := FieldData{
 			Name:         column.Name,
 			Type:         fnc(column.Type.Raw),
+			SqlType:      strings.ToUpper(strings.TrimSpace(strings.SplitN(column.Type.Raw, "(", 2)[0])),
 			Null:         column.Type.Null,
 			IsPrimaryKey: pkSet[column.Name],
 		}

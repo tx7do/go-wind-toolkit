@@ -820,25 +820,85 @@ func TestDataField_EntSetNillableFunc_NonTimestamp(t *testing.T) {
 	assert.Equal(t, expected, field.EntSetNillableFunc())
 }
 
-func TestDataFieldArray_HasTimestampField(t *testing.T) {
+func TestDataFieldArray_HasTimeConversionField(t *testing.T) {
 	t.Run("has timestamp field", func(t *testing.T) {
 		fields := DataFieldArray{
 			{Name: "id", Type: "int64"},
 			{Name: "create_time", Type: ProtoTypeTimestamp},
 		}
-		assert.True(t, fields.HasTimestampField())
+		assert.True(t, fields.HasTimeConversionField())
 	})
 
-	t.Run("no timestamp field", func(t *testing.T) {
+	t.Run("has date field", func(t *testing.T) {
+		fields := DataFieldArray{
+			{Name: "id", Type: "int64"},
+			{Name: "release_date", Type: "string", SqlType: SqlTypeDate},
+		}
+		assert.True(t, fields.HasTimeConversionField())
+	})
+
+	t.Run("no time field", func(t *testing.T) {
 		fields := DataFieldArray{
 			{Name: "id", Type: "int64"},
 			{Name: "name", Type: "string"},
 		}
-		assert.False(t, fields.HasTimestampField())
+		assert.False(t, fields.HasTimeConversionField())
 	})
 
 	t.Run("empty fields", func(t *testing.T) {
 		fields := DataFieldArray{}
-		assert.False(t, fields.HasTimestampField())
+		assert.False(t, fields.HasTimeConversionField())
+	})
+}
+
+func TestDataField_EntCreateSetFunc_Date(t *testing.T) {
+	// NOT NULL Date 字段应生成带 timeutil.StringDateToTime 转换的 Set 方法
+	field := DataField{
+		Name:         "release_date",
+		Type:         "string",
+		SqlType:      SqlTypeDate,
+		Null:         false,
+		IsPrimaryKey: false,
+	}
+	expected := "SetReleaseDate(timeutil.StringDateToTime(req.Data.GetReleaseDate()))"
+	assert.Equal(t, expected, field.EntCreateSetFunc())
+}
+
+func TestDataField_EntCreateSetFunc_Date_Nullable(t *testing.T) {
+	// Nullable Date 字段应生成带 timeutil.StringDateToTime 转换的 SetNillable 方法
+	field := DataField{
+		Name:         "release_date",
+		Type:         "string",
+		SqlType:      SqlTypeDate,
+		Null:         true,
+		IsPrimaryKey: false,
+	}
+	expected := "SetNillableReleaseDate(timeutil.StringDateToTime(req.Data.ReleaseDate))"
+	assert.Equal(t, expected, field.EntCreateSetFunc())
+}
+
+func TestDataField_EntSetNillableFunc_Date(t *testing.T) {
+	field := DataField{
+		Name:         "release_date",
+		Type:         "string",
+		SqlType:      SqlTypeDate,
+		Null:         true,
+		IsPrimaryKey: false,
+	}
+	expected := "SetNillableReleaseDate(timeutil.StringDateToTime(req.Data.ReleaseDate))"
+	assert.Equal(t, expected, field.EntSetNillableFunc())
+}
+
+func TestDataField_IsDateType(t *testing.T) {
+	t.Run("is date type", func(t *testing.T) {
+		field := DataField{Type: "string", SqlType: SqlTypeDate}
+		assert.True(t, field.IsDateType())
+		assert.True(t, field.NeedsTimeConversion())
+	})
+
+	t.Run("is not date type", func(t *testing.T) {
+		field := DataField{Type: "string", SqlType: "VARCHAR"}
+		assert.False(t, field.IsDateType())
+		assert.False(t, field.NeedsTimeConversion())
 	})
 }

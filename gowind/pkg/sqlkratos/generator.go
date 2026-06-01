@@ -304,6 +304,7 @@ func (g *Generator) generateDataPackageCode(
 			dataField := generators.DataField{
 				Name:         field.Name,
 				Type:         field.Type,
+				SqlType:      field.SqlType,
 				Comment:      field.Comment,
 				Null:         field.Null,
 				IsPrimaryKey: field.IsPrimaryKey,

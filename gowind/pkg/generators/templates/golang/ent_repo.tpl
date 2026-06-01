@@ -9,7 +9,7 @@ import (
 
 	"github.com/tx7do/go-utils/copierutil"
 	"github.com/tx7do/go-utils/mapper"
-{{- if .HasTimestampField}}
+{{- if .HasTimeConversionField}}
 	"github.com/tx7do/go-utils/timeutil"
 {{- end}}
 
