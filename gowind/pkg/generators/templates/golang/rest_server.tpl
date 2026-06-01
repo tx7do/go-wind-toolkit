@@ -1,9 +1,6 @@
 package server
 
 import (
-	"context"
-
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/selector"
@@ -22,9 +19,7 @@ import (
 
 	"{{.Module}}/app/{{lower .Service}}/service/cmd/server/assets"
 	"{{.Module}}/app/{{lower .Service}}/service/internal/service"
-{{range $key, $value := .Packages}}
-	{{apiPackageAlias (lower $value) $.ApiPackageVersion}} "{{$.Module}}/api/gen/go/{{lower $value}}/service/{{lower $.ApiPackageVersion}}"
-{{- end}}
+	{{apiPackageAlias (lower .Service) .ApiPackageVersion}} "{{.Module}}/api/gen/go/{{lower .Service}}/service/{{lower .ApiPackageVersion}}"
 	"{{.Module}}/pkg/middleware/auth"
 )
 
@@ -72,7 +67,7 @@ func NewRestServer(
 		return nil, err
 	}
 {{range $key, $value := .Services}}
-    {{apiPackageAlias (lower $value) $.ApiPackageVersion}}.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
+    {{apiPackageAlias (lower $.Service) $.ApiPackageVersion}}.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
 {{- end}}
 
 	if cfg.GetServer().GetRest().GetEnableSwagger() {

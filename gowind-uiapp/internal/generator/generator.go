@@ -262,10 +262,10 @@ func (g *Generator) GenerateRestCode(
 			options.Source = dsn
 		}
 
-		options.UseRepo = true
+		options.UseRepo = false
 		options.GenerateProto = true
 		options.GenerateORM = false
-		options.GenerateData = true
+		options.GenerateData = false
 		options.GenerateService = true
 		options.GenerateServer = true
 		options.GenerateMain = true

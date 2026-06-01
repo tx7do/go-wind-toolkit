@@ -377,17 +377,29 @@ func (g *Generator) generateServicePackageCode(
 
 		name := inflection.Singular(table.Name)
 
-		// 从 servicePackageMap 获取策略决定的 proto module 名
-		targetModule := servicePackageMap[name]
-		if targetModule == "" {
-			targetModule = strings.ToLower(name)
+		// 从 servicePackageMap 获取策略决定的 gRPC proto module 名
+		sourceModule := servicePackageMap[name]
+		if sourceModule == "" {
+			sourceModule = strings.ToLower(name)
+		}
+
+		// gRPC 和 REST 的 Target/Source 语义不同：
+		// gRPC: Target=源gRPC module(按策略), Source=同Target
+		// REST: Target=BFF module(serviceName), Source=源gRPC module(按策略)
+		var targetModule, effectiveSourceModule string
+		if isGrpcService {
+			targetModule = sourceModule
+			effectiveSourceModule = sourceModule
+		} else {
+			targetModule = strings.ToLower(serviceName)
+			effectiveSourceModule = sourceModule
 		}
 
 		if err := g.WriteServicePackageCode(
 			outputPath,
 			projectName, serviceName,
 			name,
-			targetModule, sourceModuleName, moduleVersion,
+			targetModule, effectiveSourceModule, moduleVersion,
 			userRepo, isGrpcService,
 		); err != nil {
 			return err
