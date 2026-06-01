@@ -3,7 +3,7 @@ package entimport
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"os"
 	"strings"
 
@@ -26,15 +26,12 @@ func Importer(ctx context.Context, dsn, schemaPath *string, includeTables, exclu
 
 	drv, err := mux.Default.OpenImport(normalizedDSN)
 	if err != nil {
-		log.Fatalf("entimport: failed to create import driver - %v", err)
+		return fmt.Errorf("entimport: failed to create import driver: %w", err)
 	}
 	defer func(drv *mux.ImportDriver) {
-		//if drv != nil {
-		//	err = drv.Close()
-		//	if err != nil {
-		//		log.Fatalf("entimport: failed to close import driver - %v", err)
-		//	}
-		//}
+		if drv != nil {
+			_ = drv.Close()
+		}
 	}(drv)
 
 	i, err := NewImport(
@@ -44,16 +41,16 @@ func Importer(ctx context.Context, dsn, schemaPath *string, includeTables, exclu
 		WithSchemaPath(normalizedDSN),
 	)
 	if err != nil {
-		log.Fatalf("entimport: create importer failed: %v", err)
+		return fmt.Errorf("entimport: create importer failed: %w", err)
 	}
 
 	mutations, err := i.SchemaMutations(ctx)
 	if err != nil {
-		log.Fatalf("entimport: schema import failed - %v", err)
+		return fmt.Errorf("entimport: schema import failed: %w", err)
 	}
 
 	if err = WriteSchema(mutations, WithSchemaPath(*schemaPath)); err != nil {
-		log.Fatalf("entimport: schema writing failed - %v", err)
+		return fmt.Errorf("entimport: schema writing failed: %w", err)
 	}
 
 	return nil

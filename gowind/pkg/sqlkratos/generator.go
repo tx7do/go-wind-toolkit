@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"path"
+	"strings"
 
 	"github.com/jinzhu/inflection"
 	"github.com/tx7do/go-utils/code_generator"
@@ -14,6 +16,90 @@ import (
 	sqlorm "github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlorm"
 	sqlproto "github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlproto"
 )
+
+// ensureDSNScheme ensures the DSN has a valid scheme prefix based on the driver type.
+// If the DSN already contains "://", it is returned as-is.
+// For PostgreSQL key-value format DSN (e.g. "host=localhost port=5432 user=postgres ..."),
+// it converts to URL format (e.g. "postgres://user:pass@host:port/dbname?sslmode=disable").
+func ensureDSNScheme(dsn, driver string) string {
+	if strings.Contains(dsn, "://") {
+		return dsn
+	}
+	switch strings.ToLower(driver) {
+	case "mysql":
+		return "mysql://" + dsn
+	case "postgresql", "postgres":
+		// PostgreSQL key-value DSN: "host=localhost port=5432 user=postgres password=xxx dbname=mydb sslmode=disable"
+		if isPostgresKeyValueDSN(dsn) {
+			return convertPostgresKeyValueToURL(dsn)
+		}
+		return "postgres://" + dsn
+	default:
+		return dsn
+	}
+}
+
+// isPostgresKeyValueDSN detects PostgreSQL key-value format DSN.
+// Key-value DSN contains space-separated key=value pairs like "host=localhost port=5432 user=postgres".
+func isPostgresKeyValueDSN(dsn string) bool {
+	return strings.Contains(dsn, "=") && strings.Contains(dsn, " ")
+}
+
+// convertPostgresKeyValueToURL converts PostgreSQL key-value DSN to URL format.
+// Input:  "host=localhost port=5432 user=postgres password=xxx dbname=mydb sslmode=disable"
+// Output: "postgres://postgres:xxx@localhost:5432/mydb?sslmode=disable"
+func convertPostgresKeyValueToURL(dsn string) string {
+	parts := strings.Fields(dsn)
+	vals := make(map[string]string)
+	for _, part := range parts {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) == 2 {
+			vals[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+
+	host := vals["host"]
+	if host == "" {
+		host = "localhost"
+	}
+	port := vals["port"]
+	if port == "" {
+		port = "5432"
+	}
+	user := vals["user"]
+	password := vals["password"]
+	dbname := vals["dbname"]
+
+	// Build URL: postgres://user:password@host:port/dbname?params
+	result := "postgres://"
+	if user != "" {
+		result += url.QueryEscape(user)
+		if password != "" {
+			result += ":" + url.QueryEscape(password)
+		}
+		result += "@"
+	}
+	result += host + ":" + port
+	if dbname != "" {
+		result += "/" + url.QueryEscape(dbname)
+	}
+
+	// Collect remaining params as query string
+	var params []string
+	for k, v := range vals {
+		switch k {
+		case "host", "port", "user", "password", "dbname":
+			// already handled
+		default:
+			params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(v))
+		}
+	}
+	if len(params) > 0 {
+		result += "?" + strings.Join(params, "&")
+	}
+
+	return result
+}
 
 func Generate(ctx context.Context, opts GeneratorOptions) error {
 	g := NewGenerator()
@@ -164,6 +250,9 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 
 	protoPath := path.Join(opts.OutputPath, "/api/protos/")
 
+	// 确保 DSN 有正确的 scheme 前缀
+	source := ensureDSNScheme(opts.Source, opts.Driver)
+
 	for _, server := range opts.Servers {
 		if server != "grpc" && server != "rest" {
 			continue
@@ -171,7 +260,7 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 
 		if tables, err = sqlproto.Convert(
 			ctx,
-			&opts.Source,
+			&source,
 			&protoPath,
 			&opts.ModuleName,
 			&opts.SourceModuleName,
@@ -198,6 +287,9 @@ func (g *Generator) generateOrmCode(
 
 	log.Println("Generating ORM code...")
 
+	// 确保 DSN 有正确的 scheme 前缀
+	source := ensureDSNScheme(opts.Source, opts.Driver)
+
 	var schemaPath string
 	var daoPath string
 	switch opts.OrmType {
@@ -212,7 +304,7 @@ func (g *Generator) generateOrmCode(
 		ctx,
 		opts.OrmType,
 		&opts.Driver,
-		&opts.Source,
+		&source,
 		&schemaPath,
 		&daoPath,
 		opts.IncludedTables,

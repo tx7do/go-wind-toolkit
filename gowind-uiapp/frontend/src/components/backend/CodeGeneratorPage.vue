@@ -381,6 +381,9 @@ const ormTypes = [
 
 const excludedCount = ref(0)
 
+type ProtoPackageStrategy = 'per-table' | 'by-service' | 'custom'
+const protoPackageStrategy = ref<ProtoPackageStrategy>('by-service')
+
 function updateTableStats() {
   excludedCount.value = tableData.value.filter(r => r.exclude).length
 }
@@ -655,6 +658,22 @@ EventsOn('table-imported', () => {
 
     <!-- ====== 步骤 1: 表配置 ====== -->
     <div v-if="currentStep === 1" class="step-content">
+      <!-- Proto 包策略 -->
+      <div class="proto-strategy-bar">
+        <span class="proto-strategy-label">{{ t('backend.table.protoPackageStrategy') }}</span>
+        <a-radio-group v-model:value="protoPackageStrategy" size="small">
+          <a-tooltip :title="t('backend.table.protoStrategyPerTableTip')">
+            <a-radio-button value="per-table">{{ t('backend.table.protoStrategyPerTable') }}</a-radio-button>
+          </a-tooltip>
+          <a-tooltip :title="t('backend.table.protoStrategyByServiceTip')">
+            <a-radio-button value="by-service">{{ t('backend.table.protoStrategyByService') }}</a-radio-button>
+          </a-tooltip>
+          <a-tooltip :title="t('backend.table.protoStrategyCustomTip')">
+            <a-radio-button value="custom">{{ t('backend.table.protoStrategyCustom') }}</a-radio-button>
+          </a-tooltip>
+        </a-radio-group>
+      </div>
+
       <a-card size="small">
         <template #title>
           <span>{{ t('backend.table.tableCount', {total: tableData.length, excluded: excludedCount}) }}</span>
@@ -673,6 +692,16 @@ EventsOn('table-imported', () => {
           class="table-content"
         >
           <vxe-column field="tableName" :title="t('backend.table.tableName')" min-width="200"/>
+          <vxe-column v-if="protoPackageStrategy === 'custom'" field="protoPackage" :title="t('backend.table.protoPackage')" min-width="160">
+            <template #default="{ row }">
+              <a-input
+                v-model:value="row.protoPackage"
+                :placeholder="t('backend.table.protoPackagePlaceholder')"
+                size="small"
+                @change="handleServiceChange(row)"
+              />
+            </template>
+          </vxe-column>
           <vxe-column field="service" :title="t('backend.table.service')" min-width="180">
             <template #header>
               <div class="service-header">
@@ -1039,5 +1068,24 @@ EventsOn('table-imported', () => {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #f0f0f0;
+}
+
+/* Proto 包策略栏 */
+.proto-strategy-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 16px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.proto-strategy-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #595959;
+  white-space: nowrap;
 }
 </style>

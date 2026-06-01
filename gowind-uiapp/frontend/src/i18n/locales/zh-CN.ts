@@ -114,6 +114,16 @@ export default {
       quickSelect: '一键全选',
       exclude: '排除',
       assignServiceFirst: '请为所有未排除的表分配所属服务',
+      // Proto 包策略
+      protoPackageStrategy: 'Proto 包策略',
+      protoStrategyPerTable: '每表独立包',
+      protoStrategyPerTableTip: '每张表使用独立的 proto package，避免消息类型名冲突',
+      protoStrategyByService: '按服务分包',
+      protoStrategyByServiceTip: '同一服务下的所有表共用一个 proto package',
+      protoStrategyCustom: '自定义包名',
+      protoStrategyCustomTip: '手动为每张表指定 proto package 名称',
+      protoPackage: '所属 Proto 包',
+      protoPackagePlaceholder: '输入包名',
     },
     // 生成配置
     generate: {

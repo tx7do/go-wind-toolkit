@@ -43,8 +43,8 @@ func isFile(path string) bool {
 func (t *Text) loadSQLFromFile() string {
 	// 检查 schemaPath 是否为文件
 	if !isFile(t.schemaPath) {
-		// 如果不是文件，直接返回 schemaPath，认为它是一个 SQL 文本内容。
-		return t.schemaPath
+		// 如果不是文件，去掉可能的 scheme 前缀（如 text://）后返回 SQL 文本内容。
+		return stripScheme(t.schemaPath)
 	}
 
 	content, err := os.ReadFile(t.schemaPath)
@@ -53,6 +53,14 @@ func (t *Text) loadSQLFromFile() string {
 	}
 
 	return string(content)
+}
+
+// stripScheme 去掉 DSN 中的 scheme 前缀（如 text://, file://）
+func stripScheme(path string) string {
+	if idx := strings.Index(path, "://"); idx != -1 {
+		return path[idx+3:]
+	}
+	return path
 }
 
 func (t *Text) ParseType(raw string) (schema.Type, error) {

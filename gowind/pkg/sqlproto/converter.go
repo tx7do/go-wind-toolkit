@@ -3,7 +3,7 @@ package sqlproto
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"os"
 	"strings"
 
@@ -39,15 +39,12 @@ func Convert(
 
 	convertDriver, err := mux.Default.OpenConvert(normalizedDSN)
 	if err != nil {
-		log.Fatalf("sqlproto: failed to create import driver - %v", err)
-		return nil, err
+		return nil, fmt.Errorf("sqlproto: failed to create import driver: %w", err)
 	}
 	defer func() {
-		//if convertDriver != nil {
-		//	if err = convertDriver.Close(); err != nil {
-		//		log.Printf("sqlproto: warning - failed to close driver: %v", err)
-		//	}
-		//}
+		if convertDriver != nil {
+			_ = convertDriver.Close()
+		}
 	}()
 
 	i, err := internal.NewConvert(
@@ -57,14 +54,12 @@ func Convert(
 		internal.WithSchemaPath(normalizedDSN),
 	)
 	if err != nil {
-		log.Fatalf("sqlproto: create importer failed: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("sqlproto: create importer failed: %w", err)
 	}
 
 	tableDatas, err := i.SchemaTables(ctx)
 	if err != nil {
-		log.Fatalf("sqlproto: schema import failed - %v", err)
-		return nil, err
+		return nil, fmt.Errorf("sqlproto: schema import failed: %w", err)
 	}
 
 	if exportProto {
@@ -74,7 +69,7 @@ func Convert(
 			*moduleName, *sourceModuleName, *moduleVersion,
 			tableDatas,
 		); err != nil {
-			log.Fatalf("sqlproto: schema writing failed - %v", err)
+			return nil, fmt.Errorf("sqlproto: schema writing failed: %w", err)
 		}
 	}
 
@@ -82,9 +77,9 @@ func Convert(
 }
 
 // normalizeDSN normalizes the DSN to ensure it has a valid scheme.
-// If the input is a file path, it will be prefixed with "file://".
-// If it's SQL text content, it will be prefixed with "text://".
 // If it already has a scheme (mysql://, postgres://, etc.), it's returned as-is.
+// If it's a file path, it will be prefixed with "file://".
+// Otherwise, it's treated as SQL text content and prefixed with "text://".
 func normalizeDSN(dsn string) string {
 	// Check if it already has a scheme
 	if strings.Contains(dsn, "://") {

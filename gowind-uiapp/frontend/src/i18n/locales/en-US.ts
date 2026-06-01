@@ -101,6 +101,16 @@ export default {
       quickSelect: 'Quick Select',
       exclude: 'Exclude',
       assignServiceFirst: 'Please assign a service to all non-excluded tables',
+      // Proto package strategy
+      protoPackageStrategy: 'Proto Package Strategy',
+      protoStrategyPerTable: 'Per-Table Package',
+      protoStrategyPerTableTip: 'Each table gets its own proto package to avoid message type name conflicts',
+      protoStrategyByService: 'By Service Package',
+      protoStrategyByServiceTip: 'All tables under the same service share one proto package',
+      protoStrategyCustom: 'Custom Package Name',
+      protoStrategyCustomTip: 'Manually specify the proto package name for each table',
+      protoPackage: 'Proto Package',
+      protoPackagePlaceholder: 'Enter package name',
     },
     generate: {
       title: 'Generate Targets',
