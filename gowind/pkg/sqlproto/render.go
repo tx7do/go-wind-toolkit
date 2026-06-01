@@ -27,12 +27,12 @@ func WriteServiceProto(
 ) error {
 	modelName := inflection.Singular(tableName)
 
-	// 根据 strategy 决定 proto module 名称
+	// 根据 strategy 决定 gRPC proto module 名称（REST 的 SourceModule 也必须用同一个）
 	var protoModule string
 	switch strategy {
 	case "by-service":
 		// 按服务分包：所有表共用服务名作为 proto module
-		protoModule = strings.ToLower(targetModuleName)
+		protoModule = strings.ToLower(sourceModuleName)
 	case "custom":
 		// 自定义：使用调用方传入的自定义包名，未指定则回退到表名单数
 		if customPkg != "" {
@@ -59,7 +59,7 @@ func WriteServiceProto(
 
 	case "rest":
 		data := render.RestProtoTemplateData{
-			SourceModule: sourceModuleName,
+			SourceModule: protoModule,
 			TargetModule: targetModuleName,
 			Version:      moduleVersion,
 
