@@ -101,7 +101,27 @@ gow generate --dsn "mysql://..." --service user-admin \
 gow gen --dsn "..." --service user
 ```
 
-### 5. 工具代码生成
+### 5. 微服务演进（提取拆分）
+
+从一个已有服务中提取业务模块到另一个服务，实现渐进式微服务拆分：
+
+```shell
+# 从 admin 服务提取 role 模块到 user 服务
+# 目标服务不存在时会自动创建
+# ORM 类型根据源服务目录结构自动侦测
+gow extract admin user --obj role
+
+# 提取多个实体（逗号分隔）
+gow extract admin user -o role,permission
+
+# 提取多个实体（重复 flag）
+gow extract admin user --obj role --obj permission
+
+# 保留源文件
+# gow extract admin user -o role --keep-source
+```
+
+### 6. 工具代码生成
 
 
 ```shell
@@ -178,6 +198,36 @@ Flags:
       --source-module string    Source module name for REST service
 ```
 
+### `gow extract` — 微服务模块提取
+
+从一个已有服务中提取业务模块（schema、repo、service、wire、server）到目标服务，用于微服务的渐进式拆分与演进。目标服务不存在时会自动创建脚手架。ORM 类型根据源服务目录结构自动侦测。
+
+```shell
+gow extract <source-service> <target-service> -o <model> [-o <model>...] [flags]
+
+Flags:
+  -o, --obj stringArray   要提取的实体名称（支持逗号分隔或重复使用）
+      --orm string        ORM 类型覆盖：ent, gorm（默认自动侦测）
+      --keep-source       保留源文件（默认删除）
+```
+
+#### 示例
+
+```shell
+# 单个实体
+gow extract admin user -o role
+
+# 多个实体
+gow extract admin user -o role,permission
+gow extract admin user --obj role --obj permission
+
+# 手动指定 ORM 类型
+gow extract admin user -o role --orm gorm
+
+# 保留源文件
+# gow extract admin user -o role --keep-source
+```
+
 ### `gow run` — 运行服务
 
 ```shell
@@ -241,6 +291,7 @@ myproject/
 - ✅ 自动生成 Ent / GORM 模型
 - ✅ 自动生成 Protobuf & API 定义
 - ✅ 自动生成 Wire 依赖注入
+- ✅ 微服务渐进式拆分与演进（模块提取）
 - ✅ 一键运行、热重载支持
 - ✅ 统一 CLI 入口，降低学习成本
 - ✅ 桌面 UI 可视化面板（Wails）

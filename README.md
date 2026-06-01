@@ -1,78 +1,92 @@
 # GoWind Toolkit
 
-**A comprehensive all-in-one toolkit for Go-Kratos microservice development, including scaffolding, CRUD code generation,
-dev tools, operation utilities, CLI and desktop UI.**
+[English](./README.en-US.md) | **中文**
 
 一个为 Go-Kratos 微服务生态打造的**一站式全能工具集**，包含脚手架、自动化代码生成、开发辅助、运维工具、命令行与可视化桌面客户端。
 
-## Project Structure
+## 项目结构
 
 ```
 go-wind-toolkit/
-├── gowind/            # Module 1: CLI + Shared Libraries
-│   ├── cmd/gow/       # CLI entry point (go install .../cmd/gow@latest)
-│   ├── pkg/           # Exported libraries (shared by CLI and UI)
-│   │   ├── generators/      # Code generation templates & engine
-│   │   ├── sqlkratos/       # SQL → Full Kratos service generator
-│   │   ├── sqlorm/          # SQL → ORM (ent/gorm) generator
-│   │   ├── sqlproto/        # SQL → Protobuf/gRPC/REST converter
-│   │   └── configexporter/  # Config exporter (Consul/Etcd/Nacos)
-│   └── internal/     # CLI-specific code
-├── gowind-uiapp/      # Module 2: Wails Desktop UI
+├── gowind/            # 模块 1: CLI + 共享库
+│   ├── cmd/gow/       # CLI 入口 (go install .../cmd/gow@latest)
+│   ├── pkg/           # 导出库（CLI 和 UI 共用）
+│   │   ├── generators/      # 代码生成模板与引擎
+│   │   ├── sqlkratos/       # SQL → 完整 Kratos 服务生成器
+│   │   ├── sqlorm/          # SQL → ORM (ent/gorm) 生成器
+│   │   ├── sqlproto/        # SQL → Protobuf/gRPC/REST 转换器
+│   │   ├── service/         # 服务脚手架生成器
+│   │   ├── extract/         # 微服务模块提取器
+│   │   └── configexporter/  # 配置导出 (Consul/Etcd/Nacos)
+│   └── internal/     # CLI 专用代码
+├── gowind-uiapp/      # 模块 2: Wails 桌面 UI
 │   ├── main.go
-│   ├── frontend/     # Vue.js frontend
-│   └── internal/     # UI-specific code
+│   ├── frontend/     # Vue.js 前端
+│   └── internal/     # UI 专用代码
 └── README.md
 ```
 
-## Features
+## 功能一览
 
-| Feature | Description |
+| 功能 | 说明 |
 |---|---|
-| Project Scaffolding | `gow new` — One-click Kratos project creation |
-| Service Management | `gow add service` — Add gRPC/REST microservices |
-| Code Generation | `gow generate` — Generate CRUD code from database schema |
-| Ent / GORM Models | Auto-generate ORM models from SQL database |
-| Protobuf Generation | Auto-generate gRPC & REST proto definitions |
-| Wire DI | Auto-generate Wire dependency injection |
-| Config Exporter | Export configs to Consul / Etcd / Nacos |
-| Desktop UI | Visual panel for development & operation |
+| 项目脚手架 | `gow new` — 一键创建 Kratos 项目 |
+| 服务管理 | `gow add service` — 添加 gRPC/REST 微服务 |
+| 代码生成 | `gow generate` — 从数据库 schema 生成 CRUD 代码 |
+| Ent / GORM 模型 | 从 SQL 数据库自动生成 ORM 模型 |
+| Protobuf 生成 | 自动生成 gRPC & REST proto 定义 |
+| Wire 依赖注入 | 自动生成 Wire 依赖注入 |
+| 微服务演进 | `gow extract` — 渐进式服务拆分与模块提取 |
+| 配置导出 | 导出配置到 Consul / Etcd / Nacos |
+| 桌面 UI | 可视化开发运维面板 |
 
-## Install CLI
+## 安装 CLI
 
 ```shell
 go install github.com/tx7do/go-wind-toolkit/gowind/cmd/gow@latest
 ```
 
-## Quick Start
+## 快速开始
 
-### Create project
+### 创建项目
 
 ```shell
 gow new myproject
 cd myproject && go mod tidy
 ```
 
-### Add service
+### 添加服务
 
 ```shell
 gow add service admin -s grpc
 ```
 
-### Generate CRUD code from database
+### 从数据库生成 CRUD 代码
 
 ```shell
 gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user
 ```
 
-## Feature Summary
+### 微服务演进（模块提取）
 
-- One-click creation of standard Kratos projects
-- One-click addition of multi-protocol microservices (gRPC + REST)
-- Database-driven CRUD code generation (proto, ORM, service, server, wire, config)
-- Automatic generation of Ent / GORM models
-- Automatic generation of Protobuf & API definitions
-- Automatic generation of Wire dependency injection
-- Config export to Consul / Etcd / Nacos
-- Desktop UI (Wails-based visual panel)
+```shell
+# 从 admin 服务提取 role 模块到 user 服务
+# 目标服务不存在时自动创建，ORM 类型自动侦测
+gow extract admin user -o role
+
+# 提取多个实体
+gow extract admin user -o role,permission
+```
+
+## 特性总结
+
+- 一键创建 Kratos 标准项目
+- 一键添加多协议微服务（gRPC + REST）
+- 数据库驱动 CRUD 代码生成（proto、ORM、service、server、wire、config）
+- 自动生成 Ent / GORM 模型
+- 自动生成 Protobuf & API 定义
+- 自动生成 Wire 依赖注入
+- 微服务渐进式拆分与演进（模块提取）
+- 配置导出到 Consul / Etcd / Nacos
+- 桌面 UI 可视化面板（Wails）
 

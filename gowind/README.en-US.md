@@ -101,7 +101,27 @@ gow generate --dsn "mysql://..." --service user-admin \
 gow gen --dsn "..." --service user
 ```
 
-### 5. Tool Code Generation
+### 5. Microservice Evolution (Extract & Split)
+
+Extract business modules from an existing service to another, enabling gradual microservice splitting:
+
+```shell
+# Extract role module from admin service to user service
+# Target service is auto-created if it doesn't exist
+# ORM type is auto-detected from source service directory structure
+gow extract admin user --obj role
+
+# Extract multiple objects (comma-separated)
+gow extract admin user -o role,permission
+
+# Extract multiple objects (repeated flag)
+gow extract admin user --obj role --obj permission
+
+# Keep source files
+# gow extract admin user -o role --keep-source
+```
+
+### 6. Tool Code Generation
 
 
 ```shell
@@ -178,6 +198,36 @@ Flags:
       --source-module string    Source module name for REST service
 ```
 
+### `gow extract` — Microservice Module Extraction
+
+Extract business modules (schema, repo, service, wire, server) from a source service to a target service, for gradual microservice splitting and evolution. Target service scaffold is auto-created if it doesn't exist. ORM type is auto-detected from source service directory structure.
+
+```shell
+gow extract <source-service> <target-service> -o <model> [-o <model>...] [flags]
+
+Flags:
+  -o, --obj stringArray   Object/model names to extract (comma-separated or repeated)
+      --orm string        ORM type override: ent, gorm (auto-detected by default)
+      --keep-source       Keep source files (deleted by default)
+```
+
+#### Examples
+
+```shell
+# Single object
+gow extract admin user -o role
+
+# Multiple objects
+gow extract admin user -o role,permission
+gow extract admin user --obj role --obj permission
+
+# Manually specify ORM type
+gow extract admin user -o role --orm gorm
+
+# Keep source files
+# gow extract admin user -o role --keep-source
+```
+
 ### `gow run` — Run Service
 
 ```shell
@@ -241,6 +291,7 @@ myproject/
 - ✅ Automatic generation of Ent / GORM models
 - ✅ Automatic generation of Protobuf & API definitions
 - ✅ Automatic generation of Wire dependency injection
+- ✅ Gradual microservice splitting and evolution (module extraction)
 - ✅ One-click execution and hot-reload support
 - ✅ Unified CLI entry to reduce learning costs
 - ✅ Desktop UI visual panel (Wails)
