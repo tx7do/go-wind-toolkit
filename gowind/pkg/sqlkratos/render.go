@@ -3,9 +3,7 @@ package sqlkratos
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -287,7 +285,6 @@ func (g *Generator) WriteDataWireSetCode(
 	allFunctions []string,
 ) error {
 	providersPath := filepath.Join(outputPath, "providers")
-	wireSetFile := filepath.Join(providersPath, "wire_set.go")
 
 	// 检查是否有 client. 前缀的函数
 	var extraImports []string
@@ -312,16 +309,6 @@ func (g *Generator) WriteDataWireSetCode(
 	_, err := g.goGenerator.GenerateWireSet(context.Background(), opts)
 	if err != nil {
 		return err
-	}
-
-	// 如果文件已存在（Upsert），确保 import 也被添加
-	if _, statErr := os.Stat(wireSetFile); statErr == nil {
-		for _, imp := range extraImports {
-			importPath := fmt.Sprintf("%s/app/%s/service/internal/%s", projectModule, strings.ToLower(serviceName), imp)
-			if ensureErr := g.goGenerator.EnsureImport(wireSetFile, importPath); ensureErr != nil {
-				return ensureErr
-			}
-		}
 	}
 
 	return nil

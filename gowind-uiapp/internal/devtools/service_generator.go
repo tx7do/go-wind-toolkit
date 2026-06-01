@@ -188,7 +188,6 @@ func (g *ServiceGenerator) generateData() error {
 	}
 
 	providersPath := filepath.Join(dataPath, "providers")
-	wireSetFile := filepath.Join(providersPath, "wire_set.go")
 
 	// 构建带有 client import 的 opts
 	var extraImports []string
@@ -208,16 +207,6 @@ func (g *ServiceGenerator) generateData() error {
 	}
 	if _, err := g.goGenerator.GenerateWireSet(context.Background(), opts); err != nil {
 		return fmt.Errorf("生成 data wire_set 失败: %w", err)
-	}
-
-	// 确保 import 存在（Upsert 场景）
-	if _, statErr := os.Stat(wireSetFile); statErr == nil {
-		for _, imp := range extraImports {
-			importPath := fmt.Sprintf("%s/app/%s/service/internal/%s", g.projectModule, strings.ToLower(g.serviceName), imp)
-			if ensureErr := g.goGenerator.EnsureImport(wireSetFile, importPath); ensureErr != nil {
-				return ensureErr
-			}
-		}
 	}
 
 	return nil

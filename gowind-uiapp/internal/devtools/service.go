@@ -215,6 +215,11 @@ func RunWire(projectRoot, serviceName string) *CommandResult {
 		return &CommandResult{Success: false, Error: fmt.Sprintf("服务 %s 的 cmd/server 目录不存在", serviceName)}
 	}
 
+	// 先运行 go mod tidy 确保 go.mod 是最新的，避免 wire 报错
+	if tidyResult := RunGoModTidy(projectRoot); !tidyResult.Success {
+		return &CommandResult{Success: false, Error: fmt.Sprintf("go mod tidy 失败: %s", tidyResult.Error)}
+	}
+
 	// 优先使用全局 wire，否则用 go run
 	if wirePath, err := exec.LookPath("wire"); err == nil {
 		return runCommand(serverPath, wirePath)

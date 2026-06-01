@@ -86,6 +86,25 @@ func (g *GoGenerator) GenerateWireSet(ctx context.Context, opts code_generator.O
 				return "", fmt.Errorf("failed to upsert provider set functions: %w", err)
 			}
 		}
+
+		// 确保基础包 import 存在
+		if packageName != "" {
+			baseImportPath := fmt.Sprintf("%s/app/%s/service/internal/%s", opts.Module, strings.ToLower(opts.Vars["Service"].(string)), packageName)
+			if ensureErr := g.EnsureImport(outputPath, baseImportPath); ensureErr != nil {
+				return "", fmt.Errorf("failed to ensure base import: %w", ensureErr)
+			}
+		}
+
+		// 确保额外 import 存在（如 data/client）
+		if extraImports, ok := opts.Vars["ExtraImports"].([]string); ok {
+			for _, imp := range extraImports {
+				importPath := fmt.Sprintf("%s/app/%s/service/internal/%s", opts.Module, strings.ToLower(opts.Vars["Service"].(string)), imp)
+				if ensureErr := g.EnsureImport(outputPath, importPath); ensureErr != nil {
+					return "", fmt.Errorf("failed to ensure extra import: %w", ensureErr)
+				}
+			}
+		}
+
 		return outputPath, nil
 	} else if !os.IsNotExist(err) {
 		// 其他错误
