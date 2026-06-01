@@ -50,13 +50,13 @@ jobs:
         working-directory: gowind-uiapp
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-        run: wails build -ldflags "-s -w" -o gowind-toolkit.exe
+        run: wails build -ldflags "-s -w" -o gowind-toolkit-windows-amd64.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: gowind-toolkit-windows-amd64
-          path: gowind-uiapp/build/bin/gowind-toolkit.exe
+          path: gowind-uiapp/build/bin/gowind-toolkit-windows-amd64.exe
 
   build-linux:
     runs-on: ubuntu-latest
@@ -96,13 +96,13 @@ jobs:
         working-directory: gowind-uiapp
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-        run: wails build -tags webkit2_41 -ldflags "-s -w"
+        run: wails build -tags webkit2_41 -ldflags "-s -w" -o gowind-toolkit-linux-amd64
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: gowind-toolkit-linux-amd64
-          path: gowind-uiapp/build/bin/gowind-toolkit
+          path: gowind-uiapp/build/bin/gowind-toolkit-linux-amd64
 
   build-macos:
     runs-on: macos-latest
@@ -137,24 +137,23 @@ jobs:
         working-directory: gowind-uiapp
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-        run: wails build -ldflags "-s -w"
+        run: wails build -ldflags "-s -w" -o gowind-toolkit
 
       - name: Zip macOS build
         working-directory: gowind-uiapp/build/bin
         run: |
           ls -la
-          APP_NAME=$(ls -d *.app 2>/dev/null | head -1)
-          if [ -n "$APP_NAME" ]; then
-            zip -r gowind-toolkit-darwin-amd64.zip "$APP_NAME"
+          if [ -d "gowind-toolkit.app" ]; then
+            zip -r gowind-toolkit-darwin-arm64.zip gowind-toolkit.app
           else
-            zip gowind-toolkit-darwin-amd64.zip gowind-toolkit
+            zip gowind-toolkit-darwin-arm64.zip gowind-toolkit
           fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gowind-toolkit-darwin-amd64
-          path: gowind-uiapp/build/bin/gowind-toolkit-darwin-amd64.zip
+          name: gowind-toolkit-darwin-arm64
+          path: gowind-uiapp/build/bin/gowind-toolkit-darwin-arm64.zip
 
   release:
     needs: [build-windows, build-linux, build-macos]
@@ -212,6 +211,6 @@ jobs:
             |------|----|------|
             | `gowind-toolkit-windows-amd64.exe` | Windows | x86_64 |
             | `gowind-toolkit-linux-amd64` | Linux | x86_64 |
-            | `gowind-toolkit-darwin-amd64.zip` | macOS | x86_64 |
+            | `gowind-toolkit-darwin-arm64.zip` | macOS | Apple Silicon |
           files: |
             build/*
