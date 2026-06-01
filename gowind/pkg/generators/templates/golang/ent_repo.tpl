@@ -12,6 +12,9 @@ import (
 {{- if .HasTimeConversionField}}
 	"github.com/tx7do/go-utils/timeutil"
 {{- end}}
+{{- if .HasStringNumConversionField}}
+	"github.com/tx7do/go-utils/stringutil"
+{{- end}}
 
 	paginationV1 "github.com/tx7do/go-crud/api/gen/go/pagination/v1"
 	entCrud "github.com/tx7do/go-crud/entgo"

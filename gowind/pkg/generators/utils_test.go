@@ -902,3 +902,86 @@ func TestDataField_IsDateType(t *testing.T) {
 		assert.False(t, field.NeedsTimeConversion())
 	})
 }
+
+// --- DECIMAL 类型转换测试 ---
+
+func TestDataField_IsDecimalType(t *testing.T) {
+	t.Run("is decimal type", func(t *testing.T) {
+		field := DataField{Type: "string", SqlType: SqlTypeDecimal}
+		assert.True(t, field.IsDecimalType())
+		assert.True(t, field.NeedsStringNumConversion())
+	})
+
+	t.Run("is not decimal type", func(t *testing.T) {
+		field := DataField{Type: "string", SqlType: "VARCHAR"}
+		assert.False(t, field.IsDecimalType())
+		assert.False(t, field.NeedsStringNumConversion())
+	})
+
+	t.Run("decimal with non-string type does not trigger conversion", func(t *testing.T) {
+		field := DataField{Type: "int32", SqlType: SqlTypeDecimal}
+		assert.True(t, field.IsDecimalType())
+		assert.False(t, field.NeedsStringNumConversion()) // Type 不是 string
+	})
+}
+
+func TestDataField_EntCreateSetFunc_Decimal(t *testing.T) {
+	// NOT NULL DECIMAL 字段应生成带 *stringutil.StringPtrToFloat64Ptr(&val) 的 Set 方法
+	field := DataField{
+		Name:         "price",
+		Type:         "string",
+		SqlType:      SqlTypeDecimal,
+		Null:         false,
+		IsPrimaryKey: false,
+	}
+	expected := "SetPrice(*stringutil.StringPtrToFloat64Ptr(&req.Data.GetPrice()))"
+	assert.Equal(t, expected, field.EntCreateSetFunc())
+}
+
+func TestDataField_EntCreateSetFunc_Decimal_Nullable(t *testing.T) {
+	// Nullable DECIMAL 字段应生成带 stringutil.StringPtrToFloat64Ptr 的 SetNillable 方法
+	field := DataField{
+		Name:         "price",
+		Type:         "string",
+		SqlType:      SqlTypeDecimal,
+		Null:         true,
+		IsPrimaryKey: false,
+	}
+	expected := "SetNillablePrice(stringutil.StringPtrToFloat64Ptr(req.Data.Price))"
+	assert.Equal(t, expected, field.EntCreateSetFunc())
+}
+
+func TestDataField_EntSetNillableFunc_Decimal(t *testing.T) {
+	field := DataField{
+		Name:         "price",
+		Type:         "string",
+		SqlType:      SqlTypeDecimal,
+		Null:         true,
+		IsPrimaryKey: false,
+	}
+	expected := "SetNillablePrice(stringutil.StringPtrToFloat64Ptr(req.Data.Price))"
+	assert.Equal(t, expected, field.EntSetNillableFunc())
+}
+
+func TestDataFieldArray_HasStringNumConversionField(t *testing.T) {
+	t.Run("has decimal field", func(t *testing.T) {
+		fields := DataFieldArray{
+			{Name: "id", Type: "int32", SqlType: "INT"},
+			{Name: "price", Type: "string", SqlType: SqlTypeDecimal},
+		}
+		assert.True(t, fields.HasStringNumConversionField())
+	})
+
+	t.Run("no decimal field", func(t *testing.T) {
+		fields := DataFieldArray{
+			{Name: "id", Type: "int32", SqlType: "INT"},
+			{Name: "name", Type: "string", SqlType: "VARCHAR"},
+		}
+		assert.False(t, fields.HasStringNumConversionField())
+	})
+
+	t.Run("empty fields", func(t *testing.T) {
+		fields := DataFieldArray{}
+		assert.False(t, fields.HasStringNumConversionField())
+	})
+}

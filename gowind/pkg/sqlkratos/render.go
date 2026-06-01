@@ -118,11 +118,12 @@ func (g *Generator) writeEntRepoCode(
 		OutDir: outputPath,
 		Module: projectModule,
 		Vars: map[string]any{
-			"Service":                serviceName,
-			"ApiPackage":             stringcase.LowerCamelCase(apiPackageName) + stringcase.UpperCamelCase(apiPackageVersion),
-			"Model":                  model,
-			"Fields":                 fields,
-			"HasTimeConversionField": fields.HasTimeConversionField(),
+			"Service":                     serviceName,
+			"ApiPackage":                  stringcase.LowerCamelCase(apiPackageName) + stringcase.UpperCamelCase(apiPackageVersion),
+			"Model":                       model,
+			"Fields":                      fields,
+			"HasTimeConversionField":      fields.HasTimeConversionField(),
+			"HasStringNumConversionField": fields.HasStringNumConversionField(),
 		},
 	}
 

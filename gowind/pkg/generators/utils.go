@@ -48,6 +48,14 @@ func MakeEntSetFuncWithTransfer(fieldName string, transFunc string) string {
 	return "Set" + SnakeToPascalPlus(fieldName) + "(" + transFunc + "(" + inputVar + "))"
 }
 
+// MakeEntSetFuncWithStringPtrNumTransfer 用于非空 DECIMAL 等字段：
+// proto string 值 -> ent float64 值
+// 通过取地址转换后解引用：*StringPtrToFloat64Ptr(&val)
+func MakeEntSetFuncWithStringPtrNumTransfer(fieldName string, transFunc string) string {
+	inputVar := "req.Data.Get" + SnakeToPascal(fieldName) + "()"
+	return "Set" + SnakeToPascalPlus(fieldName) + "(*" + transFunc + "(&" + inputVar + "))"
+}
+
 func RemoveTableCommentSuffix(input string) string {
 	re := regexp.MustCompile(`(表|table)$`)
 	return re.ReplaceAllString(input, "")

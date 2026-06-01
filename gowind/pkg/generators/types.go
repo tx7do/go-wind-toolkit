@@ -37,6 +37,16 @@ func (f DataFieldArray) HasTimeConversionField() bool {
 	return false
 }
 
+// HasStringNumConversionField 检查字段数组中是否有需要 stringutil 转换的字段（DECIMAL 等）
+func (f DataFieldArray) HasStringNumConversionField() bool {
+	for _, field := range f {
+		if field.NeedsStringNumConversion() {
+			return true
+		}
+	}
+	return false
+}
+
 func (f DataField) CamelName() string {
 	return stringcase.LowerCamelCase(f.Name)
 }
@@ -59,6 +69,12 @@ const (
 
 	// SqlTypeDate DATE 类型（proto string, ent time.Time）
 	SqlTypeDate = "DATE"
+
+	// SqlTypeDecimal DECIMAL 类型（proto string, ent float64）
+	SqlTypeDecimal = "DECIMAL"
+
+	// ProtoTypeString 表示 proto string 类型
+	ProtoTypeString = "string"
 )
 
 // IsTimestampType 判断字段是否为 Timestamp 类型
@@ -71,9 +87,20 @@ func (f DataField) IsDateType() bool {
 	return f.SqlType == SqlTypeDate
 }
 
+// IsDecimalType 判断字段是否为 SQL DECIMAL 类型（proto string, ent float64）
+func (f DataField) IsDecimalType() bool {
+	return f.SqlType == SqlTypeDecimal
+}
+
 // NeedsTimeConversion 判断字段是否需要 timeutil 转换
 func (f DataField) NeedsTimeConversion() bool {
 	return f.IsTimestampType() || f.IsDateType()
+}
+
+// NeedsStringNumConversion 判断字段是否需要 stringutil 字符串指针转数字指针转换
+// 条件：proto 类型为 string，且 SQL 类型为 DECIMAL
+func (f DataField) NeedsStringNumConversion() bool {
+	return f.Type == ProtoTypeString && f.IsDecimalType()
 }
 
 // TimeConvertFunc 返回时间转换函数名
@@ -88,9 +115,22 @@ func (f DataField) TimeConvertFunc() string {
 	}
 }
 
+// StringNumConvertFunc 返回字符串转数字的转换函数名
+func (f DataField) StringNumConvertFunc() string {
+	switch {
+	case f.IsDecimalType():
+		return "stringutil.StringPtrToFloat64Ptr"
+	default:
+		return ""
+	}
+}
+
 func (f DataField) EntSetNillableFunc() string {
 	if f.NeedsTimeConversion() {
 		return MakeEntSetNillableFuncWithTransfer(f.Name, f.TimeConvertFunc())
+	}
+	if f.NeedsStringNumConversion() {
+		return MakeEntSetNillableFuncWithTransfer(f.Name, f.StringNumConvertFunc())
 	}
 	return MakeEntSetNillableFunc(f.Name)
 }
@@ -108,6 +148,11 @@ func (f DataField) EntCreateSetFunc() string {
 	}
 	if f.NeedsTimeConversion() {
 		return MakeEntSetFuncWithTransfer(f.Name, f.TimeConvertFunc())
+	}
+	// DECIMAL 非空字段：proto string 值 -> ent float64 值
+	// 使用指针转换函数：取地址 -> 转换 -> 解引用
+	if f.NeedsStringNumConversion() {
+		return MakeEntSetFuncWithStringPtrNumTransfer(f.Name, f.StringNumConvertFunc())
 	}
 	return MakeEntSetFunc(f.Name)
 }
