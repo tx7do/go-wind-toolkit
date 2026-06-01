@@ -43,6 +43,11 @@ func MakeEntSetFunc(fieldName string) string {
 	return "Set" + SnakeToPascalPlus(fieldName) + "(" + inputVar + ")"
 }
 
+func MakeEntSetFuncWithTransfer(fieldName string, transFunc string) string {
+	inputVar := "req.Data.Get" + SnakeToPascal(fieldName) + "()"
+	return "Set" + SnakeToPascalPlus(fieldName) + "(" + transFunc + "(" + inputVar + "))"
+}
+
 func RemoveTableCommentSuffix(input string) string {
 	re := regexp.MustCompile(`(表|table)$`)
 	return re.ReplaceAllString(input, "")

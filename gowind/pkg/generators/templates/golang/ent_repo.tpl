@@ -9,6 +9,9 @@ import (
 
 	"github.com/tx7do/go-utils/copierutil"
 	"github.com/tx7do/go-utils/mapper"
+{{- if .HasTimestampField}}
+	"github.com/tx7do/go-utils/timeutil"
+{{- end}}
 
 	paginationV1 "github.com/tx7do/go-crud/api/gen/go/pagination/v1"
 	entCrud "github.com/tx7do/go-crud/entgo"

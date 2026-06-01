@@ -732,3 +732,113 @@ func TestRenderServerName(t *testing.T) {
 		assert.Equal(t, tt.expected, result)
 	}
 }
+
+func TestMakeEntSetFuncWithTransfer(t *testing.T) {
+	tests := []struct {
+		name      string
+		fieldName string
+		transFunc string
+		expected  string
+	}{
+		{
+			name:      "timestamp field",
+			fieldName: "create_time",
+			transFunc: "timeutil.TimestamppbToTime",
+			expected:  "SetCreateTime(timeutil.TimestamppbToTime(req.Data.GetCreateTime()))",
+		},
+		{
+			name:      "simple field",
+			fieldName: "name",
+			transFunc: "toString",
+			expected:  "SetName(toString(req.Data.GetName()))",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MakeEntSetFuncWithTransfer(tt.fieldName, tt.transFunc)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDataField_EntCreateSetFunc_Timestamp(t *testing.T) {
+	// NOT NULL Timestamp 字段应生成带 timeutil.TimestamppbToTime 转换的 Set 方法
+	field := DataField{
+		Name:         "create_time",
+		Type:         ProtoTypeTimestamp,
+		Null:         false,
+		IsPrimaryKey: false,
+	}
+	expected := "SetCreateTime(timeutil.TimestamppbToTime(req.Data.GetCreateTime()))"
+	assert.Equal(t, expected, field.EntCreateSetFunc())
+}
+
+func TestDataField_EntCreateSetFunc_Timestamp_Nullable(t *testing.T) {
+	// Nullable Timestamp 字段应生成带 timeutil.TimestamppbToTime 转换的 SetNillable 方法
+	field := DataField{
+		Name:         "update_time",
+		Type:         ProtoTypeTimestamp,
+		Null:         true,
+		IsPrimaryKey: false,
+	}
+	expected := "SetNillableUpdateTime(timeutil.TimestamppbToTime(req.Data.UpdateTime))"
+	assert.Equal(t, expected, field.EntCreateSetFunc())
+}
+
+func TestDataField_EntCreateSetFunc_NonTimestamp(t *testing.T) {
+	// 非 Timestamp 字段应生成普通 Set 方法
+	field := DataField{
+		Name:         "name",
+		Type:         "string",
+		Null:         false,
+		IsPrimaryKey: false,
+	}
+	expected := "SetName(req.Data.GetName())"
+	assert.Equal(t, expected, field.EntCreateSetFunc())
+}
+
+func TestDataField_EntSetNillableFunc_Timestamp(t *testing.T) {
+	field := DataField{
+		Name:         "create_time",
+		Type:         ProtoTypeTimestamp,
+		Null:         true,
+		IsPrimaryKey: false,
+	}
+	expected := "SetNillableCreateTime(timeutil.TimestamppbToTime(req.Data.CreateTime))"
+	assert.Equal(t, expected, field.EntSetNillableFunc())
+}
+
+func TestDataField_EntSetNillableFunc_NonTimestamp(t *testing.T) {
+	field := DataField{
+		Name:         "name",
+		Type:         "string",
+		Null:         true,
+		IsPrimaryKey: false,
+	}
+	expected := "SetNillableName(req.Data.Name)"
+	assert.Equal(t, expected, field.EntSetNillableFunc())
+}
+
+func TestDataFieldArray_HasTimestampField(t *testing.T) {
+	t.Run("has timestamp field", func(t *testing.T) {
+		fields := DataFieldArray{
+			{Name: "id", Type: "int64"},
+			{Name: "create_time", Type: ProtoTypeTimestamp},
+		}
+		assert.True(t, fields.HasTimestampField())
+	})
+
+	t.Run("no timestamp field", func(t *testing.T) {
+		fields := DataFieldArray{
+			{Name: "id", Type: "int64"},
+			{Name: "name", Type: "string"},
+		}
+		assert.False(t, fields.HasTimestampField())
+	})
+
+	t.Run("empty fields", func(t *testing.T) {
+		fields := DataFieldArray{}
+		assert.False(t, fields.HasTimestampField())
+	})
+}

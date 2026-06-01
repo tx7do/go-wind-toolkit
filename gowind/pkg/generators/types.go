@@ -26,6 +26,16 @@ type DataField struct {
 
 type DataFieldArray []DataField
 
+// HasTimestampField 检查字段数组中是否包含 Timestamp 类型的字段
+func (f DataFieldArray) HasTimestampField() bool {
+	for _, field := range f {
+		if field.IsTimestampType() {
+			return true
+		}
+	}
+	return false
+}
+
 func (f DataField) CamelName() string {
 	return stringcase.LowerCamelCase(f.Name)
 }
@@ -42,16 +52,34 @@ func (f DataField) EntPascalName() string {
 	return SnakeToPascalPlus(f.Name)
 }
 
+const (
+	// ProtoTypeTimestamp 表示 google.protobuf.Timestamp 类型
+	ProtoTypeTimestamp = "google.protobuf.Timestamp"
+)
+
+// IsTimestampType 判断字段是否为 Timestamp 类型
+func (f DataField) IsTimestampType() bool {
+	return f.Type == ProtoTypeTimestamp
+}
+
 func (f DataField) EntSetNillableFunc() string {
+	if f.IsTimestampType() {
+		return MakeEntSetNillableFuncWithTransfer(f.Name, "timeutil.TimestamppbToTime")
+	}
 	return MakeEntSetNillableFunc(f.Name)
 }
 
-// EntCreateSetFunc 根据字段是否可为 NULL 选择合适的 setter：
-// NOT NULL → SetXxx(req.Data.GetXxx())
-// NULL     → SetNillableXxx(req.Data.Xxx)
+// EntCreateSetFunc 根据字段是否可为 NULL 以及类型选择合适的 setter：
+// NOT NULL + Timestamp → SetXxx(timeutil.TimestamppbToTime(req.Data.GetXxx()))
+// NOT NULL             → SetXxx(req.Data.GetXxx())
+// NULL     + Timestamp → SetNillableXxx(timeutil.TimestamppbToTime(req.Data.Xxx))
+// NULL                 → SetNillableXxx(req.Data.Xxx)
 func (f DataField) EntCreateSetFunc() string {
 	if f.Null {
-		return MakeEntSetNillableFunc(f.Name)
+		return f.EntSetNillableFunc()
+	}
+	if f.IsTimestampType() {
+		return MakeEntSetFuncWithTransfer(f.Name, "timeutil.TimestamppbToTime")
 	}
 	return MakeEntSetFunc(f.Name)
 }

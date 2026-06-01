@@ -118,7 +118,13 @@ func (m *MySQL) SchemaTables(ctx context.Context) ([]*TableData, error) {
 }
 
 func MySQLFieldType(sqlType string) (f string) {
-	sqlType = strings.ToUpper(sqlType)
+	sqlType = strings.ToUpper(strings.TrimSpace(sqlType))
+
+	// TINYINT(1) 在 MySQL 中是布尔语义（1=TRUE, 0=FALSE）
+	// 需要在去除括号之前检查，以区分 TINYINT(1) 和 TINYINT(n)
+	if sqlType == "TINYINT(1)" {
+		return "bool"
+	}
 
 	// 去除类型声明中的括号部分，例如 "VARCHAR(255)" -> "VARCHAR"
 	baseType := strings.SplitN(sqlType, "(", 2)[0]
