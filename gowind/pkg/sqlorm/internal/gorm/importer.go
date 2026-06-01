@@ -3,6 +3,7 @@ package gorm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 
 	"gorm.io/gen"
@@ -25,7 +26,13 @@ func Importer(_ context.Context, drv, dsn, schemaPath, daoPath *string, tables, 
 	_ = os.MkdirAll(*schemaPath, os.ModePerm)
 	_ = os.MkdirAll(*daoPath, os.ModePerm)
 
-	db := NewGormClient(*drv, *dsn)
+	db, err := NewGormClient(*drv, *dsn)
+	if err != nil {
+		return fmt.Errorf("gormimport: failed to create gorm client: %w", err)
+	}
+	if db == nil {
+		return errors.New("gormimport: gorm client is nil, check database connection")
+	}
 
 	g := gen.NewGenerator(gen.Config{
 		OutPath:      *daoPath,    // 生成的代码路径

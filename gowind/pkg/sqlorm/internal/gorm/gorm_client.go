@@ -1,6 +1,8 @@
 package gorm
 
 import (
+	"fmt"
+
 	"gorm.io/driver/clickhouse"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
@@ -11,7 +13,7 @@ import (
 )
 
 // NewGormClient 创建数据库客户端
-func NewGormClient(drv, dsn string) *gorm.DB {
+func NewGormClient(drv, dsn string) (*gorm.DB, error) {
 	var driver gorm.Dialector
 	switch drv {
 	default:
@@ -35,8 +37,8 @@ func NewGormClient(drv, dsn string) *gorm.DB {
 
 	client, err := gorm.Open(driver, &gorm.Config{})
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("gormimport: failed to open database: %w", err)
 	}
 
-	return client
+	return client, nil
 }
