@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -24,7 +25,9 @@ func (s serviceGenerator) generateInterface(f *codegen.File) {
 	commentGenerator{descriptor: s.service}.generateLeading(f, 0)
 	f.P("export interface ", descriptorTypeName(s.service), " {")
 	rangeMethods(s.service.Methods(), func(method protoreflect.MethodDescriptor) {
-		if !supportedMethod(method) {
+		ok, reason := supportedMethod(method)
+		if !ok {
+			Warn("method %s.%s skipped: %s", s.service.FullName(), method.Name(), reason)
 			return
 		}
 		if isStreamingMethod(method) {
@@ -64,14 +67,19 @@ func (s serviceGenerator) generateClient(f *codegen.File) error {
 		" {",
 	)
 	f.P(t(1), "return {")
-	var methodErr error
+	var methodErrs []error
 	rangeMethods(s.service.Methods(), func(method protoreflect.MethodDescriptor) {
+		ok, reason := supportedMethod(method)
+		if !ok {
+			Warn("method %s.%s skipped in client: %s", s.service.FullName(), method.Name(), reason)
+			return
+		}
 		if err := s.generateMethod(f, method); err != nil {
-			methodErr = fmt.Errorf("generate method %s: %w", method.Name(), err)
+			methodErrs = append(methodErrs, fmt.Errorf("generate method %s.%s: %w", s.service.FullName(), method.Name(), err))
 		}
 	})
-	if methodErr != nil {
-		return methodErr
+	if len(methodErrs) > 0 {
+		return fmt.Errorf("%d method(s) failed: %w", len(methodErrs), errors.Join(methodErrs...))
 	}
 	f.P(t(1), "};")
 	f.P("}")
@@ -82,6 +90,7 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 	outputType := typeFromMessage(s.pkg, method.Output())
 	r, ok := httprule.Get(method)
 	if !ok {
+		Warn("method %s.%s has no http rule annotation; skipping", s.service.FullName(), method.Name())
 		return nil
 	}
 	rule, err := httprule.ParseRule(r)
@@ -231,15 +240,17 @@ func generateMethodQuery(
 	})
 }
 
-func supportedMethod(method protoreflect.MethodDescriptor) bool {
+// supportedMethod returns whether a method is supported by this generator,
+// along with a human-readable reason if it is not.
+func supportedMethod(method protoreflect.MethodDescriptor) (bool, string) {
 	_, ok := httprule.Get(method)
 	if !ok {
-		return false
+		return false, "no http rule annotation (google.api.http)"
 	}
 	if method.IsStreamingClient() && !method.IsStreamingServer() {
-		return false
+		return false, "client-only streaming is not supported"
 	}
-	return true
+	return true, ""
 }
 
 func jsonPath(path httprule.FieldPath, message protoreflect.MessageDescriptor) string {

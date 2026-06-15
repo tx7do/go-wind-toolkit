@@ -30,6 +30,14 @@ func run() error {
 	}
 	resp, err := plugin.Generate(req)
 	if err != nil {
+		// Even on fatal error, return a response with Error field set
+		// so protoc can display the error in its standard format.
+		errResp := &pluginpb.CodeGeneratorResponse{
+			Error: proto.String(fmt.Sprintf("%s: %v", filepath.Base(os.Args[0]), err)),
+		}
+		if out, marshalErr := proto.Marshal(errResp); marshalErr == nil {
+			_, _ = os.Stdout.Write(out)
+		}
 		return err
 	}
 	out, err := proto.Marshal(resp)

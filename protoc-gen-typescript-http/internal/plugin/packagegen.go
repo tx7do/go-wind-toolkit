@@ -47,15 +47,25 @@ func (p packageGenerator) Generate(f *codegen.File) error {
 }
 
 func (p packageGenerator) readDefaultHost() string {
+	var firstHost string
+	var firstService string
 	for _, file := range p.files {
 		services := file.Services()
 		for i := 0; i < services.Len(); i++ {
-			if host := getDefaultHost(services.Get(i)); host != "" {
-				return host
+			svc := services.Get(i)
+			host := getDefaultHost(svc)
+			if host == "" {
+				continue
+			}
+			if firstHost == "" {
+				firstHost = host
+				firstService = string(svc.FullName())
+			} else if host != firstHost {
+				Warn("service %s has default_host %q but service %s already set %q; using the first one", svc.FullName(), host, firstService, firstHost)
 			}
 		}
 	}
-	return ""
+	return firstHost
 }
 
 func (p packageGenerator) generateHeader(f *codegen.File) {
