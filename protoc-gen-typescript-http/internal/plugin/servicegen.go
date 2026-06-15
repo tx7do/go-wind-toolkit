@@ -28,8 +28,16 @@ func (s serviceGenerator) generateInterface(f *codegen.File) {
 			return
 		}
 		if isStreamingMethod(method) {
-			r, _ := httprule.Get(method)
-			rule, _ := httprule.ParseRule(r)
+			r, ok := httprule.Get(method)
+			if !ok {
+				Warn("streaming method %s.%s has no http rule; skipping", s.service.FullName(), method.Name())
+				return
+			}
+			rule, err := httprule.ParseRule(r)
+			if err != nil {
+				Warn("streaming method %s.%s has invalid http rule: %v; skipping", s.service.FullName(), method.Name(), err)
+				return
+			}
 			generateStreamInterfaceMethod(f, s.pkg, method, rule)
 			return
 		}
@@ -132,7 +140,7 @@ func generateMethodPath(
 			fieldPath := jsonPath(seg.Variable.FieldPath, input)
 			pathParts = append(pathParts, "${request."+fieldPath+"}")
 		case httprule.SegmentKindLiteral:
-			pathParts = append(pathParts, seg.Literal)
+			pathParts = append(pathParts, escapeTemplateLiteral(seg.Literal))
 		case httprule.SegmentKindMatchSingle:
 			pathParts = append(pathParts, "*")
 		case httprule.SegmentKindMatchMultiple:
@@ -141,9 +149,19 @@ func generateMethodPath(
 	}
 	path := strings.Join(pathParts, "/")
 	if rule.Template.Verb != "" {
-		path += ":" + rule.Template.Verb
+		path += ":" + escapeTemplateLiteral(rule.Template.Verb)
 	}
 	f.P(t(3), "const path = `", path, "`; // eslint-disable-line quotes")
+}
+
+// escapeTemplateLiteral escapes characters that have special meaning inside a
+// JavaScript template literal (backtick string) to prevent generated code
+// injection and syntax errors.
+func escapeTemplateLiteral(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "`", "\\`")
+	s = strings.ReplaceAll(s, "${", "\\${")
+	return s
 }
 
 func generateMethodBody(
@@ -157,6 +175,12 @@ func generateMethodBody(
 	case rule.Body == "*":
 		f.P(t(3), "const body = JSON.stringify(request);")
 	default:
+		bodyField := input.Fields().ByName(protoreflect.Name(rule.Body))
+		if bodyField == nil {
+			Warn("body field %q referenced in http rule not found in message %s; falling back to full request", rule.Body, input.FullName())
+			f.P(t(3), "const body = JSON.stringify(request);")
+			return
+		}
 		nullPath := nullPropagationPath(httprule.FieldPath{rule.Body}, input)
 		f.P(t(3), "const body = JSON.stringify(request?.", nullPath, " ?? {});")
 	}
@@ -179,6 +203,9 @@ func generateMethodQuery(
 		pathCovered[segment.Variable.FieldPath.String()] = struct{}{}
 	}
 	walkJSONLeafFields(input, func(path httprule.FieldPath, field protoreflect.FieldDescriptor) {
+		if len(path) == 0 {
+			return
+		}
 		if _, ok := pathCovered[path.String()]; ok {
 			return
 		}
@@ -227,9 +254,23 @@ func jsonPathSegments(path httprule.FieldPath, message protoreflect.MessageDescr
 	segs := make([]string, len(path))
 	for i, p := range path {
 		field := message.Fields().ByName(protoreflect.Name(p))
+		if field == nil {
+			Warn("field %q not found in message %s; path segment may be incorrect", p, message.FullName())
+			segs[i] = p
+			continue
+		}
 		segs[i] = field.JSONName()
-		if i < len(path) {
-			message = field.Message()
+		if i < len(path)-1 {
+			if field.Kind() != protoreflect.MessageKind {
+				Warn("field %q in message %s is not a message type; cannot traverse nested path %s", p, message.FullName(), path.String())
+				break
+			}
+			nested := field.Message()
+			if nested == nil {
+				Warn("field %q in message %s has no valid message descriptor; cannot traverse nested path", p, message.FullName())
+				break
+			}
+			message = nested
 		}
 	}
 	return segs

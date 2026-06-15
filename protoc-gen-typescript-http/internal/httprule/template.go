@@ -33,12 +33,19 @@ type VariableSegment struct {
 }
 
 func ParseTemplate(s string) (Template, error) {
+	if s == "" {
+		return Template{}, fmt.Errorf("empty template string")
+	}
 	p := &parser{
 		content: s,
 	}
 	template, err := p.parse()
 	if err != nil {
 		return Template{}, err
+	}
+	// Validate that at least one segment was parsed.
+	if len(template.Segments) == 0 {
+		return Template{}, fmt.Errorf("template %q contains no path segments", s)
 	}
 	if err := validate(template); err != nil {
 		return Template{}, err

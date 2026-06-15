@@ -15,6 +15,11 @@ type enumGenerator struct {
 func (e enumGenerator) Generate(f *codegen.File) {
 	commentGenerator{descriptor: e.enum}.generateLeading(f, 0)
 	f.P("export type ", scopedDescriptorTypeName(e.pkg, e.enum), " =")
+	if e.enum.Values().Len() == 0 {
+		Warn("enum %s has no values; generating fallback 'unknown' type", e.enum.FullName())
+		f.P(t(1), "unknown;")
+		return
+	}
 	if e.enum.Values().Len() == 1 {
 		commentGenerator{descriptor: e.enum.Values().Get(0)}.generateLeading(f, 1)
 		f.P(t(1), strconv.Quote(string(e.enum.Values().Get(0).Name())), ";")

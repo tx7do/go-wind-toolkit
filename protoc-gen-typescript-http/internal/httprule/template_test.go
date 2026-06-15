@@ -159,7 +159,7 @@ func Test_ParseTemplate_Invalid(t *testing.T) {
 		template string
 		expected string
 	}{
-		{template: "", expected: "expected token '/' at position 0, found EOF"},
+		{template: "", expected: "empty template string"},
 		{template: "//", expected: "expected literal at position 1, found '/'"},
 		{template: "/v1:", expected: "expected literal at position 3, found EOF"},
 		{template: "/v1/:", expected: "expected literal at position 4, found ':'"},

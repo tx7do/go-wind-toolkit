@@ -35,6 +35,11 @@ func (w *jsonWalker) walkMessage(path httprule.FieldPath, message protoreflect.M
 			p = append(p, string(field.Name()))
 			switch {
 			case !field.IsMap() && field.Kind() == protoreflect.MessageKind:
+				if field.Message() == nil {
+					Warn("field %q has message kind but no valid message descriptor; treating as leaf", field.FullName())
+					f(p, field)
+					continue
+				}
 				if IsWellKnownType(field.Message()) {
 					f(p, field)
 				} else {

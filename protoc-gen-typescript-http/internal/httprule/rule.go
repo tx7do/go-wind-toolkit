@@ -27,6 +27,9 @@ type Rule struct {
 }
 
 func ParseRule(httpRule *annotations.HttpRule) (Rule, error) {
+	if httpRule == nil {
+		return Rule{}, fmt.Errorf("http rule is nil")
+	}
 	method, err := httpRuleMethod(httpRule)
 	if err != nil {
 		return Rule{}, err

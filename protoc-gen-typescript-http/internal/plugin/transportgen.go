@@ -255,6 +255,8 @@ func literalPath(rule httprule.Rule) string {
 	if rule.Template.Verb != "" {
 		path += ":" + rule.Template.Verb
 	}
+	path = strings.ReplaceAll(path, "\\", "\\\\")
+	path = strings.ReplaceAll(path, "\"", "\\\"")
 	return `"` + path + `"`
 }
 
@@ -273,8 +275,11 @@ func isStreamingMethod(method protoreflect.MethodDescriptor) bool {
 
 // getDefaultHost reads the google.api.default_host extension from a service descriptor.
 func getDefaultHost(service protoreflect.ServiceDescriptor) string {
+	if service.Options() == nil {
+		return ""
+	}
 	ext := proto.GetExtension(service.Options(), annotations.E_DefaultHost)
-	if host, ok := ext.(string); ok {
+	if host, ok := ext.(string); ok && host != "" {
 		return host
 	}
 	return ""

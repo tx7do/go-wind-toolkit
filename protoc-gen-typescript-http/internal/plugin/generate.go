@@ -14,6 +14,12 @@ import (
 )
 
 func Generate(request *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorResponse, error) {
+	if request == nil {
+		return nil, fmt.Errorf("code generator request is nil")
+	}
+	if len(request.GetFileToGenerate()) == 0 {
+		Warn("no files to generate in the request")
+	}
 	generate := make(map[string]struct{})
 	registry, err := protodesc.NewFiles(&descriptorpb.FileDescriptorSet{
 		File: request.GetProtoFile(),
@@ -30,11 +36,17 @@ func Generate(request *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorRe
 		if err != nil {
 			return nil, fmt.Errorf("find file %s: %w", f, err)
 		}
+		if file.Package() == "" {
+			Warn("file %q has no package declaration; output will be placed in root directory", f)
+		}
 		packaged[file.Package()] = append(packaged[file.Package()], file)
 	}
 
 	var res pluginpb.CodeGeneratorResponse
 	for pkg, files := range packaged {
+		if len(files) == 0 {
+			continue
+		}
 		var index codegen.File
 		indexPathElems := append(strings.Split(string(pkg), "."), "index.ts")
 		if err := (packageGenerator{pkg: pkg, files: files}).Generate(&index); err != nil {
