@@ -26,7 +26,12 @@ func (m messageGenerator) Generate(f *codegen.File) {
 		commentGenerator{descriptor: field}.generateLeading(f, 1)
 		fieldType := typeFromField(m.pkg, field)
 		if field.ContainingOneof() == nil && !field.HasOptionalKeyword() {
-			f.P(t(1), field.JSONName(), ": ", fieldType.Reference(), " | undefined;")
+			ref := fieldType.Reference()
+			if ref < "undefined" {
+				f.P(t(1), field.JSONName(), ": ", ref, " | undefined;")
+			} else {
+				f.P(t(1), field.JSONName(), ": undefined | ", ref, ";")
+			}
 		} else {
 			f.P(t(1), field.JSONName(), "?: ", fieldType.Reference(), ";")
 		}

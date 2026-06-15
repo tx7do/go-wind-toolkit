@@ -46,7 +46,9 @@ func (s serviceGenerator) generateInterface(f *codegen.File) {
 		commentGenerator{descriptor: method}.generateLeading(f, 1)
 		input := typeFromMessage(s.pkg, method.Input())
 		output := typeFromMessage(s.pkg, method.Output())
-		f.P(t(1), method.Name(), "(request: ", input.Reference(), "): Promise<", output.Reference(), ">;")
+		f.P(t(1), method.Name(), "(")
+		f.P(t(2), "request: ", input.Reference(), ",")
+		f.P(t(1), "): Promise<", output.Reference(), ">;")
 	})
 	f.P("}")
 	f.P()
@@ -130,7 +132,7 @@ func generateMethodPathValidation(
 		nullPath := nullPropagationPath(fp, input)
 		protoPath := strings.Join(fp, ".")
 		errMsg := "missing required field request." + protoPath
-		f.P(t(3), "if (!request.", nullPath, ") {")
+		f.P(t(3), "if (request.", nullPath, " === undefined || request.", nullPath, " === null) {")
 		f.P(t(4), "throw new Error(", tsSingleQuote(errMsg), ");")
 		f.P(t(3), "}")
 	}

@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"sort"
+
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http/internal/codegen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -36,13 +38,28 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 
 	// Class declaration
 	f.P("export class ApiClient {")
-	f.P(t(1), "private readonly _transport: ClientTransport;")
 
-	// Private lazy fields
+	// Collect all private fields and sort alphabetically by name
+	type classField struct {
+		declaration string
+		name        string
+	}
+	fields := []classField{
+		{declaration: t(1) + "private readonly _transport: ClientTransport;", name: "_transport"},
+	}
 	for _, svc := range services {
 		typeName := descriptorTypeName(svc)
 		fieldName := lowerFirst(string(svc.Name()))
-		f.P(t(1), "private _", fieldName, "?: ", typeName, ";")
+		fields = append(fields, classField{
+			declaration: t(1) + "private _" + fieldName + "?: " + typeName + ";",
+			name:        "_" + fieldName,
+		})
+	}
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i].name < fields[j].name
+	})
+	for _, fld := range fields {
+		f.P(fld.declaration)
 	}
 	f.P()
 
@@ -53,14 +70,16 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 	f.P()
 
 	// Getter for each service
-	for _, svc := range services {
+	for i, svc := range services {
 		typeName := descriptorTypeName(svc)
 		serviceName := string(svc.Name())
 		fieldName := lowerFirst(serviceName)
 		f.P(t(1), "get ", fieldName, "(): ", typeName, " {")
 		f.P(t(2), "return this._", fieldName, " ??= create", serviceName, "Client(this._transport);")
 		f.P(t(1), "}")
-		f.P()
+		if i < len(services)-1 {
+			f.P()
+		}
 	}
 	f.P("}")
 	f.P()
