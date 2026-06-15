@@ -27,8 +27,8 @@ import (
 //	  }
 //	}
 //
-//	export function createApiClient(opts?: TransportOptions): ApiClient {
-//	  return new ApiClient(createDefaultTransport(opts));
+//	export function createApiClient(transport: ClientTransport): ApiClient {
+//	  return new ApiClient(transport);
 //	}
 func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescriptor) {
 	if len(services) == 0 {
@@ -90,8 +90,8 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 	f.P()
 
 	// Convenience factory
-	f.P("export function createApiClient(opts?: TransportOptions): ApiClient {")
-	f.P(t(1), "return new ApiClient(createDefaultTransport(opts));")
+	f.P("export function createApiClient(transport: ClientTransport): ApiClient {")
+	f.P(t(1), "return new ApiClient(transport);")
 	f.P("}")
 	f.P()
 }

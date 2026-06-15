@@ -32,18 +32,39 @@ protoc
 
 ______________________________________________________________________
 
-The generated clients use a `ClientTransport` interface that handles all
-communication — unary requests, server-streaming (SSE), and bidirectional
-streaming (WebSocket).
+The generated code defines a `ClientTransport` interface with three methods:
+
+- `unary()` — for regular request/response RPCs
+- `serverStream()` — for server-streaming RPCs (returns `ServerStream<T>`)
+- `duplexStream()` — for bidirectional streaming RPCs (returns `DuplexStream<TIn, TOut>`)
+
+The caller is responsible for providing a `ClientTransport` implementation.
+This gives you full control over the HTTP client (fetch, Axios, etc.),
+authentication headers, SSE transport, and WebSocket transport.
 
 ### Basic usage
 
-```typescript
-import { createDefaultTransport, createShipperServiceClient } from "./gen";
+Implement the `ClientTransport` interface and pass it to the generated client
+factory:
 
-const transport = createDefaultTransport({
-  baseUrl: "https://api.example.com",
-});
+```typescript
+import { ClientTransport, createShipperServiceClient, DEFAULT_HOST } from "./gen";
+
+const transport: ClientTransport = {
+  unary(path, method, body, _meta) {
+    return fetch(`https://${DEFAULT_HOST}/${path}`, {
+      method,
+      body: body ?? undefined,
+      headers: { Authorization: "Bearer token" },
+    }).then((r) => r.json());
+  },
+  serverStream(_path, _meta) {
+    throw new Error("not implemented");
+  },
+  duplexStream(_path, _meta) {
+    throw new Error("not implemented");
+  },
+};
 
 const client = createShipperServiceClient(transport);
 
@@ -63,39 +84,24 @@ service ShipperService {
 }
 ```
 
-```typescript
-// No baseUrl needed — uses DEFAULT_HOST
-const transport = createDefaultTransport();
-const client = createShipperServiceClient(transport);
-```
-
-### Custom request and headers
-
-`request` accepts a function with the same signature as `fetch`. You can use
-it to add logging, error handling, or delegate to another HTTP library:
+The constant is exported so you can reference it when building your transport:
 
 ```typescript
-function fetchRequest(url: string, init: RequestInit): Promise<Response> {
-  console.log("requesting", init.method, url);
-  return fetch(url, init).then((response) => {
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return response;
-  });
-}
+import { DEFAULT_HOST, createShipperServiceClient } from "./gen";
 
-const transport = createDefaultTransport({
-  baseUrl: "/api",
-  headers: { Authorization: "Bearer token" },
-  request: fetchRequest,
-});
+// Use DEFAULT_HOST when constructing fetch URLs
+const baseUrl = `https://${DEFAULT_HOST}`;
 ```
 
 ### Streaming
 
-Server-streaming RPCs (`returns (stream ...)`) are generated as **SSE** (Server-Sent Events).
-Bidirectional streaming RPCs (`stream ... returns (stream ...)`) are generated as **WebSocket**.
+Server-streaming RPCs (`returns (stream ...)`) and bidirectional streaming
+RPCs (`stream ... returns (stream ...)`) are supported through the
+`serverStream()` and `duplexStream()` methods on `ClientTransport`.
+
+The generated code only defines the `ServerStream<T>` and `DuplexStream<TIn, TOut>`
+interfaces — the actual transport implementation (SSE via `fetch` + `ReadableStream`,
+`EventSource`, WebSocket, etc.) is provided by the caller.
 
 Example proto:
 
@@ -105,70 +111,115 @@ service LogService {
     option (google.api.http) = {get: "/v1/{name=logs/*}"};
   }
 
-  // Server-streaming → SSE
+  // Server-streaming
   rpc TailLogs(TailLogsRequest) returns (stream LogEntry) {
     option (google.api.http) = {get: "/v1/{name=logs/*}:tail"};
   }
 
-  // Bidirectional streaming → WebSocket
+  // Bidirectional streaming
   rpc Chat(stream ChatMessage) returns (stream ChatMessage) {
     option (google.api.http) = {get: "/v1/chat"};
   }
 }
 ```
 
-Generated usage:
+Implementing `ServerStream` (e.g. with `fetch` + `ReadableStream` for SSE):
 
 ```typescript
-const transport = createDefaultTransport({ baseUrl: "https://api.example.com" });
+import { ServerStream } from "./gen";
+
+class FetchSSETransport<T> implements ServerStream<T> {
+  private listeners: Array<(data: T) => void> = [];
+  private errorHandlers: Array<(error: Error) => void> = [];
+  private controller?: AbortController;
+
+  constructor(url: string) {
+    this.controller = new AbortController();
+    fetch(url, { signal: this.controller.signal })
+      .then(async (response) => {
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop()!;
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6)) as T;
+                this.listeners.forEach((fn) => fn(data));
+              } catch (e) {
+                this.errorHandlers.forEach((fn) => fn(e as Error));
+              }
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        this.errorHandlers.forEach((fn) => fn(err));
+      });
+  }
+
+  onEvent(listener: (data: T) => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((fn) => fn !== listener);
+    };
+  }
+
+  onError(handler: (error: Error) => void): void {
+    this.errorHandlers.push(handler);
+  }
+
+  close(): void {
+    this.controller?.abort();
+  }
+}
+```
+
+Pass the transport to the generated client:
+
+```typescript
+const transport: ClientTransport = {
+  // ...
+  serverStream<T>(path, _meta) {
+    return new FetchSSETransport<T>(`https://api.example.com/${path}`);
+  },
+  duplexStream<TIn, TOut>(path, _meta) {
+    // return your WebSocket-based DuplexStream implementation
+  },
+};
+
 const client = createLogServiceClient(transport);
 
-// Unary
-const log = await client.GetLog({ name: "log/123" });
-
-// Server-streaming (SSE)
+// Server-streaming
 const tail = client.TailLogs({ name: "log/123" });
-const off = tail.onEvent((entry) => {
-  console.log("log entry:", entry.message);
-});
-tail.onError((err) => {
-  console.error("tail error:", err);
-});
-// off();  // unsubscribe
+tail.onEvent((entry) => console.log(entry.message));
+tail.onError((err) => console.error(err));
 // tail.close();
 
-// Bidirectional streaming (WebSocket)
+// Bidirectional streaming
 const chat = client.Chat();
-chat.onEvent((msg) => {
-  console.log("received:", msg.text);
-});
-chat.onError((err) => {
-  console.error("chat error:", err);
-});
+chat.onEvent((msg) => console.log(msg.text));
 chat.send({ text: "hello" });
 // chat.close();
 ```
 
-### Implementing a custom transport
+### Using the unified ApiClient
 
-The `ClientTransport` interface can be implemented to use any underlying HTTP
-library (Axios, Node.js http, etc.):
+When a proto package contains multiple services, an `ApiClient` class is
+generated that aggregates all service clients. Pass your transport once:
 
 ```typescript
-import { ClientTransport } from "./gen";
+import { ApiClient, ClientTransport } from "./gen";
 
-const myTransport: ClientTransport = {
-  unary(path, method, body, meta) {
-    // use your own HTTP client
-    return myHttpClient.request({ url: path, method, body }).then(r => r.json());
-  },
-  serverStream<T>(path, meta) {
-    // return a custom ServerStream implementation
-  },
-  duplexStream<TIn, TOut>(path, meta) {
-    // return a custom DuplexStream implementation
-  },
-};
+const transport: ClientTransport = { /* ... */ };
+const api = new ApiClient(transport);
+// or: const api = createApiClient(transport);
 
-const client = createMyServiceClient(myTransport);
+// Access individual services lazily
+const shipper = await api.shipperService.GetShipper({ name: "shippers/123" });
 ```
