@@ -25,7 +25,7 @@ func (e enumGenerator) Generate(f *codegen.File) {
 		values = append(values, value)
 	})
 	sort.Slice(values, func(i, j int) bool {
-		return values[i].Name() < values[j].Name()
+		return localeCompare(string(values[i].Name()), string(values[j].Name()))
 	})
 	if len(values) == 1 {
 		commentGenerator{descriptor: values[0]}.generateLeading(f, 1)

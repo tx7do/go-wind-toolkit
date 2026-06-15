@@ -27,7 +27,7 @@ func (m messageGenerator) Generate(f *codegen.File) {
 		fieldType := typeFromField(m.pkg, field)
 		if field.ContainingOneof() == nil && !field.HasOptionalKeyword() {
 			ref := fieldType.Reference()
-			if ref < "undefined" {
+			if localeCompare(ref, "undefined") {
 				f.P(t(1), field.JSONName(), ": ", ref, " | undefined;")
 			} else {
 				f.P(t(1), field.JSONName(), ": undefined | ", ref, ";")

@@ -69,15 +69,20 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 	f.P(t(1), "}")
 	f.P()
 
-	// Getter for each service
-	for i, svc := range services {
+	// Getter for each service (sorted alphabetically by field name)
+	sortedServices := make([]protoreflect.ServiceDescriptor, len(services))
+	copy(sortedServices, services)
+	sort.Slice(sortedServices, func(i, j int) bool {
+		return lowerFirst(string(sortedServices[i].Name())) < lowerFirst(string(sortedServices[j].Name()))
+	})
+	for i, svc := range sortedServices {
 		typeName := descriptorTypeName(svc)
 		serviceName := string(svc.Name())
 		fieldName := lowerFirst(serviceName)
 		f.P(t(1), "get ", fieldName, "(): ", typeName, " {")
 		f.P(t(2), "return this._", fieldName, " ??= create", serviceName, "Client(this._transport);")
 		f.P(t(1), "}")
-		if i < len(services)-1 {
+		if i < len(sortedServices)-1 {
 			f.P()
 		}
 	}

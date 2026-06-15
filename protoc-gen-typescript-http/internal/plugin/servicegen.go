@@ -102,16 +102,24 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 		generateStreamClientMethod(f, s.pkg, method, rule)
 		return nil
 	}
-	f.P(t(2), method.Name(), "(request) {")
+	paramName := "request"
+	if !methodUsesRequest(rule, method.Input()) {
+		paramName = "_request"
+	}
+	f.P(t(2), method.Name(), "(", paramName, ") {")
 	generateMethodPathValidation(f, method.Input(), rule)
 	generateMethodPath(f, method.Input(), rule)
 	generateMethodBody(f, method.Input(), rule)
-	generateMethodQuery(f, method.Input(), rule)
-	f.P(t(3), "let uri = path;")
-	f.P(t(3), "if (queryParams.length > 0) {")
-	f.P(t(4), "uri += `?${queryParams.join('&')}`;")
-	f.P(t(3), "}")
-	f.P(t(3), "return transport.unary(uri, ", tsSingleQuote(rule.Method), ", body, {")
+	hasQP := generateMethodQuery(f, method.Input(), rule)
+	uriVar := "path"
+	if hasQP {
+		f.P(t(3), "let uri = path;")
+		f.P(t(3), "if (queryParams.length > 0) {")
+		f.P(t(4), "uri += `?${queryParams.join('&')}`;")
+		f.P(t(3), "}")
+		uriVar = "uri"
+	}
+	f.P(t(3), "return transport.unary(", uriVar, ", ", tsSingleQuote(rule.Method), ", body, {")
 	f.P(t(4), "service: '", method.Parent().Name(), "',")
 	f.P(t(4), "method: '", method.Name(), "',")
 	f.P(t(3), "}) as Promise<", outputType.Reference(), ">;")
@@ -196,14 +204,17 @@ func generateMethodBody(
 	}
 }
 
-func generateMethodQuery(
-	f *codegen.File,
-	input protoreflect.MessageDescriptor,
-	rule httprule.Rule,
-) {
-	f.P(t(3), "const queryParams: string[] = [];")
+// methodUsesRequest returns true if the generated method body will reference
+// the request parameter (in path, body, or query params).
+func methodUsesRequest(rule httprule.Rule, input protoreflect.MessageDescriptor) bool {
+	return hasPathVariables(rule) || rule.Body != "" || hasQueryParams(input, rule)
+}
+
+// hasQueryParams returns true if the method has fields that will be rendered
+// as query parameters.
+func hasQueryParams(input protoreflect.MessageDescriptor, rule httprule.Rule) bool {
 	if rule.Body == "*" {
-		return
+		return false
 	}
 	pathCovered := make(map[string]struct{})
 	for _, segment := range rule.Template.Segments {
@@ -212,14 +223,37 @@ func generateMethodQuery(
 		}
 		pathCovered[segment.Variable.FieldPath.String()] = struct{}{}
 	}
+	found := false
 	walkJSONLeafFields(input, func(path httprule.FieldPath, field protoreflect.FieldDescriptor) {
-		if len(path) == 0 {
+		if found {
 			return
 		}
-		if _, ok := pathCovered[path.String()]; ok {
+		if len(path) == 0 || isPathCovered(path, pathCovered) || isBodyField(path, rule) {
 			return
 		}
-		if rule.Body != "" && path[0] == rule.Body {
+		found = true
+	})
+	return found
+}
+
+func generateMethodQuery(
+	f *codegen.File,
+	input protoreflect.MessageDescriptor,
+	rule httprule.Rule,
+) bool {
+	if !hasQueryParams(input, rule) {
+		return false
+	}
+	pathCovered := make(map[string]struct{})
+	for _, segment := range rule.Template.Segments {
+		if segment.Kind != httprule.SegmentKindVariable {
+			continue
+		}
+		pathCovered[segment.Variable.FieldPath.String()] = struct{}{}
+	}
+	f.P(t(3), "const queryParams: string[] = [];")
+	walkJSONLeafFields(input, func(path httprule.FieldPath, field protoreflect.FieldDescriptor) {
+		if len(path) == 0 || isPathCovered(path, pathCovered) || isBodyField(path, rule) {
 			return
 		}
 		nullPath := nullPropagationPath(path, input)
@@ -245,6 +279,16 @@ func generateMethodQuery(
 		}
 		f.P(t(3), "}")
 	})
+	return true
+}
+
+func isPathCovered(path httprule.FieldPath, covered map[string]struct{}) bool {
+	_, ok := covered[path.String()]
+	return ok
+}
+
+func isBodyField(path httprule.FieldPath, rule httprule.Rule) bool {
+	return rule.Body != "" && path[0] == rule.Body
 }
 
 // supportedMethod returns whether a method is supported by this generator,

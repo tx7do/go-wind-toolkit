@@ -59,8 +59,8 @@ func generateTransportInfra(f *codegen.File, defaultHost string) {
 	f.P(t(3), "try {")
 	f.P(t(4), "const data = JSON.parse(event.data) as T;")
 	f.P(t(4), "this.listeners.forEach((fn) => fn(data));")
-	f.P(t(3), "} catch (err) {")
-	f.P(t(4), "this.errorHandlers.forEach((fn) => fn(err as Error));")
+	f.P(t(3), "} catch (error) {")
+	f.P(t(4), "this.errorHandlers.forEach((fn) => fn(error as Error));")
 	f.P(t(3), "}")
 	f.P(t(2), "});")
 	f.P(t(2), "this.eventSource.addEventListener('error', () => {")
@@ -86,9 +86,9 @@ func generateTransportInfra(f *codegen.File, defaultHost string) {
 	f.P()
 	// WSTransport
 	f.P("export class WSTransport<TIn, TOut> implements DuplexStream<TIn, TOut> {")
-	f.P(t(1), "private socket: WebSocket;")
 	f.P(t(1), "private errorHandlers: Array<(error: Error) => void> = [];")
 	f.P(t(1), "private listeners: Array<(data: TOut) => void> = [];")
+	f.P(t(1), "private socket: WebSocket;")
 	f.P()
 	f.P(t(1), "constructor(url: string) {")
 	f.P(t(2), "this.socket = new WebSocket(url);")
@@ -96,8 +96,8 @@ func generateTransportInfra(f *codegen.File, defaultHost string) {
 	f.P(t(3), "try {")
 	f.P(t(4), "const data = JSON.parse(event.data as string) as TOut;")
 	f.P(t(4), "this.listeners.forEach((fn) => fn(data));")
-	f.P(t(3), "} catch (err) {")
-	f.P(t(4), "this.errorHandlers.forEach((fn) => fn(err as Error));")
+	f.P(t(3), "} catch (error) {")
+	f.P(t(4), "this.errorHandlers.forEach((fn) => fn(error as Error));")
 	f.P(t(3), "}")
 	f.P(t(2), "});")
 	f.P(t(2), "this.socket.addEventListener('error', () => {")
@@ -195,15 +195,23 @@ func generateServerStreamMethod(
 	rule httprule.Rule,
 ) {
 	output := typeFromMessage(pkg, method.Output())
-	f.P(t(2), method.Name(), "(request) {")
+	paramName := "request"
+	if !methodUsesRequest(rule, method.Input()) {
+		paramName = "_request"
+	}
+	f.P(t(2), method.Name(), "(", paramName, ") {")
 	generateMethodPathValidation(f, method.Input(), rule)
 	generateMethodPath(f, method.Input(), rule)
-	generateMethodQuery(f, method.Input(), rule)
-	f.P(t(3), "let uri = path;")
-	f.P(t(3), "if (queryParams.length > 0) {")
-	f.P(t(4), "uri += `?${queryParams.join('&')}`;")
-	f.P(t(3), "}")
-	f.P(t(3), "return transport.serverStream<", output.Reference(), ">(uri, {")
+	hasQP := generateMethodQuery(f, method.Input(), rule)
+	uriVar := "path"
+	if hasQP {
+		f.P(t(3), "let uri = path;")
+		f.P(t(3), "if (queryParams.length > 0) {")
+		f.P(t(4), "uri += `?${queryParams.join('&')}`;")
+		f.P(t(3), "}")
+		uriVar = "uri"
+	}
+	f.P(t(3), "return transport.serverStream<", output.Reference(), ">(", uriVar, ", {")
 	f.P(t(4), "service: '", method.Parent().Name(), "',")
 	f.P(t(4), "method: '", method.Name(), "',")
 	f.P(t(3), "});")
