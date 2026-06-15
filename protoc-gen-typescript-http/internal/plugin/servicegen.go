@@ -101,7 +101,7 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 		generateStreamClientMethod(f, s.pkg, method, rule)
 		return nil
 	}
-	f.P(t(2), method.Name(), "(request) { // eslint-disable-line @typescript-eslint/no-unused-vars")
+	f.P(t(2), method.Name(), "(request) {")
 	generateMethodPathValidation(f, method.Input(), rule)
 	generateMethodPath(f, method.Input(), rule)
 	generateMethodBody(f, method.Input(), rule)
