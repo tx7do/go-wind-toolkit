@@ -59,7 +59,7 @@ func (s serviceGenerator) generateClient(f *codegen.File) error {
 		"Client(",
 		"\n",
 		t(1),
-		"transport: ClientTransport",
+		"transport: ClientTransport,",
 		"\n",
 		"): ",
 		descriptorTypeName(s.service),
@@ -107,7 +107,7 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 	generateMethodQuery(f, method.Input(), rule)
 	f.P(t(3), "let uri = path;")
 	f.P(t(3), "if (queryParams.length > 0) {")
-	f.P(t(4), "uri += `?${queryParams.join('&')}`")
+	f.P(t(4), "uri += `?${queryParams.join('&')}`;")
 	f.P(t(3), "}")
 	f.P(t(3), "return transport.unary(uri, ", tsSingleQuote(rule.Method), ", body, {")
 	f.P(t(4), "service: '", method.Parent().Name(), "',")
@@ -226,14 +226,20 @@ func generateMethodQuery(
 		switch {
 		case field.IsMap():
 			f.P(t(4), "Object.entries(request.", jp, ").forEach(([key, value]) => {")
-			f.P(t(5), "queryParams.push(`", jp, "[key]=${encodeURIComponent(value.toString())}`)")
-			f.P(t(4), "})")
+			f.P(t(5), "queryParams.push(")
+			f.P(t(6), "`", jp, "[key]=${encodeURIComponent(value.toString())}`,")
+			f.P(t(5), ");")
+			f.P(t(4), "});")
 		case field.IsList():
 			f.P(t(4), "request.", jp, ".forEach((x) => {")
-			f.P(t(5), "queryParams.push(`", jp, "=${encodeURIComponent(x.toString())}`)")
-			f.P(t(4), "})")
+			f.P(t(5), "queryParams.push(")
+			f.P(t(6), "`", jp, "=${encodeURIComponent(x.toString())}`,")
+			f.P(t(5), ");")
+			f.P(t(4), "});")
 		default:
-			f.P(t(4), "queryParams.push(`", jp, "=${encodeURIComponent(request.", jp, ".toString())}`)")
+			f.P(t(4), "queryParams.push(")
+			f.P(t(5), "`", jp, "=${encodeURIComponent(request.", jp, ".toString())}`,")
+			f.P(t(4), ");")
 		}
 		f.P(t(3), "}")
 	})

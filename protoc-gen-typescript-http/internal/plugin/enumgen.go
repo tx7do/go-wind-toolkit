@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"sort"
+
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http/internal/codegen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -18,17 +20,24 @@ func (e enumGenerator) Generate(f *codegen.File) {
 		f.P(t(1), "unknown;")
 		return
 	}
-	if e.enum.Values().Len() == 1 {
-		commentGenerator{descriptor: e.enum.Values().Get(0)}.generateLeading(f, 1)
-		f.P(t(1), "'", string(e.enum.Values().Get(0).Name()), "';")
+	values := make([]protoreflect.EnumValueDescriptor, 0, e.enum.Values().Len())
+	rangeEnumValues(e.enum, func(value protoreflect.EnumValueDescriptor, _ bool) {
+		values = append(values, value)
+	})
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].Name() < values[j].Name()
+	})
+	if len(values) == 1 {
+		commentGenerator{descriptor: values[0]}.generateLeading(f, 1)
+		f.P(t(1), "'", string(values[0].Name()), "';")
 		return
 	}
-	rangeEnumValues(e.enum, func(value protoreflect.EnumValueDescriptor, last bool) {
+	for i, value := range values {
 		commentGenerator{descriptor: value}.generateLeading(f, 1)
-		if last {
+		if i == len(values)-1 {
 			f.P(t(1), "| '", string(value.Name()), "';")
 		} else {
 			f.P(t(1), "| '", string(value.Name()), "'")
 		}
-	})
+	}
 }
