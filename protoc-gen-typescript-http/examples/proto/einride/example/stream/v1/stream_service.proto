@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package einride.example.stream.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// This API demonstrates streaming RPC patterns with HTTP annotations.
+//
+// - Unary RPCs use the standard RequestHandler (fetch/axios).
+// - Server-streaming RPCs are mapped to SSE (Server-Sent Events).
+// - Bidirectional streaming RPCs are mapped to WebSocket.
+service StreamService {
+  option (google.api.default_host) = "api.example.com";
+
+  // Get a single log entry.
+  //
+  // Unary request/response — uses RequestHandler.
+  rpc GetLog(GetLogRequest) returns (LogEntry) {
+    option (google.api.http) = {get: "/v1/{name=logs/*}"};
+  }
+
+  // List log entries.
+  //
+  // Unary request/response with pagination — uses RequestHandler.
+  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse) {
+    option (google.api.http) = {get: "/v1/logs"};
+  }
+
+  // Tail log entries in real time.
+  //
+  // Server-streaming RPC → generated as SSE (Server-Sent Events).
+  // The client subscribes to a stream of log entries pushed by the server.
+  rpc TailLogs(TailLogsRequest) returns (stream LogEntry) {
+    option (google.api.http) = {get: "/v1/{name=logs/*}:tail"};
+  }
+
+  // Realtime bidirectional chat.
+  //
+  // Bidirectional streaming RPC → generated as WebSocket.
+  // Both client and server can send messages independently.
+  rpc Chat(stream ChatMessage) returns (stream ChatMessage) {
+    option (google.api.http) = {get: "/v1/chat"};
+  }
+}
+
+// A log entry.
+message LogEntry {
+  // The resource name of the log entry.
+  string name = 1;
+  // The log message text.
+  string message = 2 [(google.api.field_behavior) = REQUIRED];
+  // The severity level.
+  string severity = 3;
+  // When the log entry was created.
+  google.protobuf.Timestamp create_time = 4;
+}
+
+// Request message for GetLog.
+message GetLogRequest {
+  // The resource name of the log to retrieve.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for ListLogs.
+message ListLogsRequest {
+  // Requested page size.
+  int32 page_size = 1;
+  // A token identifying a page of results.
+  string page_token = 2;
+}
+
+// Response message for ListLogs.
+message ListLogsResponse {
+  // The list of log entries.
+  repeated LogEntry logs = 1;
+  // A token to retrieve the next page of results.
+  string next_page_token = 2;
+}
+
+// Request message for TailLogs.
+message TailLogsRequest {
+  // The resource name of the log to tail.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  // Filter expression for log entries.
+  string filter = 2;
+}
+
+// A chat message.
+message ChatMessage {
+  // The display name of the sender.
+  string from = 1;
+  // The message text.
+  string text = 2 [(google.api.field_behavior) = REQUIRED];
+  // When the message was sent.
+  google.protobuf.Timestamp send_time = 3;
+}
