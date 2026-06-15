@@ -56,3 +56,11 @@ func rangeEnumValues(enum protoreflect.EnumDescriptor, f func(value protoreflect
 func t(n int) string {
 	return strings.Repeat("  ", n)
 }
+
+// tsSingleQuote wraps s in TypeScript single quotes, escaping backslashes
+// and single quotes as needed. Prettier enforces single quotes for TS strings.
+func tsSingleQuote(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "'", "\\'")
+	return "'" + s + "'"
+}

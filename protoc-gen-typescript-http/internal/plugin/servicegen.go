@@ -3,7 +3,6 @@ package plugin
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http/internal/codegen"
@@ -108,11 +107,11 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 	generateMethodQuery(f, method.Input(), rule)
 	f.P(t(3), "let uri = path;")
 	f.P(t(3), "if (queryParams.length > 0) {")
-	f.P(t(4), "uri += `?${queryParams.join(\"&\")}`")
+	f.P(t(4), "uri += `?${queryParams.join('&')}`")
 	f.P(t(3), "}")
-	f.P(t(3), "return transport.unary(uri, ", strconv.Quote(rule.Method), ", body, {")
-	f.P(t(4), "service: \"", method.Parent().Name(), "\",")
-	f.P(t(4), "method: \"", method.Name(), "\",")
+	f.P(t(3), "return transport.unary(uri, ", tsSingleQuote(rule.Method), ", body, {")
+	f.P(t(4), "service: '", method.Parent().Name(), "',")
+	f.P(t(4), "method: '", method.Name(), "',")
 	f.P(t(3), "}) as Promise<", outputType.Reference(), ">;")
 	f.P(t(2), "},")
 	return nil
@@ -132,7 +131,7 @@ func generateMethodPathValidation(
 		protoPath := strings.Join(fp, ".")
 		errMsg := "missing required field request." + protoPath
 		f.P(t(3), "if (!request.", nullPath, ") {")
-		f.P(t(4), "throw new Error(", strconv.Quote(errMsg), ");")
+		f.P(t(4), "throw new Error(", tsSingleQuote(errMsg), ");")
 		f.P(t(3), "}")
 	}
 }
@@ -160,7 +159,7 @@ func generateMethodPath(
 	if rule.Template.Verb != "" {
 		path += ":" + escapeTemplateLiteral(rule.Template.Verb)
 	}
-	f.P(t(3), "const path = `", path, "`; // eslint-disable-line quotes")
+	f.P(t(3), "const path = `", path, "`;")
 }
 
 // escapeTemplateLiteral escapes characters that have special meaning inside a

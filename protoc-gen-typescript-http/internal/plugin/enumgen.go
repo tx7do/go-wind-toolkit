@@ -1,8 +1,6 @@
 package plugin
 
 import (
-	"strconv"
-
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http/internal/codegen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -22,15 +20,15 @@ func (e enumGenerator) Generate(f *codegen.File) {
 	}
 	if e.enum.Values().Len() == 1 {
 		commentGenerator{descriptor: e.enum.Values().Get(0)}.generateLeading(f, 1)
-		f.P(t(1), strconv.Quote(string(e.enum.Values().Get(0).Name())), ";")
+		f.P(t(1), "'", string(e.enum.Values().Get(0).Name()), "';")
 		return
 	}
 	rangeEnumValues(e.enum, func(value protoreflect.EnumValueDescriptor, last bool) {
 		commentGenerator{descriptor: value}.generateLeading(f, 1)
 		if last {
-			f.P(t(1), "| ", strconv.Quote(string(value.Name())), ";")
+			f.P(t(1), "| '", string(value.Name()), "';")
 		} else {
-			f.P(t(1), "| ", strconv.Quote(string(value.Name())))
+			f.P(t(1), "| '", string(value.Name()), "'")
 		}
 	})
 }

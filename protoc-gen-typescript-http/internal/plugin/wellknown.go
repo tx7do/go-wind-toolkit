@@ -68,7 +68,7 @@ func (wkt WellKnown) TypeDeclaration() string {
 		w.P("// Otherwise, the value will be converted into a JSON object,")
 		w.P("// and the \"@type\" field will be inserted to indicate the actual data type.")
 		w.P("interface ", wkt.Name(), " {")
-		w.P("  ", "\"@type\": string;")
+		w.P("  ", "'@type': string;")
 		w.P("  [key: string]: unknown;")
 		w.P("}")
 	case WellKnownDuration:
@@ -119,11 +119,11 @@ func (wkt WellKnown) TypeDeclaration() string {
 		WellKnownInt32Value,
 		WellKnownUInt64Value,
 		WellKnownUInt32Value:
-		w.P("type ", wkt.Name(), " = number | null;")
+		w.P("type ", wkt.Name(), " = null | number;")
 	case WellKnownBytesValue, WellKnownStringValue:
-		w.P("type ", wkt.Name(), " = string | null;")
+		w.P("type ", wkt.Name(), " = null | string;")
 	case WellKnownBoolValue:
-		w.P("type ", wkt.Name(), " = boolean | null;")
+		w.P("type ", wkt.Name(), " = null | boolean;")
 	case WellKnownStruct:
 		w.P("// Any JSON value.")
 		w.P("type ", wkt.Name(), " = Record<string, unknown>;")
