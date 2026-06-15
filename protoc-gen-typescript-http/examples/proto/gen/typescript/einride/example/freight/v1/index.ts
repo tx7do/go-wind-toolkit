@@ -2,134 +2,6 @@
 /* eslint-disable camelcase */
 // @ts-nocheck
 
-interface TransportMeta { service: string; method: string; }
-
-export interface ClientTransport {
-  unary(path: string, method: string, body: string | null, meta: TransportMeta): Promise<unknown>;
-  serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;
-  duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;
-}
-
-export interface ServerStream<T> {
-  onEvent(listener: (data: T) => void): () => void;
-  onError(handler: (error: Error) => void): void;
-  close(): void;
-}
-
-export interface DuplexStream<TIn, TOut> extends ServerStream<TOut> {
-  send(data: TIn): void;
-}
-
-const DEFAULT_HOST = "freight-example.einride.tech";
-
-export interface TransportOptions {
-  baseUrl?: string;
-  headers?: Record<string, string>;
-  request?: typeof fetch;
-}
-
-export class SSETransport<T> implements ServerStream<T> {
-  private eventSource: EventSource;
-  private listeners: Array<(data: T) => void> = [];
-  private errorHandlers: Array<(error: Error) => void> = [];
-
-  constructor(url: string) {
-    this.eventSource = new EventSource(url);
-    this.eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as T;
-        this.listeners.forEach(fn => fn(data));
-      } catch (err) {
-        this.errorHandlers.forEach(fn => fn(err as Error));
-      }
-    };
-    this.eventSource.onerror = () => {
-      this.errorHandlers.forEach(fn => fn(new Error('SSE connection error')));
-    };
-  }
-
-  onEvent(listener: (data: T) => void): () => void {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(fn => fn !== listener);
-    };
-  }
-
-  onError(handler: (error: Error) => void): void {
-    this.errorHandlers.push(handler);
-  }
-
-  close(): void {
-    this.eventSource.close();
-  }
-}
-
-export class WSTransport<TIn, TOut> implements DuplexStream<TIn, TOut> {
-  private socket: WebSocket;
-  private listeners: Array<(data: TOut) => void> = [];
-  private errorHandlers: Array<(error: Error) => void> = [];
-
-  constructor(url: string) {
-    this.socket = new WebSocket(url);
-    this.socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data as string) as TOut;
-        this.listeners.forEach(fn => fn(data));
-      } catch (err) {
-        this.errorHandlers.forEach(fn => fn(err as Error));
-      }
-    };
-    this.socket.onerror = () => {
-      this.errorHandlers.forEach(fn => fn(new Error('WebSocket connection error')));
-    };
-  }
-
-  send(data: TIn): void {
-    if (this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(data));
-    }
-  }
-
-  onEvent(listener: (data: TOut) => void): () => void {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(fn => fn !== listener);
-    };
-  }
-
-  onError(handler: (error: Error) => void): void {
-    this.errorHandlers.push(handler);
-  }
-
-  close(): void {
-    this.socket.close();
-  }
-}
-
-export function createDefaultTransport(opts?: TransportOptions): ClientTransport {
-  const baseUrl = opts?.baseUrl ?? (typeof DEFAULT_HOST !== 'undefined' ? `https://${DEFAULT_HOST}` : undefined);
-  const resolve = (path: string) => baseUrl ? `${baseUrl}/${path}` : path;
-  const doRequest = opts?.request ?? globalThis.fetch.bind(globalThis);
-  const headers = opts?.headers;
-
-  return {
-    unary(path, method, body, _meta) {
-      const init: RequestInit = { method, body: body ?? undefined };
-      if (headers) { init.headers = headers; }
-      return doRequest(resolve(path), init).then(r => r.json());
-    },
-
-    serverStream<T>(path, _meta) {
-      return new SSETransport<T>(resolve(path));
-    },
-
-    duplexStream<TIn, TOut>(path, _meta) {
-      const wsUrl = resolve(path).replace(/^http/, 'ws');
-      return new WSTransport<TIn, TOut>(wsUrl);
-    },
-  };
-}
-
 // A shipment represents transportation of goods between an origin
 // [site][einride.example.freight.v1.Site] and a destination
 // [site][einride.example.freight.v1.Site].
@@ -141,6 +13,7 @@ export type Shipment = {
   // Behaviors: OUTPUT_ONLY
   createTime: wellKnownTimestamp | undefined;
   // The last update timestamp of the shipment.
+  // 
   // Updated when create/update/delete operation is shipment.
   //
   // Behaviors: OUTPUT_ONLY
@@ -207,6 +80,7 @@ export type Shipper = {
   // Behaviors: OUTPUT_ONLY
   createTime: wellKnownTimestamp | undefined;
   // The last update timestamp of the shipper.
+  // 
   // Updated when create/update/delete operation is performed.
   //
   // Behaviors: OUTPUT_ONLY
@@ -231,6 +105,7 @@ export type Site = {
   // Behaviors: OUTPUT_ONLY
   createTime: wellKnownTimestamp | undefined;
   // The last update timestamp of the site.
+  // 
   // Updated when create/update/delete operation is performed.
   //
   // Behaviors: OUTPUT_ONLY
@@ -249,9 +124,9 @@ export type Site = {
 
 // An object that represents a latitude/longitude pair. This is expressed as a
 // pair of doubles to represent degrees latitude and degrees longitude. Unless
-// specified otherwise, this must conform to the
-// <a href="http://www.unoosa.org/pdf/icg/2012/template/WGS_84.pdf">WGS84
-// standard</a>. Values must be within normalized ranges.
+// specified otherwise, this object must conform to the
+// <a href="https://en.wikipedia.org/wiki/World_Geodetic_System#1984_version">
+// WGS84 standard</a>. Values must be within normalized ranges.
 export type googletype_LatLng = {
   // The latitude in degrees. It must be in the range [-90.0, +90.0].
   latitude: number | undefined;
@@ -491,11 +366,15 @@ export type DeleteShipmentRequest = {
 };
 
 // This API represents a simple freight service.
+// 
 // It defines the following resource model:
+// 
 // - The API has a collection of [Shipper][einride.example.freight.v1.Shipper]
 // resources, named `shippers/*`
+// 
 // - Each Shipper has a collection of [Site][einride.example.freight.v1.Site]
 // resources, named `shippers/*/sites/*`
+// 
 // - Each Shipper has a collection of [Shipment][einride.example.freight.v1.Shipment]
 // resources, named `shippers/*/shipments/*`
 export interface FreightService {
@@ -549,8 +428,16 @@ export interface FreightService {
   DeleteShipment(request: DeleteShipmentRequest): Promise<Shipment>;
 }
 
+type RequestType = {
+  path: string;
+  method: string;
+  body: string | null;
+};
+
+type RequestHandler = (request: RequestType, meta: { service: string, method: string }) => Promise<unknown>;
+
 export function createFreightServiceClient(
-  transport: ClientTransport
+  handler: RequestHandler
 ): FreightService {
   return {
     GetShipper(request) { // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -564,7 +451,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "GET", body, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "FreightService",
         method: "GetShipper",
       }) as Promise<Shipper>;
@@ -583,7 +474,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "GET", body, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "FreightService",
         method: "ListShippers",
       }) as Promise<ListShippersResponse>;
@@ -596,7 +491,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "POST", body, {
+      return handler({
+        path: uri,
+        method: "POST",
+        body,
+      }, {
         service: "FreightService",
         method: "CreateShipper",
       }) as Promise<Shipper>;
@@ -615,7 +514,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "PATCH", body, {
+      return handler({
+        path: uri,
+        method: "PATCH",
+        body,
+      }, {
         service: "FreightService",
         method: "UpdateShipper",
       }) as Promise<Shipper>;
@@ -631,7 +534,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "DELETE", body, {
+      return handler({
+        path: uri,
+        method: "DELETE",
+        body,
+      }, {
         service: "FreightService",
         method: "DeleteShipper",
       }) as Promise<Shipper>;
@@ -647,7 +554,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "GET", body, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "FreightService",
         method: "GetSite",
       }) as Promise<Site>;
@@ -669,7 +580,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "GET", body, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "FreightService",
         method: "ListSites",
       }) as Promise<ListSitesResponse>;
@@ -685,7 +600,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "POST", body, {
+      return handler({
+        path: uri,
+        method: "POST",
+        body,
+      }, {
         service: "FreightService",
         method: "CreateSite",
       }) as Promise<Site>;
@@ -704,7 +623,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "PATCH", body, {
+      return handler({
+        path: uri,
+        method: "PATCH",
+        body,
+      }, {
         service: "FreightService",
         method: "UpdateSite",
       }) as Promise<Site>;
@@ -720,7 +643,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "DELETE", body, {
+      return handler({
+        path: uri,
+        method: "DELETE",
+        body,
+      }, {
         service: "FreightService",
         method: "DeleteSite",
       }) as Promise<Site>;
@@ -736,7 +663,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "GET", body, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "FreightService",
         method: "GetShipment",
       }) as Promise<Shipment>;
@@ -758,7 +689,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "GET", body, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "FreightService",
         method: "ListShipments",
       }) as Promise<ListShipmentsResponse>;
@@ -774,7 +709,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "POST", body, {
+      return handler({
+        path: uri,
+        method: "POST",
+        body,
+      }, {
         service: "FreightService",
         method: "CreateShipment",
       }) as Promise<Shipment>;
@@ -793,7 +732,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "PATCH", body, {
+      return handler({
+        path: uri,
+        method: "PATCH",
+        body,
+      }, {
         service: "FreightService",
         method: "UpdateShipment",
       }) as Promise<Shipment>;
@@ -809,7 +752,11 @@ export function createFreightServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "DELETE", body, {
+      return handler({
+        path: uri,
+        method: "DELETE",
+        body,
+      }, {
         service: "FreightService",
         method: "DeleteShipment",
       }) as Promise<Shipment>;

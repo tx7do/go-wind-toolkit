@@ -2,134 +2,6 @@
 /* eslint-disable camelcase */
 // @ts-nocheck
 
-interface TransportMeta { service: string; method: string; }
-
-export interface ClientTransport {
-  unary(path: string, method: string, body: string | null, meta: TransportMeta): Promise<unknown>;
-  serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;
-  duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;
-}
-
-export interface ServerStream<T> {
-  onEvent(listener: (data: T) => void): () => void;
-  onError(handler: (error: Error) => void): void;
-  close(): void;
-}
-
-export interface DuplexStream<TIn, TOut> extends ServerStream<TOut> {
-  send(data: TIn): void;
-}
-
-const DEFAULT_HOST = "api.example.com";
-
-export interface TransportOptions {
-  baseUrl?: string;
-  headers?: Record<string, string>;
-  request?: typeof fetch;
-}
-
-export class SSETransport<T> implements ServerStream<T> {
-  private eventSource: EventSource;
-  private listeners: Array<(data: T) => void> = [];
-  private errorHandlers: Array<(error: Error) => void> = [];
-
-  constructor(url: string) {
-    this.eventSource = new EventSource(url);
-    this.eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as T;
-        this.listeners.forEach(fn => fn(data));
-      } catch (err) {
-        this.errorHandlers.forEach(fn => fn(err as Error));
-      }
-    };
-    this.eventSource.onerror = () => {
-      this.errorHandlers.forEach(fn => fn(new Error('SSE connection error')));
-    };
-  }
-
-  onEvent(listener: (data: T) => void): () => void {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(fn => fn !== listener);
-    };
-  }
-
-  onError(handler: (error: Error) => void): void {
-    this.errorHandlers.push(handler);
-  }
-
-  close(): void {
-    this.eventSource.close();
-  }
-}
-
-export class WSTransport<TIn, TOut> implements DuplexStream<TIn, TOut> {
-  private socket: WebSocket;
-  private listeners: Array<(data: TOut) => void> = [];
-  private errorHandlers: Array<(error: Error) => void> = [];
-
-  constructor(url: string) {
-    this.socket = new WebSocket(url);
-    this.socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data as string) as TOut;
-        this.listeners.forEach(fn => fn(data));
-      } catch (err) {
-        this.errorHandlers.forEach(fn => fn(err as Error));
-      }
-    };
-    this.socket.onerror = () => {
-      this.errorHandlers.forEach(fn => fn(new Error('WebSocket connection error')));
-    };
-  }
-
-  send(data: TIn): void {
-    if (this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(data));
-    }
-  }
-
-  onEvent(listener: (data: TOut) => void): () => void {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(fn => fn !== listener);
-    };
-  }
-
-  onError(handler: (error: Error) => void): void {
-    this.errorHandlers.push(handler);
-  }
-
-  close(): void {
-    this.socket.close();
-  }
-}
-
-export function createDefaultTransport(opts?: TransportOptions): ClientTransport {
-  const baseUrl = opts?.baseUrl ?? (typeof DEFAULT_HOST !== 'undefined' ? `https://${DEFAULT_HOST}` : undefined);
-  const resolve = (path: string) => baseUrl ? `${baseUrl}/${path}` : path;
-  const doRequest = opts?.request ?? globalThis.fetch.bind(globalThis);
-  const headers = opts?.headers;
-
-  return {
-    unary(path, method, body, _meta) {
-      const init: RequestInit = { method, body: body ?? undefined };
-      if (headers) { init.headers = headers; }
-      return doRequest(resolve(path), init).then(r => r.json());
-    },
-
-    serverStream<T>(path, _meta) {
-      return new SSETransport<T>(resolve(path));
-    },
-
-    duplexStream<TIn, TOut>(path, _meta) {
-      const wsUrl = resolve(path).replace(/^http/, 'ws');
-      return new WSTransport<TIn, TOut>(wsUrl);
-    },
-  };
-}
-
 // A log entry.
 export type LogEntry = {
   // The resource name of the log entry.
@@ -196,28 +68,31 @@ export type ChatMessage = {
 };
 
 // This API demonstrates streaming RPC patterns with HTTP annotations.
+// 
 // - Unary RPCs use the standard RequestHandler (fetch/axios).
 // - Server-streaming RPCs are mapped to SSE (Server-Sent Events).
 // - Bidirectional streaming RPCs are mapped to WebSocket.
 export interface StreamService {
   // Get a single log entry.
+  // 
   // Unary request/response — uses RequestHandler.
   GetLog(request: GetLogRequest): Promise<LogEntry>;
   // List log entries.
+  // 
   // Unary request/response with pagination — uses RequestHandler.
   ListLogs(request: ListLogsRequest): Promise<ListLogsResponse>;
-  // Tail log entries in real time.
-  // Server-streaming RPC → generated as SSE (Server-Sent Events).
-  // The client subscribes to a stream of log entries pushed by the server.
-  TailLogs(request: TailLogsRequest): ServerStream<LogEntry>;
-  // Realtime bidirectional chat.
-  // Bidirectional streaming RPC → generated as WebSocket.
-  // Both client and server can send messages independently.
-  Chat(): DuplexStream<ChatMessage, ChatMessage>;
 }
 
+type RequestType = {
+  path: string;
+  method: string;
+  body: string | null;
+};
+
+type RequestHandler = (request: RequestType, meta: { service: string, method: string }) => Promise<unknown>;
+
 export function createStreamServiceClient(
-  transport: ClientTransport
+  handler: RequestHandler
 ): StreamService {
   return {
     GetLog(request) { // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -231,7 +106,11 @@ export function createStreamServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "GET", body, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "StreamService",
         method: "GetLog",
       }) as Promise<LogEntry>;
@@ -250,35 +129,63 @@ export function createStreamServiceClient(
       if (queryParams.length > 0) {
         uri += `?${queryParams.join("&")}`
       }
-      return transport.unary(uri, "GET", body, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "StreamService",
         method: "ListLogs",
       }) as Promise<ListLogsResponse>;
     },
-    TailLogs(request) {
+    TailLogs(request) { // eslint-disable-line @typescript-eslint/no-unused-vars
       if (!request.name) {
         throw new Error("missing required field request.name");
       }
       const path = `v1/${request.name}:tail`; // eslint-disable-line quotes
+      const body = null;
       const queryParams: string[] = [];
       if (request.filter) {
         queryParams.push(`filter=${encodeURIComponent(request.filter.toString())}`)
       }
       let uri = path;
       if (queryParams.length > 0) {
-        uri += `?${queryParams.join("&")}`;
+        uri += `?${queryParams.join("&")}`
       }
-      return transport.serverStream<LogEntry>(uri, {
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "StreamService",
         method: "TailLogs",
-      });
+      }) as Promise<LogEntry>;
     },
-    Chat() {
-      const path = "v1/chat";
-      return transport.duplexStream(path, {
+    Chat(request) { // eslint-disable-line @typescript-eslint/no-unused-vars
+      const path = `v1/chat`; // eslint-disable-line quotes
+      const body = null;
+      const queryParams: string[] = [];
+      if (request.from) {
+        queryParams.push(`from=${encodeURIComponent(request.from.toString())}`)
+      }
+      if (request.text) {
+        queryParams.push(`text=${encodeURIComponent(request.text.toString())}`)
+      }
+      if (request.sendTime) {
+        queryParams.push(`sendTime=${encodeURIComponent(request.sendTime.toString())}`)
+      }
+      let uri = path;
+      if (queryParams.length > 0) {
+        uri += `?${queryParams.join("&")}`
+      }
+      return handler({
+        path: uri,
+        method: "GET",
+        body,
+      }, {
         service: "StreamService",
         method: "Chat",
-      });
+      }) as Promise<ChatMessage>;
     },
   };
 }

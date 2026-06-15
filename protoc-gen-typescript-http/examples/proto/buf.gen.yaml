@@ -1,5 +1,5 @@
-version: v1
+version: v2
 
 plugins:
-  - name: typescript-http
+  - local: protoc-gen-typescript-http
     out: gen/typescript
