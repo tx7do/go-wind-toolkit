@@ -1,0 +1,17 @@
+version: v2
+
+modules:
+  - path: .
+    name: buf.build/tx7do/protoc-gen-dart-http
+
+deps:
+  - buf.build/googleapis/googleapis
+
+lint:
+  use:
+    - STANDARD
+  except:
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
+    - RPC_REQUEST_RESPONSE_UNIQUE
+    - ENUM_VALUE_PREFIX

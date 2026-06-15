@@ -1,0 +1,240 @@
+syntax = "proto3";
+
+package einride.example.syntax.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+// Message
+message Message {
+  // NestedMessage
+  message NestedMessage {
+    // nested_message.string
+    string string = 1;
+  }
+  // NestedEnum
+  enum NestedEnum {
+    // NESTEDENUM_UNSPECIFIED
+    NESTEDENUM_UNSPECIFIED = 0;
+  }
+  // double
+  double double = 1;
+  // float
+  float float = 2;
+  // int32
+  int32 int32 = 3;
+  // int64
+  int64 int64 = 4;
+  // uint32
+  uint32 uint32 = 5;
+  // uint64
+  uint64 uint64 = 6;
+  // sint32
+  sint32 sint32 = 7;
+  // sint64
+  sint64 sint64 = 8;
+  // fixed32
+  fixed32 fixed32 = 9;
+  // fixed64
+  fixed64 fixed64 = 10;
+  // sfixed32
+  sfixed32 sfixed32 = 11;
+  // sfixed64
+  sfixed64 sfixed64 = 12;
+  // bool
+  bool bool = 13;
+  // string
+  string string = 14;
+  // bytes
+  bytes bytes = 15;
+  // enum
+  Enum enum = 16;
+  // message
+  Message message = 17;
+
+  // optional double
+  optional double optional_double = 81;
+  // optional float
+  optional float optional_float = 82;
+  // optional int32
+  optional int32 optional_int32 = 83;
+  // optional int64
+  optional int64 optional_int64 = 84;
+  // optional uint32
+  optional uint32 optional_uint32 = 85;
+  // optional uint64
+  optional uint64 optional_uint64 = 86;
+  // optional sint32
+  optional sint32 optional_sint32 = 87;
+  // optional sint64
+  optional sint64 optional_sint64 = 88;
+  // optional fixed32
+  optional fixed32 optional_fixed32 = 89;
+  // optional fixed64
+  optional fixed64 optional_fixed64 = 90;
+  // optional sfixed32
+  optional sfixed32 optional_sfixed32 = 91;
+  // optional sfixed64
+  optional sfixed64 optional_sfixed64 = 92;
+  // optional bool
+  optional bool optional_bool = 93;
+  // optional string
+  optional string optional_string = 94;
+  // optional bytes
+  optional bytes optional_bytes = 95;
+  // optional enum
+  optional Enum optional_enum = 96;
+  // optional message
+  optional Message optional_message = 97;
+
+  // repeated_double
+  repeated double repeated_double = 18;
+  // repeated_float
+  repeated float repeated_float = 19;
+  // repeated_int32
+  repeated int32 repeated_int32 = 20;
+  // repeated_int64
+  repeated int64 repeated_int64 = 21;
+  // repeated_uint32
+  repeated uint32 repeated_uint32 = 22;
+  // repeated_uint64
+  repeated uint64 repeated_uint64 = 23;
+  // repeated_sint32
+  repeated sint32 repeated_sint32 = 24;
+  // repeated_sint64
+  repeated sint64 repeated_sint64 = 25;
+  // repeated_fixed32
+  repeated fixed32 repeated_fixed32 = 26;
+  // repeated_fixed64
+  repeated fixed64 repeated_fixed64 = 27;
+  // repeated_sfixed32
+  repeated sfixed32 repeated_sfixed32 = 28;
+  // repeated_sfixed64
+  repeated sfixed64 repeated_sfixed64 = 29;
+  // repeated_bool
+  repeated bool repeated_bool = 30;
+  // repeated_string
+  repeated string repeated_string = 31;
+  // repeated_bytes
+  repeated bytes repeated_bytes = 32;
+  // repeated_enum
+  repeated Enum repeated_enum = 33;
+  // repeated_message
+  repeated Message repeated_message = 34;
+
+  // map_string_string
+  map<string, string> map_string_string = 35;
+  // map_string_message
+  map<string, Message> map_string_message = 36;
+
+  // oneof
+  oneof oneof {
+    // oneof_string
+    string oneof_string = 37;
+    // oneof_enum
+    Enum oneof_enum = 38;
+    // oneof_message1
+    Message oneof_message1 = 39;
+    // oneof_message2
+    Message oneof_message2 = 40;
+  }
+
+  // any
+  google.protobuf.Any any = 41;
+  // repeated_any
+  repeated google.protobuf.Any repeated_any = 42;
+
+  // duration
+  google.protobuf.Duration duration = 43;
+  // repeated_duration
+  repeated google.protobuf.Duration repeated_duration = 44;
+
+  // empty
+  google.protobuf.Empty empty = 45;
+  // repeated_empty
+  repeated google.protobuf.Empty repeated_empty = 46;
+
+  // field_mask
+  google.protobuf.FieldMask field_mask = 47;
+  // repeated_field_mask
+  repeated google.protobuf.FieldMask repeated_field_mask = 48;
+
+  // struct
+  google.protobuf.Struct struct = 49;
+  // repeated_struct
+  repeated google.protobuf.Struct repeated_struct = 50;
+
+  // value
+  google.protobuf.Value value = 51;
+  // repeated_value
+  repeated google.protobuf.Value repeated_value = 52;
+
+  // null_value
+  google.protobuf.NullValue null_value = 53;
+  // repeated_null_value
+  repeated google.protobuf.NullValue repeated_null_value = 54;
+
+  // list_value
+  google.protobuf.ListValue list_value = 55;
+  // repeated_list_value
+  repeated google.protobuf.ListValue repeated_list_value = 56;
+
+  // bool_value
+  google.protobuf.BoolValue bool_value = 57;
+  // repeated_bool_value
+  repeated google.protobuf.BoolValue repeated_bool_value = 58;
+
+  // bytes_value
+  google.protobuf.BytesValue bytes_value = 59;
+  // repeated_bytes_value
+  repeated google.protobuf.BytesValue repeated_bytes_value = 60;
+
+  // double_value
+  google.protobuf.DoubleValue double_value = 61;
+  // repeated_double_value
+  repeated google.protobuf.DoubleValue repeated_double_value = 62;
+
+  // float_value
+  google.protobuf.FloatValue float_value = 63;
+  // repeated_float_value
+  repeated google.protobuf.FloatValue repeated_float_value = 64;
+
+  // int32_value
+  google.protobuf.Int32Value int32_value = 65;
+  // repeated_int32_value
+  repeated google.protobuf.Int32Value repeated_int32_value = 66;
+
+  // int64_value
+  google.protobuf.Int64Value int64_value = 67;
+  // repeated_int64_value
+  repeated google.protobuf.Int64Value repeated_int64_value = 68;
+
+  // uint32_value
+  google.protobuf.UInt32Value uint32_value = 69;
+  // repeated_uint32_value
+  repeated google.protobuf.UInt32Value repeated_uint32_value = 70;
+
+  // uint64_value
+  google.protobuf.UInt64Value uint64_value = 71;
+  // repeated_uint64_value
+  repeated google.protobuf.UInt64Value repeated_uint64_value = 72;
+
+  // string_value
+  google.protobuf.UInt64Value string_value = 73;
+  // repeated_string_value
+  repeated google.protobuf.StringValue repeated_string_value = 74;
+}
+
+// Enum
+enum Enum {
+  // ENUM_UNSPECIFIED
+  ENUM_UNSPECIFIED = 0;
+  // ENUM_ONE
+  ENUM_ONE = 1;
+  // ENUM_TWO
+  ENUM_TWO = 2;
+}
