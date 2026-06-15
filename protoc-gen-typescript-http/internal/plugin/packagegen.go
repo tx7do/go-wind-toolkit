@@ -16,6 +16,7 @@ func (p packageGenerator) Generate(f *codegen.File) error {
 	defaultHost := p.readDefaultHost()
 	generateTransportInfra(f, defaultHost)
 	var walkErr error
+	var services []protoreflect.ServiceDescriptor
 	protowalk.WalkFiles(p.files, func(desc protoreflect.Descriptor) bool {
 		if wkt, ok := WellKnownType(desc); ok {
 			f.P(wkt.TypeDeclaration())
@@ -30,6 +31,7 @@ func (p packageGenerator) Generate(f *codegen.File) error {
 		case protoreflect.EnumDescriptor:
 			enumGenerator{pkg: p.pkg, enum: v}.Generate(f)
 		case protoreflect.ServiceDescriptor:
+			services = append(services, v)
 			if err := (serviceGenerator{
 				pkg:     p.pkg,
 				service: v,
@@ -43,6 +45,8 @@ func (p packageGenerator) Generate(f *codegen.File) error {
 	if walkErr != nil {
 		return walkErr
 	}
+	// Generate the unified ApiClient after all individual service clients.
+	generateApiClient(f, services)
 	return nil
 }
 
