@@ -1537,7 +1537,7 @@ class FreightServiceClient {
     if (request.name == null) {
       throw ArgumentError('missing required field request.name');
     }
-    final path = 'v1/${request.name}';
+    final path = '/v1/${request.name}';
     final result = await _transport.unary(path, 'GET', null, TransportMeta(
       service: 'FreightService',
       method: 'GetShipper',
@@ -1548,7 +1548,7 @@ class FreightServiceClient {
   /// List shippers.
   /// See: https://google.aip.dev/132 (Standard methods: List).
   Future<ListShippersResponse> listShippers(ListShippersRequest request, {Map<String, String>? headers}) async {
-    final path = 'v1/shippers';
+    final path = '/v1/shippers';
     final queryParams = <String>[];
     if (request.pageSize != null) {
       queryParams.add('pageSize=${Uri.encodeComponent(request.pageSize!.toString())}');
@@ -1570,7 +1570,7 @@ class FreightServiceClient {
   /// Create a shipper.
   /// See: https://google.aip.dev/133 (Standard methods: Create).
   Future<Shipper> createShipper(CreateShipperRequest request, {Map<String, String>? headers}) async {
-    final path = 'v1/shippers';
+    final path = '/v1/shippers';
     final body = jsonEncode(request.shipper?.toJson() ?? {});
     final result = await _transport.unary(path, 'POST', body, TransportMeta(
       service: 'FreightService',
@@ -1585,7 +1585,7 @@ class FreightServiceClient {
     if (request.shipper?.name == null) {
       throw ArgumentError('missing required field request.shipper.name');
     }
-    final path = 'v1/${request.shipper?.name}';
+    final path = '/v1/${request.shipper?.name}';
     final body = jsonEncode(request.shipper?.toJson() ?? {});
     final queryParams = <String>[];
     if (request.updateMask != null) {
@@ -1609,7 +1609,7 @@ class FreightServiceClient {
     if (request.name == null) {
       throw ArgumentError('missing required field request.name');
     }
-    final path = 'v1/${request.name}';
+    final path = '/v1/${request.name}';
     final result = await _transport.unary(path, 'DELETE', null, TransportMeta(
       service: 'FreightService',
       method: 'DeleteShipper',
@@ -1623,7 +1623,7 @@ class FreightServiceClient {
     if (request.name == null) {
       throw ArgumentError('missing required field request.name');
     }
-    final path = 'v1/${request.name}';
+    final path = '/v1/${request.name}';
     final result = await _transport.unary(path, 'GET', null, TransportMeta(
       service: 'FreightService',
       method: 'GetSite',
@@ -1637,7 +1637,7 @@ class FreightServiceClient {
     if (request.parent == null) {
       throw ArgumentError('missing required field request.parent');
     }
-    final path = 'v1/${request.parent}/sites';
+    final path = '/v1/${request.parent}/sites';
     final queryParams = <String>[];
     if (request.pageSize != null) {
       queryParams.add('pageSize=${Uri.encodeComponent(request.pageSize!.toString())}');
@@ -1662,7 +1662,7 @@ class FreightServiceClient {
     if (request.parent == null) {
       throw ArgumentError('missing required field request.parent');
     }
-    final path = 'v1/${request.parent}/sites';
+    final path = '/v1/${request.parent}/sites';
     final body = jsonEncode(request.site?.toJson() ?? {});
     final result = await _transport.unary(path, 'POST', body, TransportMeta(
       service: 'FreightService',
@@ -1677,7 +1677,7 @@ class FreightServiceClient {
     if (request.site?.name == null) {
       throw ArgumentError('missing required field request.site.name');
     }
-    final path = 'v1/${request.site?.name}';
+    final path = '/v1/${request.site?.name}';
     final body = jsonEncode(request.site?.toJson() ?? {});
     final queryParams = <String>[];
     if (request.updateMask != null) {
@@ -1701,7 +1701,7 @@ class FreightServiceClient {
     if (request.name == null) {
       throw ArgumentError('missing required field request.name');
     }
-    final path = 'v1/${request.name}';
+    final path = '/v1/${request.name}';
     final result = await _transport.unary(path, 'DELETE', null, TransportMeta(
       service: 'FreightService',
       method: 'DeleteSite',
@@ -1715,7 +1715,7 @@ class FreightServiceClient {
     if (request.name == null) {
       throw ArgumentError('missing required field request.name');
     }
-    final path = 'v1/${request.name}';
+    final path = '/v1/${request.name}';
     final result = await _transport.unary(path, 'GET', null, TransportMeta(
       service: 'FreightService',
       method: 'GetShipment',
@@ -1729,7 +1729,7 @@ class FreightServiceClient {
     if (request.parent == null) {
       throw ArgumentError('missing required field request.parent');
     }
-    final path = 'v1/${request.parent}/shipments';
+    final path = '/v1/${request.parent}/shipments';
     final queryParams = <String>[];
     if (request.pageSize != null) {
       queryParams.add('pageSize=${Uri.encodeComponent(request.pageSize!.toString())}');
@@ -1754,7 +1754,7 @@ class FreightServiceClient {
     if (request.parent == null) {
       throw ArgumentError('missing required field request.parent');
     }
-    final path = 'v1/${request.parent}/shipments';
+    final path = '/v1/${request.parent}/shipments';
     final body = jsonEncode(request.shipment?.toJson() ?? {});
     final result = await _transport.unary(path, 'POST', body, TransportMeta(
       service: 'FreightService',
@@ -1769,7 +1769,7 @@ class FreightServiceClient {
     if (request.shipment?.name == null) {
       throw ArgumentError('missing required field request.shipment.name');
     }
-    final path = 'v1/${request.shipment?.name}';
+    final path = '/v1/${request.shipment?.name}';
     final body = jsonEncode(request.shipment?.toJson() ?? {});
     final queryParams = <String>[];
     if (request.updateMask != null) {
@@ -1793,7 +1793,7 @@ class FreightServiceClient {
     if (request.name == null) {
       throw ArgumentError('missing required field request.name');
     }
-    final path = 'v1/${request.name}';
+    final path = '/v1/${request.name}';
     final result = await _transport.unary(path, 'DELETE', null, TransportMeta(
       service: 'FreightService',
       method: 'DeleteShipment',

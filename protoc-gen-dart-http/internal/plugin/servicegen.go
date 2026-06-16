@@ -147,7 +147,7 @@ func generateMethodPath(
 			pathParts = append(pathParts, "**")
 		}
 	}
-	path := strings.Join(pathParts, "/")
+	path := "/" + strings.Join(pathParts, "/")
 	if rule.Template.Verb != "" {
 		path += ":" + rule.Template.Verb
 	}

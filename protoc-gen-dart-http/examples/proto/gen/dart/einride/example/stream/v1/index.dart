@@ -397,7 +397,7 @@ class StreamServiceClient {
     if (request.name == null) {
       throw ArgumentError('missing required field request.name');
     }
-    final path = 'v1/${request.name}';
+    final path = '/v1/${request.name}';
     final result = await _transport.unary(path, 'GET', null, TransportMeta(
       service: 'StreamService',
       method: 'GetLog',
@@ -409,7 +409,7 @@ class StreamServiceClient {
   /// 
   /// Unary request/response with pagination — uses ClientTransport.
   Future<ListLogsResponse> listLogs(ListLogsRequest request, {Map<String, String>? headers}) async {
-    final path = 'v1/logs';
+    final path = '/v1/logs';
     final queryParams = <String>[];
     if (request.pageSize != null) {
       queryParams.add('pageSize=${Uri.encodeComponent(request.pageSize!.toString())}');
@@ -436,7 +436,7 @@ class StreamServiceClient {
     if (request.name == null) {
       throw ArgumentError('missing required field request.name');
     }
-    final path = 'v1/${request.name}:tail';
+    final path = '/v1/${request.name}:tail';
     final queryParams = <String>[];
     if (request.filter != null) {
       queryParams.add('filter=${Uri.encodeComponent(request.filter!.toString())}');
@@ -457,7 +457,7 @@ class StreamServiceClient {
   /// Bidirectional streaming RPC → generated as WebSocket.
   /// Both client and server can send messages independently.
   TypedDuplexConnection<ChatMessage, ChatMessage> chat({Map<String, String>? headers}) {
-    final path = 'v1/chat';
+    final path = '/v1/chat';
     return TypedDuplexConnection<ChatMessage, ChatMessage>( 
       _transport.duplexStream(path, TransportMeta(
         service: 'StreamService',

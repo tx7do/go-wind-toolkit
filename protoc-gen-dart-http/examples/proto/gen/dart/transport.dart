@@ -53,6 +53,26 @@ abstract class ClientTransport {
   });
 }
 
+/// Safely joins a base URL with a request path.
+///
+/// Handles all combinations of trailing/leading slashes so that
+/// the result always contains exactly one slash between base and path:
+///
+/// ```dart
+/// joinPath('https://api.example.com', '/v1/users');   // https://api.example.com/v1/users
+/// joinPath('https://api.example.com/', '/v1/users'); // https://api.example.com/v1/users
+/// joinPath('https://api.example.com/', 'v1/users');   // https://api.example.com/v1/users
+/// joinPath('https://api.example.com', 'v1/users');    // https://api.example.com/v1/users
+/// ```
+///
+/// Use this in your [ClientTransport] implementation to build the full URL.
+String joinPath(String baseUrl, String path) {
+  if (path.isEmpty) return baseUrl;
+  final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+  final p = path.startsWith('/') ? path : '/$path';
+  return base + p;
+}
+
 /// Abstract bidirectional connection for duplex streaming.
 abstract class DuplexConnection {
   /// Stream of incoming JSON messages from the server.

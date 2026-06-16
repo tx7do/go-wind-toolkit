@@ -74,6 +74,28 @@ func generateTransportSharedFile(f *codegen.File) {
 	f.P("}")
 	f.P()
 
+	// --- joinPath ---
+	f.P("/// Safely joins a base URL with a request path.")
+	f.P("///")
+	f.P("/// Handles all combinations of trailing/leading slashes so that")
+	f.P("/// the result always contains exactly one slash between base and path:")
+	f.P("///")
+	f.P("/// ```dart")
+	f.P("/// joinPath('https://api.example.com', '/v1/users');   // https://api.example.com/v1/users")
+	f.P("/// joinPath('https://api.example.com/', '/v1/users'); // https://api.example.com/v1/users")
+	f.P("/// joinPath('https://api.example.com/', 'v1/users');   // https://api.example.com/v1/users")
+	f.P("/// joinPath('https://api.example.com', 'v1/users');    // https://api.example.com/v1/users")
+	f.P("/// ```")
+	f.P("///")
+	f.P("/// Use this in your [ClientTransport] implementation to build the full URL.")
+	f.P("String joinPath(String baseUrl, String path) {")
+	f.P(t(1), "if (path.isEmpty) return baseUrl;")
+	f.P(t(1), "final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;")
+	f.P(t(1), "final p = path.startsWith('/') ? path : '/$path';")
+	f.P(t(1), "return base + p;")
+	f.P("}")
+	f.P()
+
 	// --- DuplexConnection ---
 	f.P("/// Abstract bidirectional connection for duplex streaming.")
 	f.P("abstract class DuplexConnection {")
@@ -262,7 +284,7 @@ func literalPath(rule httprule.Rule) string {
 			parts = append(parts, "**")
 		}
 	}
-	path := strings.Join(parts, "/")
+	path := "/" + strings.Join(parts, "/")
 	if rule.Template.Verb != "" {
 		path += ":" + rule.Template.Verb
 	}

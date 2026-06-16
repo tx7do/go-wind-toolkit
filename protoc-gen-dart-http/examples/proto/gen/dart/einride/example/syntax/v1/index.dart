@@ -1124,7 +1124,7 @@ class SyntaxServiceClient {
   SyntaxServiceClient(this._transport);
 
   Future<Message> queryOnly(Request request, {Map<String, String>? headers}) async {
-    final path = 'v1';
+    final path = '/v1';
     final queryParams = <String>[];
     if (request.string != null) {
       queryParams.add('string=${Uri.encodeComponent(request.string!.toString())}');
@@ -1149,7 +1149,7 @@ class SyntaxServiceClient {
   }
 
   Future<Map<String, dynamic>> emptyVerb(Map<String, dynamic> _request, {Map<String, String>? headers}) async {
-    final path = 'v1:emptyVerb';
+    final path = '/v1:emptyVerb';
     final result = await _transport.unary(path, 'GET', null, TransportMeta(
       service: 'SyntaxService',
       method: 'EmptyVerb',
@@ -1158,7 +1158,7 @@ class SyntaxServiceClient {
   }
 
   Future<Message> starBody(Request request, {Map<String, String>? headers}) async {
-    final path = 'v1:starBody';
+    final path = '/v1:starBody';
     final body = jsonEncode(request.toJson());
     final result = await _transport.unary(path, 'POST', body, TransportMeta(
       service: 'SyntaxService',
@@ -1168,7 +1168,7 @@ class SyntaxServiceClient {
   }
 
   Future<Message> body(Request request, {Map<String, String>? headers}) async {
-    final path = 'v1:body';
+    final path = '/v1:body';
     final body = jsonEncode(request.nested?.toJson() ?? {});
     final queryParams = <String>[];
     if (request.string != null) {
@@ -1194,7 +1194,7 @@ class SyntaxServiceClient {
     if (request.string == null) {
       throw ArgumentError('missing required field request.string');
     }
-    final path = 'v1/${request.string}:path';
+    final path = '/v1/${request.string}:path';
     final queryParams = <String>[];
     if (request.repeatedString != null) {
       request.repeatedString!.forEach((x) {
@@ -1219,7 +1219,7 @@ class SyntaxServiceClient {
     if (request.string == null) {
       throw ArgumentError('missing required field request.string');
     }
-    final path = 'v1/${request.string}:pathBody';
+    final path = '/v1/${request.string}:pathBody';
     final body = jsonEncode(request.nested?.toJson() ?? {});
     final queryParams = <String>[];
     if (request.repeatedString != null) {
