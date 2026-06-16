@@ -314,13 +314,13 @@ class Message {
       enum_: json['enum'] != null ? Enum.fromString(json['enum'] as String) : null,
       fieldMask: json['fieldMask'] as String?,
       fixed32: json['fixed32'] as int?,
-      fixed64: json['fixed64'] as int?,
+      fixed64: json['fixed64'] != null ? int.parse(json['fixed64'].toString()) : null,
       float: (json['float'] as num?)?.toDouble(),
       floatValue: (json['floatValue'] as num?)?.toDouble(),
       int32: json['int32'] as int?,
       int32Value: json['int32Value'] as int?,
-      int64: json['int64'] as int?,
-      int64Value: json['int64Value'] as int?,
+      int64: json['int64'] != null ? int.parse(json['int64'].toString()) : null,
+      int64Value: json['int64Value'] != null ? int.parse(json['int64Value'].toString()) : null,
       listValue: json['listValue'] as List<dynamic>?,
       mapStringMessage: (json['mapStringMessage'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, Message.fromJson(v as Map<String, dynamic>))),
       mapStringString: (json['mapStringString'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, v as String)),
@@ -335,18 +335,18 @@ class Message {
       optionalDouble: (json['optionalDouble'] as num?)?.toDouble(),
       optionalEnum: json['optionalEnum'] != null ? Enum.fromString(json['optionalEnum'] as String) : null,
       optionalFixed32: json['optionalFixed32'] as int?,
-      optionalFixed64: json['optionalFixed64'] as int?,
+      optionalFixed64: json['optionalFixed64'] != null ? int.parse(json['optionalFixed64'].toString()) : null,
       optionalFloat: (json['optionalFloat'] as num?)?.toDouble(),
       optionalInt32: json['optionalInt32'] as int?,
-      optionalInt64: json['optionalInt64'] as int?,
+      optionalInt64: json['optionalInt64'] != null ? int.parse(json['optionalInt64'].toString()) : null,
       optionalMessage: json['optionalMessage'] != null ? Message.fromJson(json['optionalMessage'] as Map<String, dynamic>) : null,
       optionalSfixed32: json['optionalSfixed32'] as int?,
-      optionalSfixed64: json['optionalSfixed64'] as int?,
+      optionalSfixed64: json['optionalSfixed64'] != null ? int.parse(json['optionalSfixed64'].toString()) : null,
       optionalSint32: json['optionalSint32'] as int?,
-      optionalSint64: json['optionalSint64'] as int?,
+      optionalSint64: json['optionalSint64'] != null ? int.parse(json['optionalSint64'].toString()) : null,
       optionalString: json['optionalString'] as String?,
       optionalUint32: json['optionalUint32'] as int?,
-      optionalUint64: json['optionalUint64'] as int?,
+      optionalUint64: json['optionalUint64'] != null ? int.parse(json['optionalUint64'].toString()) : null,
       repeatedAny: (json['repeatedAny'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList(),
       repeatedBool: (json['repeatedBool'] as List<dynamic>?)?.map((e) => e as bool).toList(),
       repeatedBoolValue: (json['repeatedBoolValue'] as List<dynamic>?)?.map((e) => e as bool).toList(),
@@ -359,39 +359,39 @@ class Message {
       repeatedEnum: (json['repeatedEnum'] as List<dynamic>?)?.map((e) => Enum.fromString(e as String)).toList(),
       repeatedFieldMask: (json['repeatedFieldMask'] as List<dynamic>?)?.map((e) => e as String).toList(),
       repeatedFixed32: (json['repeatedFixed32'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      repeatedFixed64: (json['repeatedFixed64'] as List<dynamic>?)?.map((e) => e as int).toList(),
+      repeatedFixed64: (json['repeatedFixed64'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList(),
       repeatedFloat: (json['repeatedFloat'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList(),
       repeatedFloatValue: (json['repeatedFloatValue'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList(),
       repeatedInt32: (json['repeatedInt32'] as List<dynamic>?)?.map((e) => e as int).toList(),
       repeatedInt32Value: (json['repeatedInt32Value'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      repeatedInt64: (json['repeatedInt64'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      repeatedInt64Value: (json['repeatedInt64Value'] as List<dynamic>?)?.map((e) => e as int).toList(),
+      repeatedInt64: (json['repeatedInt64'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList(),
+      repeatedInt64Value: (json['repeatedInt64Value'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList(),
       repeatedListValue: (json['repeatedListValue'] as List<dynamic>?)?.map((e) => e as List<dynamic>).toList(),
       repeatedMessage: (json['repeatedMessage'] as List<dynamic>?)?.map((e) => Message.fromJson(e as Map<String, dynamic>)).toList(),
       repeatedNullValue: (json['repeatedNullValue'] as List<dynamic>?)?.map((e) => e as String).toList(),
       repeatedSfixed32: (json['repeatedSfixed32'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      repeatedSfixed64: (json['repeatedSfixed64'] as List<dynamic>?)?.map((e) => e as int).toList(),
+      repeatedSfixed64: (json['repeatedSfixed64'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList(),
       repeatedSint32: (json['repeatedSint32'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      repeatedSint64: (json['repeatedSint64'] as List<dynamic>?)?.map((e) => e as int).toList(),
+      repeatedSint64: (json['repeatedSint64'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList(),
       repeatedString: (json['repeatedString'] as List<dynamic>?)?.map((e) => e as String).toList(),
       repeatedStringValue: (json['repeatedStringValue'] as List<dynamic>?)?.map((e) => e as String).toList(),
       repeatedStruct: (json['repeatedStruct'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList(),
       repeatedUint32: (json['repeatedUint32'] as List<dynamic>?)?.map((e) => e as int).toList(),
       repeatedUint32Value: (json['repeatedUint32Value'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      repeatedUint64: (json['repeatedUint64'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      repeatedUint64Value: (json['repeatedUint64Value'] as List<dynamic>?)?.map((e) => e as int).toList(),
+      repeatedUint64: (json['repeatedUint64'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList(),
+      repeatedUint64Value: (json['repeatedUint64Value'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList(),
       repeatedValue: json['repeatedValue'] as List<dynamic>?,
       sfixed32: json['sfixed32'] as int?,
-      sfixed64: json['sfixed64'] as int?,
+      sfixed64: json['sfixed64'] != null ? int.parse(json['sfixed64'].toString()) : null,
       sint32: json['sint32'] as int?,
-      sint64: json['sint64'] as int?,
+      sint64: json['sint64'] != null ? int.parse(json['sint64'].toString()) : null,
       string: json['string'] as String?,
-      stringValue: json['stringValue'] as int?,
+      stringValue: json['stringValue'] != null ? int.parse(json['stringValue'].toString()) : null,
       struct: json['struct'] as Map<String, dynamic>?,
       uint32: json['uint32'] as int?,
       uint32Value: json['uint32Value'] as int?,
-      uint64: json['uint64'] as int?,
-      uint64Value: json['uint64Value'] as int?,
+      uint64: json['uint64'] != null ? int.parse(json['uint64'].toString()) : null,
+      uint64Value: json['uint64Value'] != null ? int.parse(json['uint64Value'].toString()) : null,
       value: json['value'],
     );
   }
@@ -410,13 +410,13 @@ class Message {
     if (enum_ != null) json['enum'] = enum_!.value;
     if (fieldMask != null) json['fieldMask'] = fieldMask;
     if (fixed32 != null) json['fixed32'] = fixed32;
-    if (fixed64 != null) json['fixed64'] = fixed64;
+    if (fixed64 != null) json['fixed64'] = fixed64.toString();
     if (float != null) json['float'] = float;
     if (floatValue != null) json['floatValue'] = floatValue;
     if (int32 != null) json['int32'] = int32;
     if (int32Value != null) json['int32Value'] = int32Value;
-    if (int64 != null) json['int64'] = int64;
-    if (int64Value != null) json['int64Value'] = int64Value;
+    if (int64 != null) json['int64'] = int64.toString();
+    if (int64Value != null) json['int64Value'] = int64Value.toString();
     if (listValue != null) json['listValue'] = listValue;
     if (mapStringMessage != null) json['mapStringMessage'] = mapStringMessage!.map((k, v) => MapEntry(k, v.toJson()));
     if (mapStringString != null) json['mapStringString'] = mapStringString;
@@ -431,18 +431,18 @@ class Message {
     if (optionalDouble != null) json['optionalDouble'] = optionalDouble;
     if (optionalEnum != null) json['optionalEnum'] = optionalEnum!.value;
     if (optionalFixed32 != null) json['optionalFixed32'] = optionalFixed32;
-    if (optionalFixed64 != null) json['optionalFixed64'] = optionalFixed64;
+    if (optionalFixed64 != null) json['optionalFixed64'] = optionalFixed64.toString();
     if (optionalFloat != null) json['optionalFloat'] = optionalFloat;
     if (optionalInt32 != null) json['optionalInt32'] = optionalInt32;
-    if (optionalInt64 != null) json['optionalInt64'] = optionalInt64;
+    if (optionalInt64 != null) json['optionalInt64'] = optionalInt64.toString();
     if (optionalMessage != null) json['optionalMessage'] = optionalMessage!.toJson();
     if (optionalSfixed32 != null) json['optionalSfixed32'] = optionalSfixed32;
-    if (optionalSfixed64 != null) json['optionalSfixed64'] = optionalSfixed64;
+    if (optionalSfixed64 != null) json['optionalSfixed64'] = optionalSfixed64.toString();
     if (optionalSint32 != null) json['optionalSint32'] = optionalSint32;
-    if (optionalSint64 != null) json['optionalSint64'] = optionalSint64;
+    if (optionalSint64 != null) json['optionalSint64'] = optionalSint64.toString();
     if (optionalString != null) json['optionalString'] = optionalString;
     if (optionalUint32 != null) json['optionalUint32'] = optionalUint32;
-    if (optionalUint64 != null) json['optionalUint64'] = optionalUint64;
+    if (optionalUint64 != null) json['optionalUint64'] = optionalUint64.toString();
     if (repeatedAny != null) json['repeatedAny'] = repeatedAny;
     if (repeatedBool != null) json['repeatedBool'] = repeatedBool;
     if (repeatedBoolValue != null) json['repeatedBoolValue'] = repeatedBoolValue;
@@ -455,39 +455,39 @@ class Message {
     if (repeatedEnum != null) json['repeatedEnum'] = repeatedEnum!.map((e) => e.value).toList();
     if (repeatedFieldMask != null) json['repeatedFieldMask'] = repeatedFieldMask;
     if (repeatedFixed32 != null) json['repeatedFixed32'] = repeatedFixed32;
-    if (repeatedFixed64 != null) json['repeatedFixed64'] = repeatedFixed64;
+    if (repeatedFixed64 != null) json['repeatedFixed64'] = repeatedFixed64!.map((e) => e.toString()).toList();
     if (repeatedFloat != null) json['repeatedFloat'] = repeatedFloat;
     if (repeatedFloatValue != null) json['repeatedFloatValue'] = repeatedFloatValue;
     if (repeatedInt32 != null) json['repeatedInt32'] = repeatedInt32;
     if (repeatedInt32Value != null) json['repeatedInt32Value'] = repeatedInt32Value;
-    if (repeatedInt64 != null) json['repeatedInt64'] = repeatedInt64;
-    if (repeatedInt64Value != null) json['repeatedInt64Value'] = repeatedInt64Value;
+    if (repeatedInt64 != null) json['repeatedInt64'] = repeatedInt64!.map((e) => e.toString()).toList();
+    if (repeatedInt64Value != null) json['repeatedInt64Value'] = repeatedInt64Value!.map((e) => e.toString()).toList();
     if (repeatedListValue != null) json['repeatedListValue'] = repeatedListValue;
     if (repeatedMessage != null) json['repeatedMessage'] = repeatedMessage!.map((e) => e.toJson()).toList();
     if (repeatedNullValue != null) json['repeatedNullValue'] = repeatedNullValue;
     if (repeatedSfixed32 != null) json['repeatedSfixed32'] = repeatedSfixed32;
-    if (repeatedSfixed64 != null) json['repeatedSfixed64'] = repeatedSfixed64;
+    if (repeatedSfixed64 != null) json['repeatedSfixed64'] = repeatedSfixed64!.map((e) => e.toString()).toList();
     if (repeatedSint32 != null) json['repeatedSint32'] = repeatedSint32;
-    if (repeatedSint64 != null) json['repeatedSint64'] = repeatedSint64;
+    if (repeatedSint64 != null) json['repeatedSint64'] = repeatedSint64!.map((e) => e.toString()).toList();
     if (repeatedString != null) json['repeatedString'] = repeatedString;
     if (repeatedStringValue != null) json['repeatedStringValue'] = repeatedStringValue;
     if (repeatedStruct != null) json['repeatedStruct'] = repeatedStruct;
     if (repeatedUint32 != null) json['repeatedUint32'] = repeatedUint32;
     if (repeatedUint32Value != null) json['repeatedUint32Value'] = repeatedUint32Value;
-    if (repeatedUint64 != null) json['repeatedUint64'] = repeatedUint64;
-    if (repeatedUint64Value != null) json['repeatedUint64Value'] = repeatedUint64Value;
+    if (repeatedUint64 != null) json['repeatedUint64'] = repeatedUint64!.map((e) => e.toString()).toList();
+    if (repeatedUint64Value != null) json['repeatedUint64Value'] = repeatedUint64Value!.map((e) => e.toString()).toList();
     if (repeatedValue != null) json['repeatedValue'] = repeatedValue;
     if (sfixed32 != null) json['sfixed32'] = sfixed32;
-    if (sfixed64 != null) json['sfixed64'] = sfixed64;
+    if (sfixed64 != null) json['sfixed64'] = sfixed64.toString();
     if (sint32 != null) json['sint32'] = sint32;
-    if (sint64 != null) json['sint64'] = sint64;
+    if (sint64 != null) json['sint64'] = sint64.toString();
     if (string != null) json['string'] = string;
-    if (stringValue != null) json['stringValue'] = stringValue;
+    if (stringValue != null) json['stringValue'] = stringValue.toString();
     if (struct != null) json['struct'] = struct;
     if (uint32 != null) json['uint32'] = uint32;
     if (uint32Value != null) json['uint32Value'] = uint32Value;
-    if (uint64 != null) json['uint64'] = uint64;
-    if (uint64Value != null) json['uint64Value'] = uint64Value;
+    if (uint64 != null) json['uint64'] = uint64.toString();
+    if (uint64Value != null) json['uint64Value'] = uint64Value.toString();
     if (value != null) json['value'] = value;
     return json;
   }

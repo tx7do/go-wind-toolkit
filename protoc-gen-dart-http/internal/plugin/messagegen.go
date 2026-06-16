@@ -148,6 +148,9 @@ func fromJsonExpr(pkg protoreflect.FullName, field protoreflect.FieldDescriptor)
 		case categoryEnum:
 			return "(json[" + jsonKey + "] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, " + valType.Name + ".fromString(v as String)))"
 		default:
+			if isInt64Field(field.MapValue()) {
+				return "(json[" + jsonKey + "] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, int.parse(v.toString())))"
+			}
 			if valType.Name == "double" {
 				return "(json[" + jsonKey + "] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, (v as num).toDouble()))"
 			}
@@ -166,6 +169,9 @@ func fromJsonExpr(pkg protoreflect.FullName, field protoreflect.FieldDescriptor)
 		case categoryEnum:
 			return "(json[" + jsonKey + "] as List<dynamic>?)?.map((e) => " + valType.Name + ".fromString(e as String)).toList()"
 		default:
+			if isInt64Field(field) {
+				return "(json[" + jsonKey + "] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList()"
+			}
 			if valType.Name == "double" {
 				return "(json[" + jsonKey + "] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList()"
 			}
@@ -184,6 +190,9 @@ func fromJsonExpr(pkg protoreflect.FullName, field protoreflect.FieldDescriptor)
 		case categoryEnum:
 			return "json[" + jsonKey + "] != null ? " + fieldType.Name + ".fromString(json[" + jsonKey + "] as String) : null"
 		default:
+			if isInt64Field(field) {
+				return "json[" + jsonKey + "] != null ? int.parse(json[" + jsonKey + "].toString()) : null"
+			}
 			if fieldType.Name == "double" {
 				return "(json[" + jsonKey + "] as num?)?.toDouble()"
 			}
@@ -213,6 +222,11 @@ func toJsonStmt(field protoreflect.FieldDescriptor) []string {
 				"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + "!.map((k, v) => MapEntry(k, v.value));",
 			}
 		default:
+			if isInt64Field(field.MapValue()) {
+				return []string{
+					"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + "!.map((k, v) => MapEntry(k, v.toString()));",
+				}
+			}
 			return []string{
 				"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + ";",
 			}
@@ -230,6 +244,11 @@ func toJsonStmt(field protoreflect.FieldDescriptor) []string {
 				"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + "!.map((e) => e.value).toList();",
 			}
 		default:
+			if isInt64Field(field) {
+				return []string{
+					"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + "!.map((e) => e.toString()).toList();",
+				}
+			}
 			return []string{
 				"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + ";",
 			}
@@ -247,6 +266,11 @@ func toJsonStmt(field protoreflect.FieldDescriptor) []string {
 				"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + "!.value;",
 			}
 		default:
+			if isInt64Field(field) {
+				return []string{
+					"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + ".toString();",
+				}
+			}
 			return []string{
 				"if (" + fname + " != null) json[" + jsonKey + "] = " + fname + ";",
 			}

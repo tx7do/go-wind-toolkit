@@ -95,6 +95,24 @@ func typeFromMessage(pkg protoreflect.FullName, message protoreflect.MessageDesc
 	return Type{IsNamed: true, Name: scopedDescriptorTypeName(pkg, message)}
 }
 
+// isInt64Field returns true if the field is a 64-bit integer type.
+// In proto3 JSON encoding, int64/uint64/sint64/fixed64/sfixed64 and the
+// well-known wrappers Int64Value/UInt64Value are represented as JSON strings
+// to avoid precision loss, so deserialization must accept both String and int.
+func isInt64Field(field protoreflect.FieldDescriptor) bool {
+	switch field.Kind() {
+	case protoreflect.Int64Kind, protoreflect.Uint64Kind,
+		protoreflect.Fixed64Kind, protoreflect.Sfixed64Kind,
+		protoreflect.Sint64Kind:
+		return true
+	case protoreflect.MessageKind:
+		if wkt, ok := WellKnownType(field.Message()); ok {
+			return wkt == WellKnownInt64Value || wkt == WellKnownUInt64Value
+		}
+	}
+	return false
+}
+
 // fieldCategoryOf returns the serialization category for a field.
 func fieldCategoryOf(field protoreflect.FieldDescriptor) fieldCategory {
 	if field.Kind() == protoreflect.MessageKind {
