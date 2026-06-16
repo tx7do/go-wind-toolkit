@@ -34,7 +34,7 @@ func (e enumGenerator) Generate(f *codegen.File) {
 	// enum declaration
 	f.P("enum ", enumName, " {")
 	for i, value := range values {
-		dartName := protoEnumToDartName(string(value.Name()))
+		dartName := dartFieldName(protoEnumToDartName(string(value.Name())))
 		protoName := string(value.Name())
 		if i == len(values)-1 {
 			f.P(t(1), dartName, "(", dartString(protoName), ");")

@@ -1135,7 +1135,7 @@ class SyntaxServiceClient {
       });
     }
     if (request.nested?.string != null) {
-      queryParams.add('nested.string=${Uri.encodeComponent(request.nested?.string!.toString())}');
+      queryParams.add('nested.string=${Uri.encodeComponent(request.nested!.string!.toString())}');
     }
     var uri = path;
     if (queryParams.isNotEmpty) {
@@ -1202,7 +1202,7 @@ class SyntaxServiceClient {
       });
     }
     if (request.nested?.string != null) {
-      queryParams.add('nested.string=${Uri.encodeComponent(request.nested?.string!.toString())}');
+      queryParams.add('nested.string=${Uri.encodeComponent(request.nested!.string!.toString())}');
     }
     var uri = path;
     if (queryParams.isNotEmpty) {

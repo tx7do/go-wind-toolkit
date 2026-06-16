@@ -159,13 +159,23 @@ func generateMethodBody(
 	input protoreflect.MessageDescriptor,
 	rule httprule.Rule,
 ) string {
+	isWKT := IsWellKnownType(input)
 	switch {
 	case rule.Body == "":
 		return "null"
 	case rule.Body == "*":
-		f.P(t(2), "final body = jsonEncode(request.toJson());")
+		if isWKT {
+			f.P(t(2), "final body = jsonEncode(request ?? {});")
+		} else {
+			f.P(t(2), "final body = jsonEncode(request.toJson());")
+		}
 		return "body"
 	default:
+		if isWKT {
+			// WKT inputs don't have named body fields; fall back to encoding the whole request.
+			f.P(t(2), "final body = jsonEncode(request ?? {});")
+			return "body"
+		}
 		bodyField := input.Fields().ByName(protoreflect.Name(rule.Body))
 		if bodyField == nil {
 			Warn("body field %q referenced in http rule not found in message %s; falling back to full request", rule.Body, input.FullName())
@@ -205,6 +215,9 @@ func hasQueryParams(input protoreflect.MessageDescriptor, rule httprule.Rule) bo
 		if len(path) == 0 || isPathCovered(path, pathCovered) || isBodyField(path, rule) {
 			return
 		}
+		if isMessageCollectionField(field) {
+			return
+		}
 		found = true
 	})
 	return found
@@ -230,24 +243,41 @@ func generateMethodQuery(
 		if len(path) == 0 || isPathCovered(path, pathCovered) || isBodyField(path, rule) {
 			return
 		}
+		if isMessageCollectionField(field) {
+			return
+		}
 		jp := jsonAccessPath(path, input)
+		jpNonNull := jsonNonNullAccessPath(path, input)
 		jsonName := jsonNameFromPath(path, input)
 		f.P(t(2), "if (request.", jp, " != null) {")
 		switch {
 		case field.IsMap():
-			f.P(t(3), "request.", jp, "!.forEach((key, value) {")
+			f.P(t(3), "request.", jpNonNull, "!.forEach((key, value) {")
 			f.P(t(4), "queryParams.add('", jsonName, "[key]=${Uri.encodeComponent(value.toString())}');")
 			f.P(t(3), "});")
 		case field.IsList():
-			f.P(t(3), "request.", jp, "!.forEach((x) {")
+			f.P(t(3), "request.", jpNonNull, "!.forEach((x) {")
 			f.P(t(4), "queryParams.add('", jsonName, "=${Uri.encodeComponent(x.toString())}');")
 			f.P(t(3), "});")
 		default:
-			f.P(t(3), "queryParams.add('", jsonName, "=${Uri.encodeComponent(request.", jp, "!.toString())}');")
+			f.P(t(3), "queryParams.add('", jsonName, "=${Uri.encodeComponent(request.", jpNonNull, "!.toString())}');")
 		}
 		f.P(t(2), "}")
 	})
 	return true
+}
+
+// isMessageCollectionField returns true if the field is a repeated or map field
+// whose element/value type is a message. Such fields cannot be meaningfully
+// serialized as query parameters.
+func isMessageCollectionField(field protoreflect.FieldDescriptor) bool {
+	if field.IsList() && field.Kind() == protoreflect.MessageKind {
+		return true
+	}
+	if field.IsMap() && field.MapValue().Kind() == protoreflect.MessageKind {
+		return true
+	}
+	return false
 }
 
 func isPathCovered(path httprule.FieldPath, covered map[string]struct{}) bool {
@@ -284,6 +314,15 @@ func dartAccessPath(path httprule.FieldPath, message protoreflect.MessageDescrip
 func jsonAccessPath(path httprule.FieldPath, message protoreflect.MessageDescriptor) string {
 	segs := jsonPathSegments(path, message)
 	return strings.Join(segs, "?.")
+}
+
+// jsonNonNullAccessPath returns the Dart access path with non-null assertions
+// (!.) for intermediate segments. Used inside if-null blocks where we've
+// already verified the value is non-null.
+// e.g. ["filterExpr", "type"] → "filterExpr!.type"
+func jsonNonNullAccessPath(path httprule.FieldPath, message protoreflect.MessageDescriptor) string {
+	segs := jsonPathSegments(path, message)
+	return strings.Join(segs, "!.")
 }
 
 // jsonNameFromPath returns the raw JSON field name path for URL query parameter keys.
