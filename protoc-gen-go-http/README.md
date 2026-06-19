@@ -125,6 +125,38 @@ func main() {
 }
 ```
 
+## 使用 Buf
+
+除了直接使用 `protoc`，你也可以使用 [Buf](https://buf.build) 来管理代码生成。Buf 提供了更简洁的配置方式和依赖管理能力。
+
+### 1. 配置 `buf.gen.yaml`
+
+在项目根目录下创建 `buf.gen.yaml` 文件：
+
+```yaml
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: .
+    opt: paths=source_relative
+  - local: protoc-gen-go-http
+    out: .
+    opt:
+      - paths=source_relative
+      - omitempty=false
+      - omitempty_prefix=/api/v1
+```
+
+> 如果不需要为无 HTTP 注解的方法生成默认路由，可省略 `omitempty` 与 `omitempty_prefix` 选项。
+
+### 2. 执行代码生成
+
+```bash
+buf generate
+```
+
+更多关于 Buf 的使用方法，请参考 [Buf 官方文档](https://buf.build/docs)。
+
 ## 命令行参数
 
 | 参数 | 默认值 | 说明 |

@@ -125,6 +125,38 @@ func main() {
 }
 ```
 
+## Using Buf
+
+In addition to using `protoc` directly, you can also use [Buf](https://buf.build) to manage code generation. Buf provides a cleaner configuration approach along with dependency management.
+
+### 1. Configure `buf.gen.yaml`
+
+Create a `buf.gen.yaml` file in the project root:
+
+```yaml
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: .
+    opt: paths=source_relative
+  - local: protoc-gen-go-http
+    out: .
+    opt:
+      - paths=source_relative
+      - omitempty=false
+      - omitempty_prefix=/api/v1
+```
+
+> If you do not need default routes for methods without HTTP annotations, the `omitempty` and `omitempty_prefix` options can be omitted.
+
+### 2. Run code generation
+
+```bash
+buf generate
+```
+
+For more information about using Buf, please refer to the [Buf documentation](https://buf.build/docs).
+
 ## Command-line Flags
 
 | Flag | Default | Description |

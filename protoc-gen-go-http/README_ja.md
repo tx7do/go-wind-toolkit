@@ -125,6 +125,38 @@ func main() {
 }
 ```
 
+## Buf の使用
+
+`protoc` を直接使用するほかに、[Buf](https://buf.build) を使ってコード生成を管理することもできます。Buf はよりシンプルな設定方法と依存関係管理を提供します。
+
+### 1. `buf.gen.yaml` の設定
+
+プロジェクトルートに `buf.gen.yaml` ファイルを作成します：
+
+```yaml
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: .
+    opt: paths=source_relative
+  - local: protoc-gen-go-http
+    out: .
+    opt:
+      - paths=source_relative
+      - omitempty=false
+      - omitempty_prefix=/api/v1
+```
+
+> HTTP アノテーションを持たないメソッドのデフォルトルートが不要な場合、`omitempty` と `omitempty_prefix` オプションは省略できます。
+
+### 2. コード生成の実行
+
+```bash
+buf generate
+```
+
+Buf の使用方法の詳細については、[Buf ドキュメント](https://buf.build/docs) を参照してください。
+
 ## コマンドライン引数
 
 | 引数 | デフォルト | 説明 |
