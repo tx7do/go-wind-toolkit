@@ -24,7 +24,16 @@ const (
 
 var methodSets = make(map[string]int)
 
-// generateFile generates a _http.pb.go file containing kratos errors definitions.
+// generateFile 读取 proto 文件并生成对应的 _http.pb.go 文件，其中包含 HTTP 服务端接口与路由处理代码。
+// 若文件无 Service，或 omitempty 为真且无 google.api.http 注解，则跳过生成。
+//
+// generateFile reads a proto file and produces the corresponding _http.pb.go file, containing
+// the HTTP server interface and route handler code. Generation is skipped when the file has no
+// service, or when omitempty is true and no google.api.http annotation is present.
+//
+// generateFile は proto ファイルを読み込み、HTTP サーバーインターフェースとルートハンドラコードを含む
+// _http.pb.go ファイルを生成します。ファイルにサービスがない場合、または omitempty が true で
+// google.api.http アノテーションが存在しない場合は生成をスキップします。
 func generateFile(gen *protogen.Plugin, file *protogen.File, omitempty bool, omitemptyPrefix string) *protogen.GeneratedFile {
 	if len(file.Services) == 0 || (omitempty && !hasHTTPRule(file.Services)) {
 		return nil
@@ -47,7 +56,13 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, omitempty bool, omi
 	return g
 }
 
-// generateFileContent generates the kratos errors definitions, excluding the package statement.
+// generateFileContent 生成除 package 声明以外的 HTTP 服务端代码内容（服务接口、注册函数与各方法处理器）。
+//
+// generateFileContent generates the HTTP server code content excluding the package statement
+// (server interface, registration function and per-method handlers).
+//
+// generateFileContent は package 宣言を除く HTTP サーバーコード（サーバーインターフェース、登録関数、
+// 各メソッドハンドラ）を生成します。
 func generateFileContent(gen *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile, omitempty bool, omitemptyPrefix string) {
 	if len(file.Services) == 0 {
 		return

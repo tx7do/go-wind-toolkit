@@ -222,7 +222,7 @@ func TestHTTPTemplateBindingAndHandler(t *testing.T) {
 			t.Fatalf("generated template missing %q in:\n%s", want, got)
 		}
 	}
-	// Should NOT contain kratos-specific code
+	// Should NOT contain any framework-specific helper code
 	for _, notWant := range []string{
 		"http.Context",
 		"ctx.Bind",
