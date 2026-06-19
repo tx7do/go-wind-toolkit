@@ -10,7 +10,7 @@ import (
 	reflect "reflect"
 	sync "sync"
 
-	_ "github.com/menta2k/protoc-gen-redact/v3/redact/v3"
+	_ "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"

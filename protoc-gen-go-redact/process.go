@@ -7,8 +7,6 @@ import (
 
 	pgs "github.com/lyft/protoc-gen-star/v2"
 	"google.golang.org/grpc/codes"
-
-	"github.com/menta2k/protoc-gen-redact/v3/redact/v3"
 )
 
 // hasRedactUsage returns true if the file (or any entity within it)
@@ -291,7 +289,7 @@ func (m *Module) Process(file pgs.File) {
 
 	// Custom helper needs the redact package
 	if data.NeedCustomHelper {
-		data.Imports["redact"] = "github.com/menta2k/protoc-gen-redact/v3/redact/v3"
+		data.Imports["redact"] = "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact"
 	}
 
 	// render file in the template

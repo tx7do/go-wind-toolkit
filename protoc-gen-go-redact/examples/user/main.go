@@ -12,8 +12,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/menta2k/protoc-gen-redact/v3/redact/v3"
-
 	"github.com/menta2k/protoc-gen-redact/v3/examples/user/pb"
 )
 

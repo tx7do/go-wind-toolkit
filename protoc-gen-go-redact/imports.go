@@ -21,18 +21,18 @@ func (m *Module) importPaths(file pgs.File) (path2Alias, alias2Path map[string]s
 
 	// Initialize standard imports
 	path2Alias = map[string]string{
-		"context":                                           "context",
-		"google.golang.org/grpc":                            "grpc",
-		"google.golang.org/grpc/codes":                      "codes",
-		"google.golang.org/grpc/status":                     "status",
-		"github.com/menta2k/protoc-gen-redact/v3/redact/v3": "redact",
+		"context":                       "context",
+		"google.golang.org/grpc":        "grpc",
+		"google.golang.org/grpc/codes":  "codes",
+		"google.golang.org/grpc/status": "status",
+		"github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact": "redact",
 	}
 	alias2Path = map[string]string{
 		"context": "context",
 		"grpc":    "google.golang.org/grpc",
 		"codes":   "google.golang.org/grpc/codes",
 		"status":  "google.golang.org/grpc/status",
-		"redact":  "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+		"redact":  "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 	}
 
 	self := m.ctx.ImportPath(file).String()

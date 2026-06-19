@@ -1,0 +1,463 @@
+protoc-gen-redact (PGR)
+=======================
+
+[中文](README.md) | **[English](README_EN.md)** | [日本語](README_JA.md)
+
+[![Build and Publish](https://github.com/menta2k/protoc-gen-redact/workflows/Build%20and%20Publish/badge.svg)](https://github.com/menta2k/protoc-gen-redact/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/menta2k/protoc-gen-redact/v3?dropcache)](https://goreportcard.com/report/github.com/menta2k/protoc-gen-redact/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/menta2k/protoc-gen-redact/v3.svg)](https://pkg.go.dev/github.com/menta2k/protoc-gen-redact/v3)
+[![License](https://img.shields.io/badge/license-apache2-mildgreen.svg)](./LICENSE)
+[![GitHub release](https://img.shields.io/github/release/menta2k/protoc-gen-redact.svg)](https://github.com/menta2k/protoc-gen-redact/releases)
+
+_protoc-gen-redact (PGR)_ is a protoc plugin for automatically redacting field values in gRPC responses on the server side.
+
+---
+
+## Table of Contents
+
+- [Attribution](#attribution)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Field-Level Redaction Rules](#field-level-redaction-rules)
+  - [Scalar Fields](#scalar-fields)
+  - [Message Fields](#message-fields)
+  - [Repeated / Map Fields](#repeated--map-fields)
+  - [Proto3 Optional Fields](#proto3-optional-fields)
+  - [Oneof Fields](#oneof-fields)
+  - [Regex Masking](#regex-masking)
+  - [Position-Based Mask](#position-based-mask)
+  - [Email Masking](#email-masking)
+  - [Truncate](#truncate)
+  - [Hash](#hash)
+  - [UUID Replacement](#uuid-replacement)
+  - [IP Address Masking](#ip-address-masking)
+  - [URL Masking](#url-masking)
+  - [Fixed-Length Mask](#fixed-length-mask)
+  - [Custom Redactor](#custom-redactor)
+  - [Conditional Redaction](#conditional-redaction)
+- [File-Level AutoDetect](#file-level-autodetect)
+- [Message-Level Options](#message-level-options)
+- [Service and Method Options](#service-and-method-options)
+- [Custom Templates](#custom-templates)
+- [Development and CI/CD](#development-and-cicd)
+- [Contributing](#contributing)
+- [License and Attribution](#license-and-attribution)
+
+---
+
+## Attribution
+
+This project is a derivative work based on the original [protoc-gen-redact](https://github.com/arrakis-digital/protoc-gen-redact) by **Shivam Rathore** (Copyright 2020).
+
+- **Original Author:** Shivam Rathore
+- **Original Project:** https://github.com/arrakis-digital/protoc-gen-redact
+- **Contributors:** John Castronuovo
+
+This fork includes the following enhancements:
+- Comprehensive error handling and validation system
+- Extensive test suite (374+ tests)
+- Oneof field support with type-safe switch statement generation
+- Proto3 optional field support with correct pointer semantics
+- Custom template file support
+- Integration tests with actual protoc compilation
+- 15 redaction rules (regex, mask, email, truncate, hash, UUID, IP, URL, fixed-length, custom, conditional, etc.)
+- File-level auto-detection (match fields by name automatically)
+- Conditional `.pb.redact.go` generation (only when redact annotations are used)
+
+All modifications are licensed under the Apache License 2.0, consistent with the original project.
+
+---
+
+## Quick Start
+
+Import the PGR extension and annotate messages or fields in your proto files:
+
+```protobuf
+syntax = "proto3";
+
+package user;
+
+import "redact/v3/redact.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/menta2k/protoc-gen-redact/v3/examples/user/pb;user";
+
+message User {
+    string username = 1;
+    string password = 2 [(redact.v3.value).string = "REDACTED"];
+    string email    = 3 [(redact.v3.value).email = { keep_local_first: 2 }];
+    string name     = 4;
+    Location home   = 5 [(redact.v3.value).message.apply = true];
+
+    message Location {
+        double lat = 1 [(redact.v3.value).double = 0.0];
+        double lng = 2 [(redact.v3.value).double = 0.0];
+    }
+}
+
+service Chat {
+    rpc GetUser(GetUserRequest) returns (User);
+    rpc GetUserInternal(GetUserRequest) returns (User) {
+        option (redact.v3.method_skip) = true;
+    }
+    rpc ListUsers (google.protobuf.Empty) returns (ListUsersResponse) {
+        option (redact.v3.internal_method) = true;
+    }
+}
+```
+
+---
+
+## Installation
+
+```bash
+go install github.com/menta2k/protoc-gen-redact/v3@latest
+```
+
+---
+
+## Field-Level Redaction Rules
+
+### Scalar Fields
+
+Annotate individual fields with custom redaction values:
+
+```protobuf
+string password = 1 [(redact.v3.value).string = "REDACTED"];
+int32  age      = 2 [(redact.v3.value).int32 = 0];
+bool   active   = 3 [(redact.v3.value).bool = false];
+bytes  sign     = 4 [(redact.v3.value).bytes = ""];
+double score    = 5 [(redact.v3.value).double = 0.0];
+```
+
+All proto scalar types are supported: `float`, `double`, `int32`, `int64`, `uint32`, `uint64`, `sint32`, `sint64`, `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `bool`, `string`, `bytes`, and `enum`.
+
+### Message Fields
+
+Control redaction of nested messages:
+
+```protobuf
+// Recursively apply redaction rules
+Profile profile = 1 [(redact.v3.value).message.apply = true];
+
+// Set the entire message to nil
+Settings settings = 2 [(redact.v3.value).message.nil = true];
+
+// Replace with an empty instance
+Metadata metadata = 3 [(redact.v3.value).message.empty = true];
+
+// Skip redaction entirely
+AuditLog log = 4 [(redact.v3.value).message.skip = true];
+```
+
+### Repeated / Map Fields
+
+```protobuf
+// Clear the collection
+map<string, string> attributes = 1 [(redact.v3.value).element.empty = true];
+
+// Apply default redaction to each element
+repeated Address addresses = 2 [(redact.v3.value).element.nested = true];
+
+// Apply custom rules to each item
+repeated int32 scores = 3 [(redact.v3.value).element.item.int32 = 0];
+repeated string phones = 4 [(redact.v3.value).element.item.mask = { keep_first: 3 keep_last: 4 }];
+```
+
+### Proto3 Optional Fields
+
+Proto3 `optional` fields use pointer semantics in Go. The generator handles this correctly:
+
+```protobuf
+message User {
+    optional string email = 1 [(redact.v3.value).string = "r*d@ct*d"];
+    optional int32 age    = 2 [(redact.v3.value).int32 = 0];
+}
+```
+
+Generated code correctly uses pointer assignment:
+```go
+tmp := "r*d@ct*d"
+x.Email = &tmp
+```
+
+### Oneof Fields
+
+The generator supports `oneof` groups with type-safe switch statements:
+
+```protobuf
+message OneofMessage {
+    oneof contact {
+        string email = 1 [(redact.v3.value).string = "r*d@ct*d"];
+        string phone = 2 [(redact.v3.value).mask = { keep_first: 3 keep_last: 4 }];
+    }
+}
+```
+
+Generated code:
+```go
+switch v := x.Contact.(type) {
+case *OneofMessage_Email:
+    v.Email = "r*d@ct*d"
+case *OneofMessage_Phone:
+    v.Phone = _redactMask(v.Phone, 3, 4, "*")
+}
+```
+
+### Regex Masking
+
+Use regular expressions for partial masking. Capture groups can be referenced via `${1}`, `${2}`:
+
+```protobuf
+string phone = 1 [(redact.v3.value).regex = {
+    pattern: "^(\\d{3})\\d{4}(\\d{4})$"
+    replacement: "${1}****${2}"
+}];
+// 13812345678 → 138****5678
+```
+
+### Position-Based Mask
+
+Keep the first N and last M characters, mask the rest:
+
+```protobuf
+string phone   = 1 [(redact.v3.value).mask = { keep_first: 3 keep_last: 4 }];
+// 13812345678 → 138****5678
+
+string id_card = 2 [(redact.v3.value).mask = { keep_first: 6 keep_last: 4 mask_char: "X" }];
+// 110101199001011234 → 110101XXXXXXXX1234
+```
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `keep_first` | Characters to keep at the start | 0 |
+| `keep_last` | Characters to keep at the end | 0 |
+| `mask_char` | Mask character | `"*"` |
+
+### Email Masking
+
+Split on `@`, mask the local part and/or domain separately:
+
+```protobuf
+string email  = 1 [(redact.v3.value).email = { keep_local_first: 2 }];
+// alice@example.com → al***@example.com
+
+string email2 = 2 [(redact.v3.value).email = { keep_local_first: 1 mask_domain: true }];
+// bob@test.com → ***@********
+```
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `keep_local_first` | Characters to keep at the start of local part | 0 |
+| `mask_domain` | Whether to mask the domain | `false` |
+| `mask_char` | Mask character | `"*"` |
+
+### Truncate
+
+Keep only the first N characters, optionally append a suffix:
+
+```protobuf
+string name = 1 [(redact.v3.value).truncate = { length: 1 suffix: "**" }];
+// Alexander → A**
+```
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `length` | Characters to keep | — |
+| `suffix` | Suffix appended after truncation | `"..."` |
+
+### Hash
+
+Replace the field value with its hex-encoded hash digest:
+
+```protobuf
+string token = 1 [(redact.v3.value).hash = { algo: SHA256 }];
+
+repeated string tokens = 2 [(redact.v3.value).element.item.hash = { algo: MD5 }];
+```
+
+| Algorithm | Output Length |
+|-----------|---------------|
+| `MD5` | 32 chars |
+| `SHA1` | 40 chars |
+| `SHA256` | 64 chars |
+
+### UUID Replacement
+
+Replace the field value with a deterministic UUID v5 (SHA-1 based). Same input always produces the same UUID:
+
+```protobuf
+string user_id = 1 [(redact.v3.value).uuid = {}];
+// alice@example.com → a2b4c6d8-e9f0-5a1b-8c2d-3e4f5a6b7c8d
+```
+
+### IP Address Masking
+
+Mask an IP address (IPv4 or IPv6), preserving the first N octets/hextets:
+
+```protobuf
+string client_ip = 1 [(redact.v3.value).ip = { keep_octets: 2 }];
+// 192.168.1.100 → 192.168.x.x
+```
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `keep_octets` | Leading octets (IPv4) or hextets (IPv6) to preserve | 2 |
+| `mask_char` | Mask character | `"x"` |
+
+### URL Masking
+
+Mask URL query parameter values:
+
+```protobuf
+string callback = 1 [(redact.v3.value).url = { mask_query: true }];
+// https://api.example.com/cb?token=secret → ...?token=******
+```
+
+### Fixed-Length Mask
+
+Replace the entire value with a mask of the same length:
+
+```protobuf
+string bank_account = 1 [(redact.v3.value).fixed_length = { char: "X" }];
+// 6225880123456789 → XXXXXXXXXXXXXXXX
+```
+
+### Custom Redactor
+
+Invoke a user-registered redactor function at runtime:
+
+```go
+import "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact"
+
+func init() {
+    redact.RegisterCustomRedactor("myRedactor", func(s string) string {
+        return "***" + s[len(s)-4:]
+    })
+}
+```
+
+```protobuf
+string ssn = 1 [(redact.v3.value).custom = { name: "myRedactor" }];
+// 123456789 → ***6789
+```
+
+### Conditional Redaction
+
+Apply inner rules only when an environment variable matches:
+
+```protobuf
+string phone = 1 [(redact.v3.value).condition = {
+    env_var: "APP_ENV"
+    env_val: "production"
+    rules: { mask: { keep_first: 3 keep_last: 4 } }
+}];
+// Only redacts when APP_ENV=production
+```
+
+---
+
+## File-Level AutoDetect
+
+Automatically apply redaction rules to fields matching name patterns:
+
+```protobuf
+option (redact.v3.auto_detect) = {
+    patterns: ["password", "token", "secret", "api_key"]
+    default_action: { mask: { keep_first: 2 keep_last: 2 } }
+};
+
+message LoginRequest {
+    string username = 1;  // No match — no redaction
+    string password = 2;  // Matches "password" → auto-redacted
+    string api_key  = 3;  // Matches "api_key" → auto-redacted
+}
+```
+
+Matching is case-insensitive substring matching. Fields with explicit rules are not overridden.
+
+---
+
+## Message-Level Options
+
+```protobuf
+message PublicData {
+    option (redact.v3.ignored) = true;
+    string data = 1;
+}
+
+message SensitiveData {
+    option (redact.v3.nil) = true;
+    string secret = 1;
+}
+
+message EmptyData {
+    option (redact.v3.empty) = true;
+    string field1 = 1;
+}
+```
+
+---
+
+## Service and Method Options
+
+```protobuf
+service MyService {
+    rpc GetUser(GetUserRequest) returns (User);
+
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse) {
+        option (redact.v3.method_skip) = true;
+    }
+
+    rpc AdminOperation(AdminRequest) returns (AdminResponse) {
+        option (redact.v3.internal_method) = true;
+    }
+}
+```
+
+Service-level options: `service_skip`, `internal_service`, `internal_service_code`, `internal_service_err_message`.
+
+---
+
+## Custom Templates
+
+```bash
+protoc \
+  --plugin=protoc-gen-redact=/path/to/protoc-gen-redact \
+  --redact_out=. \
+  --redact_opt=template_file=/path/to/your/template.tmpl \
+  your_proto_file.proto
+```
+
+See [examples/CUSTOM_TEMPLATE.md](examples/CUSTOM_TEMPLATE.md) for full documentation.
+
+---
+
+## Development and CI/CD
+
+```bash
+make help           # List all targets
+make fmt            # Format code
+make lint           # Run linters
+make test           # Run all tests
+make build          # Build the plugin
+make pre-commit     # fmt + lint + test-short
+make ci-full        # Full CI pipeline
+```
+
+---
+
+## Contributing
+
+Contributions are welcome! Please open a PR with your changes. Ensure all tests pass before submitting.
+
+---
+
+## License and Attribution
+
+Licensed under the [Apache License 2.0](./LICENSE).
+
+- Copyright 2020 Shivam Rathore (Original Work)
+- Copyright 2025 Contributors (Modifications)
+
+See [NOTICE](./NOTICE) for detailed attribution.

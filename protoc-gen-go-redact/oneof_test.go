@@ -411,7 +411,7 @@ func TestOneofCompleteScenario(t *testing.T) {
 		Imports: map[string]string{
 			"context": "context",
 			"grpc":    "google.golang.org/grpc",
-			"redact":  "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+			"redact":  "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 		},
 		Messages: []*MessageData{
 			{
@@ -678,7 +678,7 @@ func renderOneof(t *testing.T, tpl *template.Template, msg *MessageData) string 
 		Source:  "test.proto",
 		Package: "testpkg",
 		Imports: map[string]string{
-			"redact": "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+			"redact": "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 		},
 		Messages: []*MessageData{msg},
 	}
@@ -698,7 +698,7 @@ func TestOneofTemplateExecution(t *testing.T) {
 			Source:  "test.proto",
 			Package: "testpkg",
 			Imports: map[string]string{
-				"redact": "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+				"redact": "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 			},
 			Messages: []*MessageData{
 				{
@@ -768,7 +768,7 @@ func TestOneofTemplateExecution(t *testing.T) {
 			Source:  "test.proto",
 			Package: "testpkg",
 			Imports: map[string]string{
-				"redact": "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+				"redact": "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 			},
 			Messages: []*MessageData{
 				{
@@ -843,7 +843,7 @@ func TestOneofTemplateExecution(t *testing.T) {
 			Source:  "test.proto",
 			Package: "testpkg",
 			Imports: map[string]string{
-				"redact": "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+				"redact": "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 			},
 			Messages: []*MessageData{
 				{
@@ -905,7 +905,7 @@ func TestOneofTemplateExecution(t *testing.T) {
 			Source:  "test.proto",
 			Package: "testpkg",
 			Imports: map[string]string{
-				"redact": "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+				"redact": "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 			},
 			Messages: []*MessageData{
 				{
@@ -957,7 +957,7 @@ func TestOneofTemplateExecution(t *testing.T) {
 			Source:  "test.proto",
 			Package: "testpkg",
 			Imports: map[string]string{
-				"redact": "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+				"redact": "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 			},
 			Messages: []*MessageData{
 				{
@@ -1000,7 +1000,7 @@ func TestOneofTemplateExecution(t *testing.T) {
 			Source:  "test.proto",
 			Package: "testpkg",
 			Imports: map[string]string{
-				"redact": "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+				"redact": "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 			},
 			Messages: []*MessageData{
 				{
@@ -1067,7 +1067,7 @@ func TestOneofTemplateExecution(t *testing.T) {
 			Source:  "test.proto",
 			Package: "testpkg",
 			Imports: map[string]string{
-				"redact": "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+				"redact": "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 			},
 			Messages: []*MessageData{
 				{

@@ -9,7 +9,7 @@ import (
 	sha1 "crypto/sha1"
 	sha256 "crypto/sha256"
 	fmt "fmt"
-	redact "github.com/menta2k/protoc-gen-redact/v3/redact/v3"
+	redact "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"

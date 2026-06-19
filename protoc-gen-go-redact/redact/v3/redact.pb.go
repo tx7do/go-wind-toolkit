@@ -1731,7 +1731,7 @@ const file_redact_v3_redact_proto_rawDesc = "" +
 	"\x03nil\x12\x1f.google.protobuf.MessageOptions\x18\xeb\xa6\x03 \x01(\bR\x03nil:7\n" +
 	"\x05empty\x12\x1f.google.protobuf.MessageOptions\x18\xec\xa6\x03 \x01(\bR\x05empty:;\n" +
 	"\aignored\x12\x1f.google.protobuf.MessageOptions\x18\xed\xa6\x03 \x01(\bR\aignored:L\n" +
-	"\x05value\x12\x1d.google.protobuf.FieldOptions\x18\xeb\xa6\x03 \x01(\v2\x15.redact.v3.FieldRulesR\x05valueB:Z8github.com/menta2k/protoc-gen-redact/v3/redact/v3;redactb\x06proto3"
+	"\x05value\x12\x1d.google.protobuf.FieldOptions\x18\xeb\xa6\x03 \x01(\v2\x15.redact.v3.FieldRulesR\x05valueB:Z8github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact;redactb\x06proto3"
 
 var (
 	file_redact_v3_redact_proto_rawDescOnce sync.Once

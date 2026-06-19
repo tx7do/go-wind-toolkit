@@ -5,8 +5,6 @@ import (
 	"strconv"
 
 	pgs "github.com/lyft/protoc-gen-star/v2"
-
-	"github.com/menta2k/protoc-gen-redact/v3/redact/v3"
 )
 
 // processFields extracts each fields information. ownerName is the enclosing

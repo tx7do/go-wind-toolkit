@@ -6,8 +6,6 @@ import (
 	pgs "github.com/lyft/protoc-gen-star/v2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
-
-	"github.com/menta2k/protoc-gen-redact/v3/redact/v3"
 )
 
 // TestErrorContext tests the ErrorContext error type

@@ -83,7 +83,7 @@ func TestStandardImports(t *testing.T) {
 		"grpc":    "google.golang.org/grpc",
 		"codes":   "google.golang.org/grpc/codes",
 		"status":  "google.golang.org/grpc/status",
-		"redact":  "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+		"redact":  "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 	}
 
 	// Verify all standard imports are present
@@ -403,7 +403,7 @@ func TestEmptyImportHandling(t *testing.T) {
 	minimalImports := map[string]string{
 		"context": "context",
 		"grpc":    "google.golang.org/grpc",
-		"redact":  "github.com/menta2k/protoc-gen-redact/v3/redact/v3",
+		"redact":  "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact",
 	}
 
 	assert.NotEmpty(t, minimalImports, "Should always have at least standard imports")

@@ -6,8 +6,6 @@ import (
 	pgs "github.com/lyft/protoc-gen-star/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/menta2k/protoc-gen-redact/v3/redact/v3"
 )
 
 // TestRedactionDefaults tests the default redaction values for various protobuf types

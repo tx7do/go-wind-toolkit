@@ -1,34 +1,76 @@
 protoc-gen-redact (PGR)
 =======================
+
+**[中文](README.md)** | [English](README_EN.md) | [日本語](README_JA.md)
+
 [![Build and Publish](https://github.com/menta2k/protoc-gen-redact/workflows/Build%20and%20Publish/badge.svg)](https://github.com/menta2k/protoc-gen-redact/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/menta2k/protoc-gen-redact/v3?dropcache)](https://goreportcard.com/report/github.com/menta2k/protoc-gen-redact/v3)
 [![Go Reference](https://pkg.go.dev/badge/github.com/menta2k/protoc-gen-redact/v3.svg)](https://pkg.go.dev/github.com/menta2k/protoc-gen-redact/v3)
 [![License](https://img.shields.io/badge/license-apache2-mildgreen.svg)](./LICENSE)
 [![GitHub release](https://img.shields.io/github/release/menta2k/protoc-gen-redact.svg)](https://github.com/menta2k/protoc-gen-redact/releases)
 
-_protoc-gen-redact (PGR)_ is a protoc plugin to redact field values in GRPC client calls from the server. This plugin
-adds support to protoc-generated code to redact certain fields in the GRPC calls.
+_protoc-gen-redact (PGR)_ 是一个 protoc 插件，用于在服务端对 gRPC 调用中的字段值进行自动脱敏。
 
-## Attribution
+---
 
-This project is a derivative work based on the original [protoc-gen-redact](https://github.com/arrakis-digital/protoc-gen-redact) by **Shivam Rathore** (Copyright 2020).
+## 目录
 
-**Original Author:** Shivam Rathore
-**Original Project:** https://github.com/arrakis-digital/protoc-gen-redact
-**Contributors:** John Castronuovo
+- [归属说明](#归属说明)
+- [快速开始](#快速开始)
+- [安装](#安装)
+- [字段级脱敏规则](#字段级脱敏规则)
+  - [标量字段](#标量字段)
+  - [消息字段](#消息字段)
+  - [Repeated / Map 字段](#repeated--map-字段)
+  - [Proto3 Optional 字段](#proto3-optional-字段)
+  - [Oneof 字段](#oneof-字段)
+  - [正则脱敏 (Regex)](#正则脱敏-regex)
+  - [位置遮罩 (Mask)](#位置遮罩-mask)
+  - [邮箱脱敏 (Email)](#邮箱脱敏-email)
+  - [截断脱敏 (Truncate)](#截断脱敏-truncate)
+  - [哈希脱敏 (Hash)](#哈希脱敏-hash)
+  - [UUID 替换](#uuid-替换)
+  - [IP 地址脱敏](#ip-地址脱敏)
+  - [URL 脱敏](#url-脱敏)
+  - [等长掩码 (FixedLength)](#等长掩码-fixedlength)
+  - [自定义脱敏 (Custom)](#自定义脱敏-custom)
+  - [条件脱敏 (Condition)](#条件脱敏-condition)
+- [文件级自动检测 (AutoDetect)](#文件级自动检测-autodetect)
+- [消息级选项](#消息级选项)
+- [服务与方法级选项](#服务与方法级选项)
+- [自定义模板](#自定义模板)
+- [开发与 CI/CD](#开发与-cicd)
+- [贡献指南](#贡献指南)
+- [许可证与归属](#许可证与归属)
 
-This fork includes enhancements and modifications including:
-- Comprehensive error handling and validation
-- Extensive test suite (374+ tests)
-- Oneof field support with type-safe switch statement generation
-- Support for proto3 optional fields with correct pointer semantics
-- Custom template file support for code generation
-- Integration tests with actual protoc compilation
-- Improved documentation and examples
+---
 
-All modifications are licensed under the Apache License 2.0, consistent with the original project.
+## 归属说明
 
-Developers only need to import the PGR extension and annotate the messages or fields in their proto files to redact:
+本项目基于 **Shivam Rathore**（Copyright 2020）的原始项目 [protoc-gen-redact](https://github.com/arrakis-digital/protoc-gen-redact) 衍生而来。
+
+- **原作者：** Shivam Rathore
+- **原始项目：** https://github.com/arrakis-digital/protoc-gen-redact
+- **贡献者：** John Castronuovo
+
+本分支包含以下增强和改进：
+- 全面的错误处理和验证系统
+- 完整的测试套件（374+ 测试用例）
+- Oneof 字段支持（类型安全的 switch 语句生成）
+- Proto3 optional 字段支持（正确的指针语义）
+- 自定义模板文件支持
+- 集成测试（真实 protoc 编译）
+- 15 种脱敏规则（正则、遮罩、邮箱、截断、哈希、UUID、IP、URL、等长掩码、自定义、条件等）
+- 文件级自动检测（按字段名自动匹配脱敏规则）
+- 按需条件生成 `.pb.redact.go` 文件
+
+所有修改遵循 Apache License 2.0 许可证，与原始项目保持一致。
+
+---
+
+## 快速开始
+
+只需导入 PGR 扩展并在 proto 文件中为消息或字段添加注解即可：
 
 ```protobuf
 syntax = "proto3";
@@ -43,9 +85,9 @@ option go_package = "github.com/menta2k/protoc-gen-redact/v3/examples/user/pb;us
 message User {
     string username = 1;
     string password = 2 [(redact.v3.value).string = "REDACTED"];
-    string email = 3 [(redact.v3.value).string = "r*d@ct*d"];
-    string name = 4;
-    Location home = 5 [(redact.v3.value).message.apply = true];
+    string email    = 3 [(redact.v3.value).email = { keep_local_first: 2 }];
+    string name     = 4;
+    Location home   = 5 [(redact.v3.value).message.apply = true];
 
     message Location {
         double lat = 1 [(redact.v3.value).double = 0.0];
@@ -64,173 +106,390 @@ service Chat {
 }
 ```
 
-## Field-Level Redaction
+---
 
-### Scalar Fields
+## 安装
 
-Annotate individual fields with custom redaction values:
+```bash
+go install github.com/menta2k/protoc-gen-redact/v3@latest
+```
+
+---
+
+## 字段级脱敏规则
+
+### 标量字段
+
+为各字段指定自定义脱敏值：
 
 ```protobuf
 string password = 1 [(redact.v3.value).string = "REDACTED"];
-int32 age = 2 [(redact.v3.value).int32 = 0];
-bool is_active = 3 [(redact.v3.value).bool = false];
-bytes signature = 4 [(redact.v3.value).bytes = ""];
-double score = 5 [(redact.v3.value).double = 0.0];
+int32  age      = 2 [(redact.v3.value).int32 = 0];
+bool   active   = 3 [(redact.v3.value).bool = false];
+bytes  sign     = 4 [(redact.v3.value).bytes = ""];
+double score    = 5 [(redact.v3.value).double = 0.0];
 ```
 
-All proto scalar types are supported: `float`, `double`, `int32`, `int64`, `uint32`, `uint64`, `sint32`, `sint64`, `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `bool`, `string`, `bytes`, and `enum`.
+支持所有 proto 标量类型：`float`、`double`、`int32`、`int64`、`uint32`、`uint64`、`sint32`、`sint64`、`fixed32`、`fixed64`、`sfixed32`、`sfixed64`、`bool`、`string`、`bytes`、`enum`。
 
-### Message Fields
+### 消息字段
 
-Control redaction of nested messages:
+控制嵌套消息的脱敏行为：
 
 ```protobuf
-// Recursively apply redaction rules to nested message fields
+// 递归应用脱敏规则到嵌套消息的字段
 Profile profile = 1 [(redact.v3.value).message.apply = true];
 
-// Set the entire message to nil
+// 将整个消息设为 nil
 Settings settings = 2 [(redact.v3.value).message.nil = true];
 
-// Replace with an empty instance
+// 替换为空实例
 Metadata metadata = 3 [(redact.v3.value).message.empty = true];
 
-// Skip redaction entirely for this field
+// 完全跳过该字段的脱敏
 AuditLog log = 4 [(redact.v3.value).message.skip = true];
 ```
 
-### Repeated and Map Fields
+### Repeated / Map 字段
 
 ```protobuf
-// Clear the collection to empty
+// 清空集合
 map<string, string> attributes = 1 [(redact.v3.value).element.empty = true];
 
-// Apply default redaction to each element
+// 对每个元素应用默认脱敏
 repeated Address addresses = 2 [(redact.v3.value).element.nested = true];
 
-// Apply custom redaction to each item
+// 对每个元素应用自定义脱敏规则
 repeated int32 scores = 3 [(redact.v3.value).element.item.int32 = 0];
+repeated string phones = 4 [(redact.v3.value).element.item.mask = { keep_first: 3 keep_last: 4 }];
 ```
 
-## Proto3 Optional Fields
+### Proto3 Optional 字段
 
-Proto3 `optional` fields use pointer semantics in Go. The generator handles this correctly by creating temporary variables and assigning pointers:
+Proto3 `optional` 字段在 Go 中使用指针语义。生成器会正确处理指针赋值：
 
 ```protobuf
 message User {
     optional string email = 1 [(redact.v3.value).string = "r*d@ct*d"];
-    optional int32 age = 2 [(redact.v3.value).int32 = 0];
-    optional bool is_active = 3 [(redact.v3.value).bool = false];
-    optional bytes signature = 4 [(redact.v3.value).bytes = ""];
-    optional Profile profile = 5 [(redact.v3.value).message.nil = true];
+    optional int32 age    = 2 [(redact.v3.value).int32 = 0];
 }
 ```
 
-Generated code correctly uses pointer assignment:
+生成的代码正确使用指针赋值：
 ```go
 tmp := "r*d@ct*d"
 x.Email = &tmp
 ```
 
-## Oneof Fields
+### Oneof 字段
 
-The generator supports `oneof` groups with type-safe switch statements. Each oneof variant is matched by its Go wrapper type, and only fields with redaction annotations generate case branches:
+生成器支持 `oneof` 分组，生成类型安全的 switch 语句。只有标注了脱敏的字段才会生成对应的 case 分支：
 
 ```protobuf
 message OneofMessage {
-    string id = 1;
-
-    // All fields redacted
     oneof contact {
-        string email = 2 [(redact.v3.value).string = "r*d@ct*d"];
-        string phone = 3 [(redact.v3.value).string = "XXX-XXX-XXXX"];
-        int32 phone_code = 4 [(redact.v3.value).int32 = 0];
-    }
-
-    // Message fields in oneofs
-    oneof payload {
-        Profile user_profile = 5 [(redact.v3.value).message.apply = true];
-        Settings user_settings = 6 [(redact.v3.value).message.nil = true];
-        string raw_data = 7 [(redact.v3.value).string = "REDACTED"];
-    }
-
-    // Mixed: some fields redacted, some not
-    oneof identifier {
-        string username = 8 [(redact.v3.value).string = "REDACTED"];
-        string public_id = 9;  // not redacted
-        int64 internal_id = 10 [(redact.v3.value).int64 = 0];
+        string email = 1 [(redact.v3.value).string = "r*d@ct*d"];
+        string phone = 2 [(redact.v3.value).mask = { keep_first: 3 keep_last: 4 }];
     }
 }
 ```
 
-Generated code for a oneof group:
+生成的代码：
 ```go
-// Redacting oneof: Contact
 switch v := x.Contact.(type) {
 case *OneofMessage_Email:
     v.Email = "r*d@ct*d"
 case *OneofMessage_Phone:
-    v.Phone = "XXX-XXX-XXXX"
-case *OneofMessage_PhoneCode:
-    v.PhoneCode = 0
+    v.Phone = _redactMask(v.Phone, 3, 4, "*")
 }
 ```
 
-If a oneof group has no redacted fields, the switch statement is omitted entirely to avoid compilation errors.
+### 正则脱敏 (Regex)
 
-## Message-Level Options
-
-Control redaction behavior for entire messages:
+使用正则表达式进行部分掩码，捕获组可通过 `${1}`、`${2}` 引用：
 
 ```protobuf
-// Skip all redaction for this message
+string phone = 1 [(redact.v3.value).regex = {
+    pattern: "^(\\d{3})\\d{4}(\\d{4})$"
+    replacement: "${1}****${2}"
+}];
+// 13812345678 → 138****5678
+
+repeated string id_cards = 2 [(redact.v3.value).element.item.regex = {
+    pattern: "(\\d{4})\\d{10}(\\d{4})"
+    replacement: "${1}**********${2}"
+}];
+```
+
+### 位置遮罩 (Mask)
+
+保留首尾指定数量的字符，中间用掩码字符替换：
+
+```protobuf
+string phone    = 1 [(redact.v3.value).mask = { keep_first: 3 keep_last: 4 }];
+// 13812345678 → 138****5678
+
+string id_card  = 2 [(redact.v3.value).mask = { keep_first: 6 keep_last: 4 mask_char: "X" }];
+// 110101199001011234 → 110101XXXXXXXX1234
+
+repeated string emails = 3 [(redact.v3.value).element.item.mask = { keep_first: 2 keep_last: 0 }];
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `keep_first` | 保留开头的字符数 | 0 |
+| `keep_last` | 保留结尾的字符数 | 0 |
+| `mask_char` | 掩码字符 | `"*"` |
+
+### 邮箱脱敏 (Email)
+
+按 `@` 分割，分别对本地部分和域名进行掩码：
+
+```protobuf
+string email  = 1 [(redact.v3.value).email = { keep_local_first: 2 }];
+// alice@example.com → al***@example.com
+
+string email2 = 2 [(redact.v3.value).email = { keep_local_first: 1 mask_domain: true }];
+// bob@test.com → ***@********
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `keep_local_first` | 保留 `@` 前面开头的字符数 | 0 |
+| `mask_domain` | 是否掩码域名部分 | `false` |
+| `mask_char` | 掩码字符 | `"*"` |
+
+### 截断脱敏 (Truncate)
+
+只保留前 N 个字符，后接可选后缀：
+
+```protobuf
+string name = 1 [(redact.v3.value).truncate = { length: 1 suffix: "**" }];
+// Alexander → A**
+
+string bio  = 2 [(redact.v3.value).truncate = { length: 2 }];
+// HelloWorld → He...
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `length` | 保留的字符数 | — |
+| `suffix` | 截断后追加的后缀 | `"..."` |
+
+### 哈希脱敏 (Hash)
+
+将字段值替换为单向哈希摘要（十六进制）：
+
+```protobuf
+string token   = 1 [(redact.v3.value).hash = { algo: SHA256 }];
+// secret123 → 5f2c...（64 位十六进制）
+
+string session = 2 [(redact.v3.value).hash = { algo: MD5 }];
+
+repeated string tokens = 3 [(redact.v3.value).element.item.hash = { algo: SHA1 }];
+```
+
+| 算法 | 输出长度 |
+|------|----------|
+| `MD5` | 32 字符 |
+| `SHA1` | 40 字符 |
+| `SHA256` | 64 字符 |
+
+### UUID 替换
+
+将字段值替换为确定性 UUID v5（基于 SHA-1 哈希生成）。相同输入始终产生相同 UUID，适合匿名化场景：
+
+```protobuf
+string user_id   = 1 [(redact.v3.value).uuid = {}];
+// alice@example.com → a2b4c6d8-e9f0-5a1b-8c2d-3e4f5a6b7c8d
+
+repeated string ids = 2 [(redact.v3.value).element.item.uuid = {}];
+```
+
+### IP 地址脱敏
+
+掩码 IP 地址（支持 IPv4 和 IPv6），保留前 N 个段：
+
+```protobuf
+string client_ip = 1 [(redact.v3.value).ip = { keep_octets: 2 }];
+// 192.168.1.100 → 192.168.x.x
+
+string server_ip = 2 [(redact.v3.value).ip = { keep_octets: 3 mask_char: "0" }];
+// 10.0.0.1 → 10.0.0.0
+
+string ipv6_addr = 3 [(redact.v3.value).ip = { keep_octets: 4 }];
+// 2001:db8::1 → 2001:db8:0:0:x:x:x:x
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `keep_octets` | 保留的前段数（IPv4 为 octet，IPv6 为 hextet） | 2 |
+| `mask_char` | 掩码字符 | `"x"` |
+
+### URL 脱敏
+
+掩码 URL 的查询参数值：
+
+```protobuf
+string callback = 1 [(redact.v3.value).url = { mask_query: true }];
+// https://api.example.com/cb?token=secret123 → https://api.example.com/cb?token=*********
+
+string link = 2 [(redact.v3.value).url = { mask_query: true mask_char: "#" }];
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `mask_query` | 是否掩码所有查询参数值 | — |
+| `mask_char` | 掩码字符 | `"*"` |
+
+### 等长掩码 (FixedLength)
+
+用等长掩码替换整个值：
+
+```protobuf
+string bank_account = 1 [(redact.v3.value).fixed_length = { char: "X" }];
+// 6225880123456789 → XXXXXXXXXXXXXXXX
+
+string card = 2 [(redact.v3.value).fixed_length = { char: "#" }];
+// 1234 → ####
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `char` | 掩码字符 | `"X"` |
+
+### 自定义脱敏 (Custom)
+
+调用运行时注册的自定义脱敏函数。通过 `redact.RegisterCustomRedactor` 注册：
+
+```go
+import "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact"
+
+func init() {
+    redact.RegisterCustomRedactor("myRedactor", func(s string) string {
+        // 自定义脱敏逻辑
+        return "***" + s[len(s)-4:]
+    })
+}
+```
+
+```protobuf
+string ssn = 1 [(redact.v3.value).custom = { name: "myRedactor" }];
+// 123456789 → ***6789
+```
+
+### 条件脱敏 (Condition)
+
+根据环境变量决定是否执行脱敏，内部可包裹任意其他规则：
+
+```protobuf
+string phone = 1 [(redact.v3.value).condition = {
+    env_var: "APP_ENV"
+    env_val: "production"
+    rules: { mask: { keep_first: 3 keep_last: 4 } }
+}];
+// APP_ENV=production 时脱敏，否则不处理
+
+string debug_data = 2 [(redact.v3.value).condition = {
+    env_var: "DEBUG"
+    env_val: ""
+    rules: { hash: { algo: SHA256 } }
+}];
+// DEBUG 变量存在（任意非空值）时执行哈希脱敏
+```
+
+| 参数 | 说明 |
+|------|------|
+| `env_var` | 环境变量名 |
+| `env_val` | 期望值（为空时检查变量是否存在且非空） |
+| `rules` | 条件满足时应用的脱敏规则 |
+
+---
+
+## 文件级自动检测 (AutoDetect)
+
+通过文件级选项，按字段名自动匹配并应用脱敏规则，无需逐个标注：
+
+```protobuf
+syntax = "proto3";
+
+import "redact/v3/redact.proto";
+
+option (redact.v3.auto_detect) = {
+    patterns: ["password", "token", "secret", "api_key"]
+    default_action: { mask: { keep_first: 2 keep_last: 2 } }
+};
+
+message LoginRequest {
+    string username    = 1;  // 不匹配，不脱敏
+    string password    = 2;  // 匹配 "password" → 自动脱敏
+    string api_key     = 3;  // 匹配 "api_key" → 自动脱敏
+    string session_id  = 4;  // 不匹配，不脱敏
+}
+```
+
+已显式标注脱敏规则的字段不会被 AutoDetect 覆盖。匹配为大小写不敏感的子串匹配。
+
+---
+
+## 消息级选项
+
+控制整个消息的脱敏行为：
+
+```protobuf
+// 跳过该消息的所有脱敏
 message PublicData {
     option (redact.v3.ignored) = true;
     string data = 1;
 }
 
-// Always set to nil
+// 始终设为 nil
 message SensitiveData {
     option (redact.v3.nil) = true;
     string secret = 1;
 }
 
-// Always replace with empty instance
+// 替换为空实例
 message EmptyData {
     option (redact.v3.empty) = true;
     string field1 = 1;
 }
 ```
 
-## Service and Method Options
+---
 
-Control redaction at the service and method level:
+## 服务与方法级选项
+
+在服务和方法级别控制脱敏行为：
 
 ```protobuf
 service MyService {
-    // Normal RPC with response redaction
+    // 普通 RPC，自动脱敏响应
     rpc GetUser(GetUserRequest) returns (User);
 
-    // Skip redaction for this method
+    // 跳过该方法的脱敏
     rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse) {
         option (redact.v3.method_skip) = true;
     }
 
-    // Mark method as internal (returns PermissionDenied)
+    // 标记为内部方法（客户端收到 PermissionDenied 错误）
     rpc AdminOperation(AdminRequest) returns (AdminResponse) {
         option (redact.v3.internal_method) = true;
     }
 }
 ```
 
-## Advanced Features
+也可在服务级别设置：
+- `service_skip`：跳过整个服务的脱敏
+- `internal_service`：标记整个服务为内部服务
+- `internal_service_code`：自定义错误码（默认 PermissionDenied）
+- `internal_service_err_message`：自定义错误消息（支持 `%service%` 和 `%method%` 占位符）
 
-### Custom Code Generation Templates
+---
 
-protoc-gen-redact supports using custom templates for code generation, allowing you to modify the generated code to match your specific requirements.
+## 自定义模板
 
-#### Using a Custom Template
-
-To use a custom template, pass the `template_file` parameter to protoc via `--redact_opt`:
+PGR 支持使用自定义模板进行代码生成：
 
 ```bash
 protoc \
@@ -240,75 +499,51 @@ protoc \
   your_proto_file.proto
 ```
 
-#### Example Template
+示例模板见 [examples/custom-template.tmpl](examples/custom-template.tmpl)。
 
-An example template is provided in `examples/custom-template.tmpl`. You can use this as a starting point for your customizations:
+完整文档请参考 [examples/CUSTOM_TEMPLATE.md](examples/CUSTOM_TEMPLATE.md)。
 
-```bash
-protoc \
-  --plugin=protoc-gen-redact=./protoc-gen-redact \
-  --redact_out=. \
-  --redact_opt=template_file=./examples/custom-template.tmpl \
-  examples/user/pb/user.proto
-```
+---
 
-#### Documentation
+## 开发与 CI/CD
 
-For complete documentation on custom templates including:
-- Template structure and data types
-- Available template functions
-- Use cases and examples
-- Troubleshooting guide
-
-See [examples/CUSTOM_TEMPLATE.md](examples/CUSTOM_TEMPLATE.md)
-
-## Development and CI/CD
-
-This project includes a comprehensive build system and CI/CD pipeline:
-
-### Build System (Makefile)
-
-The project uses Make for build automation with 50+ targets organized into categories:
+本项目包含完整的构建系统和 CI/CD 流水线：
 
 ```bash
-# See all available targets
+# 查看所有可用目标
 make help
 
-# Development workflow
-make fmt              # Format code
-make lint             # Run all linters
-make test             # Run all tests
-make test-short       # Quick tests during development
-make build            # Build the plugin
+# 开发工作流
+make fmt              # 格式化代码
+make lint             # 运行所有 linter
+make test             # 运行所有测试
+make test-short       # 快速测试
+make build            # 构建插件
 
-# Before committing
-make pre-commit       # Run fmt + lint + test-short
+# 提交前检查
+make pre-commit       # fmt + lint + test-short
 
-# Full CI pipeline
-make ci-full          # Full CI with coverage and buf checks
+# 完整 CI 流水线
+make ci-full          # 完整 CI 含覆盖率和 buf 检查
 ```
 
+---
 
+## 贡献指南
 
-Request for Contribution
-------------------------
-Contributors are more than welcome and much appreciated. Please feel free to open a PR to improve anything you don't
-like, or would like to add.
+欢迎提交 Pull Request！请在特定分支中进行修改，并向 master 分支发起 PR。
 
-Please make your changes in a specific branch and create a pull request into master! If you can, please make sure all
-the changes work properly and does not affect the existing functioning.
+请确保所有更改正常工作，且不影响现有功能。即使是最小的贡献也非常欢迎。
 
-No PR is too small! Even the smallest effort is countable.
+---
 
-License and Attribution
------------------------
+## 许可证与归属
 
-This project is licensed under the [Apache License 2.0](./LICENSE).
+本项目基于 [Apache License 2.0](./LICENSE) 许可证。
 
-Copyright 2020 Shivam Rathore (Original Work)
-Copyright 2025 Contributors (Modifications)
+- Copyright 2020 Shivam Rathore（原始工作）
+- Copyright 2025 Contributors（修改）
 
-This is a derivative work based on the original protoc-gen-redact project. All attribution notices, copyright statements, and license terms from the original work have been retained in accordance with the Apache License 2.0.
+本项目是基于原始 protoc-gen-redact 项目的衍生作品。所有归属声明、版权声明和许可证条款均已根据 Apache License 2.0 的要求予以保留。
 
-See the [NOTICE](./NOTICE) file for detailed attribution and a list of modifications
-
+详见 [NOTICE](./NOTICE) 文件。
