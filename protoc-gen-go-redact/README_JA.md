@@ -39,6 +39,7 @@ _protoc-gen-redact (PGR)_ は、サーバー側で gRPC レスポンスのフィ
 - [メッセージレベルオプション](#メッセージレベルオプション)
 - [サービス・メソッドレベルオプション](#サービスメソッドレベルオプション)
 - [カスタムテンプレート](#カスタムテンプレート)
+- [Buf 設定](#buf-設定)
 - [開発と CI/CD](#開発と-cicd)
 - [コントリビュート](#コントリビュート)
 - [ライセンスと帰属](#ライセンスと帰属)
@@ -428,6 +429,114 @@ protoc \
 ```
 
 詳細は [examples/CUSTOM_TEMPLATE.md](examples/CUSTOM_TEMPLATE.md) を参照してください。
+
+---
+
+## Buf 設定
+
+本プロジェクトは [Buf](https://buf.build/) を使用して、Protobuf ファイルの管理、lint チェック、破壊的変更の検出、コード生成を行います。プロジェクトルートには以下の buf 設定ファイルが含まれています：
+
+### buf.yaml - モジュール設定
+
+Buf モジュール、lint ルール、破壊的変更ポリシーを定義します：
+
+```yaml
+version: v1
+name: buf.build/menta2k-org/redact
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - STANDARD
+```
+
+| フィールド | 説明 |
+|------|------|
+| `name` | Buf モジュールの一意識別子。Buf Schema Registry (BSR) へのプッシュに使用 |
+| `breaking.use` | 破壊的変更チェックレベル。`FILE` はファイルレベルで API 互換性をチェック |
+| `lint.use` | lint ルールセット。`STANDARD` は Buf 推奨の標準ルール |
+
+### buf.gen.yaml - コード生成設定
+
+コード生成プラグインの設定を定義します。現在の設定は Go protobuf と gRPC コードを生成します：
+
+```yaml
+version: v1
+plugins:
+  # Generate Go protobuf code
+  - plugin: go
+    out: .
+    opt:
+      - paths=source_relative
+
+  # Generate Go gRPC code
+  - plugin: go-grpc
+    out: .
+    opt:
+      - paths=source_relative
+```
+
+Buf 経由でマスキングコードも生成するには、`plugins` 配下に `redact` プラグインを追加します（事前に `protoc-gen-redact` のインストールが必要）：
+
+```yaml
+version: v1
+plugins:
+  - plugin: go
+    out: .
+    opt:
+      - paths=source_relative
+
+  - plugin: go-grpc
+    out: .
+    opt:
+      - paths=source_relative
+
+  # マスキングコードを生成（protoc-gen-redact のインストールが必要）
+  - plugin: redact
+    out: .
+    opt:
+      - paths=source_relative
+```
+
+設定後、`buf generate` を実行するだけで、protobuf、gRPC、マスキングコードを一度に生成できます。
+
+### .bufignore - 除外ファイル
+
+Buf が除外するディレクトリを指定し、サンプルやテストデータに対する lint チェックを回避します：
+
+```
+# Test data - examples and tests can have non-standard formatting
+testdata
+examples
+```
+
+### buf.lock - 依存関係ロック
+
+Buf が自動生成します。手動で編集しないでください。
+
+### 一般的な Buf コマンド
+
+本プロジェクトは Makefile 経由で一般的な Buf コマンドをラップしています：
+
+```bash
+make buf-lint                      # proto ファイルを lint
+make buf-format                    # proto ファイルをフォーマット
+make buf-breaking                  # 破壊的変更をチェック（main ブランチと比較）
+make buf-generate                  # コードを生成
+make buf-push                      # Buf Schema Registry にプッシュ
+make buf-push-tag TAG=v1.0.0       # タグ付きで BSR にプッシュ
+```
+
+Buf コマンドを直接使用することもできます：
+
+```bash
+buf lint                           # proto ファイルを lint
+buf format -w                      # proto ファイルをフォーマット（-w でファイルに書き込み）
+buf breaking --against '.git#branch=main'  # 破壊的変更をチェック
+buf generate                       # コードを生成
+buf push                           # BSR にプッシュ
+```
 
 ---
 
