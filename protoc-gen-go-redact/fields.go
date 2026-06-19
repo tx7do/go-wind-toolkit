@@ -136,6 +136,19 @@ func regexVarName(owner, field string) string {
 	return "_redactRegex_" + owner + "_" + field
 }
 
+// hashFuncName maps an algorithm name to the generated helper function name.
+func hashFuncName(algo string) string {
+	switch algo {
+	case "md5":
+		return "_redactHashMD5"
+	case "sha1":
+		return "_redactHashSHA1"
+	case "sha256":
+		return "_redactHashSHA256"
+	}
+	return ""
+}
+
 func (m *Module) redactedCustomValue(
 	flData *FieldData,
 	field pgs.Field,
@@ -188,6 +201,63 @@ func (m *Module) redactedCustomValue(
 			return
 		}
 		flData.RegexReplacement = strconv.Quote(rr.Regex.GetReplacement())
+		return
+	}
+	if info.IsMask {
+		// Position-based masking for string fields
+		flData.IsMask = true
+		mr, ok := fieldRules.Values.(*redact.FieldRules_Mask)
+		if !ok || mr.Mask == nil {
+			m.Failf("Invalid mask rule for field %s", field.Name())
+			return
+		}
+		mc := mr.Mask.GetMaskChar()
+		if mc == "" {
+			mc = "*"
+		}
+		flData.MaskKeepFirst = mr.Mask.GetKeepFirst()
+		flData.MaskKeepLast = mr.Mask.GetKeepLast()
+		flData.MaskChar = strconv.Quote(mc)
+		return
+	}
+	if info.IsEmail {
+		// Email-specific masking for string fields
+		flData.IsEmail = true
+		er, ok := fieldRules.Values.(*redact.FieldRules_Email)
+		if !ok || er.Email == nil {
+			m.Failf("Invalid email rule for field %s", field.Name())
+			return
+		}
+		mc := er.Email.GetMaskChar()
+		if mc == "" {
+			mc = "*"
+		}
+		flData.EmailKeepLocalFirst = er.Email.GetKeepLocalFirst()
+		flData.EmailMaskDomain = er.Email.GetMaskDomain()
+		flData.EmailMaskChar = strconv.Quote(mc)
+		return
+	}
+	if info.IsTruncate {
+		// Truncation for string fields
+		flData.IsTruncate = true
+		tr, ok := fieldRules.Values.(*redact.FieldRules_Truncate)
+		if !ok || tr.Truncate == nil {
+			m.Failf("Invalid truncate rule for field %s", field.Name())
+			return
+		}
+		suffix := tr.Truncate.GetSuffix()
+		if suffix == "" {
+			suffix = "..."
+		}
+		flData.TruncateLength = tr.Truncate.GetLength()
+		flData.TruncateSuffix = strconv.Quote(suffix)
+		return
+	}
+	if info.IsHash {
+		// One-way hashing for string fields
+		flData.IsHash = true
+		flData.HashAlgo = info.HashAlgo
+		flData.HashFuncName = hashFuncName(info.HashAlgo)
 		return
 	}
 
@@ -270,6 +340,79 @@ func (m *Module) redactedCustomValue(
 			flData.RegexReplacement = strconv.Quote(rr.GetReplacement())
 			return
 		}
+		if _, ok := rules.Values.(*redact.FieldRules_Mask); ok {
+			// Position-based masking for each element
+			flData.IsMask = true
+			flData.Iterate = true
+			mr := rules.GetMask()
+			if mr == nil {
+				m.Failf("Invalid mask rule for field %s", field.Name())
+				return
+			}
+			mc := mr.GetMaskChar()
+			if mc == "" {
+				mc = "*"
+			}
+			flData.MaskKeepFirst = mr.GetKeepFirst()
+			flData.MaskKeepLast = mr.GetKeepLast()
+			flData.MaskChar = strconv.Quote(mc)
+			return
+		}
+		if _, ok := rules.Values.(*redact.FieldRules_Email); ok {
+			// Email-specific masking for each element
+			flData.IsEmail = true
+			flData.Iterate = true
+			er := rules.GetEmail()
+			if er == nil {
+				m.Failf("Invalid email rule for field %s", field.Name())
+				return
+			}
+			mc := er.GetMaskChar()
+			if mc == "" {
+				mc = "*"
+			}
+			flData.EmailKeepLocalFirst = er.GetKeepLocalFirst()
+			flData.EmailMaskDomain = er.GetMaskDomain()
+			flData.EmailMaskChar = strconv.Quote(mc)
+			return
+		}
+		if _, ok := rules.Values.(*redact.FieldRules_Truncate); ok {
+			// Truncation for each element
+			flData.IsTruncate = true
+			flData.Iterate = true
+			tr := rules.GetTruncate()
+			if tr == nil {
+				m.Failf("Invalid truncate rule for field %s", field.Name())
+				return
+			}
+			suffix := tr.GetSuffix()
+			if suffix == "" {
+				suffix = "..."
+			}
+			flData.TruncateLength = tr.GetLength()
+			flData.TruncateSuffix = strconv.Quote(suffix)
+			return
+		}
+		if _, ok := rules.Values.(*redact.FieldRules_Hash); ok {
+			// One-way hashing for each element
+			flData.IsHash = true
+			flData.Iterate = true
+			hr := rules.GetHash()
+			if hr == nil {
+				m.Failf("Invalid hash rule for field %s", field.Name())
+				return
+			}
+			switch hr.GetAlgo() {
+			case redact.HashAlgo_MD5:
+				flData.HashAlgo = "md5"
+			case redact.HashAlgo_SHA1:
+				flData.HashAlgo = "sha1"
+			case redact.HashAlgo_SHA256:
+				flData.HashAlgo = "sha256"
+			}
+			flData.HashFuncName = hashFuncName(flData.HashAlgo)
+			return
+		}
 		info := m.RuleInformation(rules)
 		// match types
 		if info.ProtoType != typ.Element().ProtoType() {
@@ -316,6 +459,16 @@ type RuleInfo struct {
 	ProtoLabel pgs.ProtoLabel
 	// IsRegex indicates the rule is regex-based masking
 	IsRegex bool
+	// IsMask indicates the rule is position-based masking
+	IsMask bool
+	// IsEmail indicates the rule is email-specific masking
+	IsEmail bool
+	// IsTruncate indicates the rule is truncation
+	IsTruncate bool
+	// IsHash indicates the rule is one-way hashing
+	IsHash bool
+	// HashAlgo stores the hash algorithm name ("md5", "sha1", "sha256")
+	HashAlgo string
 }
 
 // RuleInformation returns required information from the redact.FieldRules
@@ -381,6 +534,45 @@ func (m *Module) RuleInformation(rules *redact.FieldRules) (res RuleInfo) {
 		res.IsRegex = true
 		if rule == nil || rule.Regex == nil {
 			m.Fail("(redact.custom).regex is nil, no option defined")
+			return // unreachable
+		}
+	case *redact.FieldRules_Mask:
+		res.ProtoType = pgs.StringT
+		res.IsMask = true
+		if rule == nil || rule.Mask == nil {
+			m.Fail("(redact.custom).mask is nil, no option defined")
+			return // unreachable
+		}
+	case *redact.FieldRules_Hash:
+		res.ProtoType = pgs.StringT
+		res.IsHash = true
+		if rule == nil || rule.Hash == nil {
+			m.Fail("(redact.custom).hash is nil, no option defined")
+			return // unreachable
+		}
+		switch rule.Hash.GetAlgo() {
+		case redact.HashAlgo_MD5:
+			res.HashAlgo = "md5"
+		case redact.HashAlgo_SHA1:
+			res.HashAlgo = "sha1"
+		case redact.HashAlgo_SHA256:
+			res.HashAlgo = "sha256"
+		default:
+			m.Failf("Unknown hash algorithm: %v", rule.Hash.GetAlgo())
+			return // unreachable
+		}
+	case *redact.FieldRules_Email:
+		res.ProtoType = pgs.StringT
+		res.IsEmail = true
+		if rule == nil || rule.Email == nil {
+			m.Fail("(redact.custom).email is nil, no option defined")
+			return // unreachable
+		}
+	case *redact.FieldRules_Truncate:
+		res.ProtoType = pgs.StringT
+		res.IsTruncate = true
+		if rule == nil || rule.Truncate == nil {
+			m.Fail("(redact.custom).truncate is nil, no option defined")
 			return // unreachable
 		}
 	case *redact.FieldRules_Element:

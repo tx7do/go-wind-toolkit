@@ -5,12 +5,17 @@ package tests
 
 import (
 	context "context"
+	md5 "crypto/md5"
+	sha1 "crypto/sha1"
+	sha256 "crypto/sha256"
+	fmt "fmt"
 	redact "github.com/menta2k/protoc-gen-redact/v3/redact/v3"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	regexp "regexp"
+	strings "strings"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -31,6 +36,47 @@ var (
 	_redactRegex_TestMessage_TagsRegex  = regexp.MustCompile("\\d")
 	_redactRegex_OneofMessage_ApiKey    = regexp.MustCompile("(.{4}).*(.{4})")
 )
+
+// Redaction helper functions
+func _redactMask(s string, keepFirst, keepLast int, maskChar string) string {
+	if len(s) <= keepFirst+keepLast {
+		return s
+	}
+	return s[:keepFirst] + strings.Repeat(maskChar, len(s)-keepFirst-keepLast) + s[len(s)-keepLast:]
+}
+func _redactEmail(s string, keepLocalFirst int, maskDomain bool, maskChar string) string {
+	at := strings.LastIndex(s, "@")
+	if at < 0 {
+		return s
+	}
+	local := s[:at]
+	domain := s[at+1:]
+	if len(local) > keepLocalFirst {
+		local = local[:keepLocalFirst] + strings.Repeat(maskChar, len(local)-keepLocalFirst)
+	}
+	if maskDomain {
+		domain = strings.Repeat(maskChar, len(domain))
+	}
+	return local + "@" + domain
+}
+func _redactTruncate(s string, length int, suffix string) string {
+	if len(s) <= length {
+		return s
+	}
+	return s[:length] + suffix
+}
+func _redactHashMD5(s string) string {
+	h := md5.Sum([]byte(s))
+	return fmt.Sprintf("%x", h[:])
+}
+func _redactHashSHA1(s string) string {
+	h := sha1.Sum([]byte(s))
+	return fmt.Sprintf("%x", h[:])
+}
+func _redactHashSHA256(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return fmt.Sprintf("%x", h[:])
+}
 
 // Ensure TestMessage implements the Redactor interface at compile time.
 var _ redact.Redactor = (*TestMessage)(nil)
@@ -145,6 +191,40 @@ func (x *TestMessage) Redact() {
 	for _regexIdx := range x.TagsRegex {
 		x.TagsRegex[_regexIdx] = _redactRegex_TestMessage_TagsRegex.ReplaceAllString(x.TagsRegex[_regexIdx], "*")
 	}
+
+	// Redacting field: MaskPhone
+	x.MaskPhone = _redactMask(x.MaskPhone, 3, 4, "*")
+
+	// Redacting field: MaskIdCard
+	if x.MaskIdCard != nil {
+		MaskIdCardMaskTmp := _redactMask(*x.MaskIdCard, 6, 4, "X")
+		x.MaskIdCard = &MaskIdCardMaskTmp
+	}
+
+	// Redacting field: MaskEmails
+	for _maskIdx := range x.MaskEmails {
+		x.MaskEmails[_maskIdx] = _redactMask(x.MaskEmails[_maskIdx], 2, 0, "*")
+	}
+
+	// Redacting field: EmailAddr
+	x.EmailAddr = _redactEmail(x.EmailAddr, 2, false, "*")
+
+	// Redacting field: EmailAddr2
+	if x.EmailAddr2 != nil {
+		EmailAddr2EmailTmp := _redactEmail(*x.EmailAddr2, 1, true, "*")
+		x.EmailAddr2 = &EmailAddr2EmailTmp
+	}
+
+	// Redacting field: TruncateName
+	x.TruncateName = _redactTruncate(x.TruncateName, 1, "**")
+
+	// Redacting field: HashToken
+	x.HashToken = _redactHashSHA256(x.HashToken)
+
+	// Redacting field: HashTokens
+	for _hashIdx := range x.HashTokens {
+		x.HashTokens[_hashIdx] = _redactHashMD5(x.HashTokens[_hashIdx])
+	}
 }
 
 // Ensure OneofMessage implements the Redactor interface at compile time.
@@ -186,6 +266,17 @@ func (x *OneofMessage) Redact() {
 	switch v := x.Credential.(type) {
 	case *OneofMessage_ApiKey:
 		v.ApiKey = _redactRegex_OneofMessage_ApiKey.ReplaceAllString(v.ApiKey, "${1}****${2}")
+	}
+	// Redacting oneof: Pii
+	switch v := x.Pii.(type) {
+	case *OneofMessage_SsnMask:
+		v.SsnMask = _redactMask(v.SsnMask, 0, 4, "*")
+	case *OneofMessage_EmailMask:
+		v.EmailMask = _redactEmail(v.EmailMask, 1, false, "*")
+	case *OneofMessage_NameTrunc:
+		v.NameTrunc = _redactTruncate(v.NameTrunc, 2, "...")
+	case *OneofMessage_SecretHash:
+		v.SecretHash = _redactHashSHA1(v.SecretHash)
 	}
 }
 

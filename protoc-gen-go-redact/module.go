@@ -186,6 +186,61 @@ var (
 )
 {{ end }}
 
+{{ if or $data.NeedMaskHelper $data.NeedEmailHelper $data.NeedTruncateHelper $data.NeedHashMD5 $data.NeedHashSHA1 $data.NeedHashSHA256 }}
+// Redaction helper functions
+{{- if $data.NeedMaskHelper }}
+func _redactMask(s string, keepFirst, keepLast int, maskChar string) string {
+	if len(s) <= keepFirst+keepLast {
+		return s
+	}
+	return s[:keepFirst] + strings.Repeat(maskChar, len(s)-keepFirst-keepLast) + s[len(s)-keepLast:]
+}
+{{- end }}
+{{- if $data.NeedEmailHelper }}
+func _redactEmail(s string, keepLocalFirst int, maskDomain bool, maskChar string) string {
+	at := strings.LastIndex(s, "@")
+	if at < 0 {
+		return s
+	}
+	local := s[:at]
+	domain := s[at+1:]
+	if len(local) > keepLocalFirst {
+		local = local[:keepLocalFirst] + strings.Repeat(maskChar, len(local)-keepLocalFirst)
+	}
+	if maskDomain {
+		domain = strings.Repeat(maskChar, len(domain))
+	}
+	return local + "@" + domain
+}
+{{- end }}
+{{- if $data.NeedTruncateHelper }}
+func _redactTruncate(s string, length int, suffix string) string {
+	if len(s) <= length {
+		return s
+	}
+	return s[:length] + suffix
+}
+{{- end }}
+{{- if $data.NeedHashMD5 }}
+func _redactHashMD5(s string) string {
+	h := md5.Sum([]byte(s))
+	return fmt.Sprintf("%x", h[:])
+}
+{{- end }}
+{{- if $data.NeedHashSHA1 }}
+func _redactHashSHA1(s string) string {
+	h := sha1.Sum([]byte(s))
+	return fmt.Sprintf("%x", h[:])
+}
+{{- end }}
+{{- if $data.NeedHashSHA256 }}
+func _redactHashSHA256(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return fmt.Sprintf("%x", h[:])
+}
+{{- end }}
+{{ end }}
+
 {{ range $srv := $data.Services }}
 	{{- if $srv.Skip }}
 		// Redacted server wrapper for {{ $srv.Name }} is skipped
@@ -333,6 +388,58 @@ var (
 						{{- else }}
 							x.{{ $field.Name }} = {{ $field.RegexVarName }}.ReplaceAllString(x.{{ $field.Name }}, {{ $field.RegexReplacement }})
 						{{- end }}
+					{{- else if $field.IsMask }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}MaskTmp := _redactMask(*x.{{ $field.Name }}, {{ $field.MaskKeepFirst }}, {{ $field.MaskKeepLast }}, {{ $field.MaskChar }})
+								x.{{ $field.Name }} = &{{ $field.Name }}MaskTmp
+							}
+						{{- else if $field.Iterate }}
+							for _maskIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_maskIdx] = _redactMask(x.{{ $field.Name }}[_maskIdx], {{ $field.MaskKeepFirst }}, {{ $field.MaskKeepLast }}, {{ $field.MaskChar }})
+							}
+						{{- else }}
+							x.{{ $field.Name }} = _redactMask(x.{{ $field.Name }}, {{ $field.MaskKeepFirst }}, {{ $field.MaskKeepLast }}, {{ $field.MaskChar }})
+						{{- end }}
+					{{- else if $field.IsEmail }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}EmailTmp := _redactEmail(*x.{{ $field.Name }}, {{ $field.EmailKeepLocalFirst }}, {{ $field.EmailMaskDomain }}, {{ $field.EmailMaskChar }})
+								x.{{ $field.Name }} = &{{ $field.Name }}EmailTmp
+							}
+						{{- else if $field.Iterate }}
+							for _emailIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_emailIdx] = _redactEmail(x.{{ $field.Name }}[_emailIdx], {{ $field.EmailKeepLocalFirst }}, {{ $field.EmailMaskDomain }}, {{ $field.EmailMaskChar }})
+							}
+						{{- else }}
+							x.{{ $field.Name }} = _redactEmail(x.{{ $field.Name }}, {{ $field.EmailKeepLocalFirst }}, {{ $field.EmailMaskDomain }}, {{ $field.EmailMaskChar }})
+						{{- end }}
+					{{- else if $field.IsTruncate }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}TruncTmp := _redactTruncate(*x.{{ $field.Name }}, {{ $field.TruncateLength }}, {{ $field.TruncateSuffix }})
+								x.{{ $field.Name }} = &{{ $field.Name }}TruncTmp
+							}
+						{{- else if $field.Iterate }}
+							for _truncIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_truncIdx] = _redactTruncate(x.{{ $field.Name }}[_truncIdx], {{ $field.TruncateLength }}, {{ $field.TruncateSuffix }})
+							}
+						{{- else }}
+							x.{{ $field.Name }} = _redactTruncate(x.{{ $field.Name }}, {{ $field.TruncateLength }}, {{ $field.TruncateSuffix }})
+						{{- end }}
+					{{- else if $field.IsHash }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}HashTmp := {{ $field.HashFuncName }}(*x.{{ $field.Name }})
+								x.{{ $field.Name }} = &{{ $field.Name }}HashTmp
+							}
+						{{- else if $field.Iterate }}
+							for _hashIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_hashIdx] = {{ $field.HashFuncName }}(x.{{ $field.Name }}[_hashIdx])
+							}
+						{{- else }}
+							x.{{ $field.Name }} = {{ $field.HashFuncName }}(x.{{ $field.Name }})
+						{{- end }}
 					{{- else if $field.Iterate }}
 						{{- if $field.NestedEmbedCall }}
 							for k := range x.{{ $field.Name }} {
@@ -379,6 +486,14 @@ var (
 					case *{{ $field.WrapperTypeName }}:
 						{{- if $field.IsRegex }}
 							v.{{ $field.Name }} = {{ $field.RegexVarName }}.ReplaceAllString(v.{{ $field.Name }}, {{ $field.RegexReplacement }})
+						{{- else if $field.IsMask }}
+							v.{{ $field.Name }} = _redactMask(v.{{ $field.Name }}, {{ $field.MaskKeepFirst }}, {{ $field.MaskKeepLast }}, {{ $field.MaskChar }})
+						{{- else if $field.IsEmail }}
+							v.{{ $field.Name }} = _redactEmail(v.{{ $field.Name }}, {{ $field.EmailKeepLocalFirst }}, {{ $field.EmailMaskDomain }}, {{ $field.EmailMaskChar }})
+						{{- else if $field.IsTruncate }}
+							v.{{ $field.Name }} = _redactTruncate(v.{{ $field.Name }}, {{ $field.TruncateLength }}, {{ $field.TruncateSuffix }})
+						{{- else if $field.IsHash }}
+							v.{{ $field.Name }} = {{ $field.HashFuncName }}(v.{{ $field.Name }})
 						{{- else if $field.IsMessage }}
 							{{- if $field.NestedEmbedCall }}
 								redact.Apply(v.{{ $field.Name }})

@@ -24,6 +24,60 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// HashRules describe one-way hashing for string fields.
+// The field value is replaced with its hex-encoded hash digest.
+type HashAlgo int32
+
+const (
+	HashAlgo_HASH_UNSPECIFIED HashAlgo = 0
+	HashAlgo_MD5              HashAlgo = 1
+	HashAlgo_SHA1             HashAlgo = 2
+	HashAlgo_SHA256           HashAlgo = 3
+)
+
+// Enum value maps for HashAlgo.
+var (
+	HashAlgo_name = map[int32]string{
+		0: "HASH_UNSPECIFIED",
+		1: "MD5",
+		2: "SHA1",
+		3: "SHA256",
+	}
+	HashAlgo_value = map[string]int32{
+		"HASH_UNSPECIFIED": 0,
+		"MD5":              1,
+		"SHA1":             2,
+		"SHA256":           3,
+	}
+)
+
+func (x HashAlgo) Enum() *HashAlgo {
+	p := new(HashAlgo)
+	*p = x
+	return p
+}
+
+func (x HashAlgo) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (HashAlgo) Descriptor() protoreflect.EnumDescriptor {
+	return file_redact_v3_redact_proto_enumTypes[0].Descriptor()
+}
+
+func (HashAlgo) Type() protoreflect.EnumType {
+	return &file_redact_v3_redact_proto_enumTypes[0]
+}
+
+func (x HashAlgo) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use HashAlgo.Descriptor instead.
+func (HashAlgo) EnumDescriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{0}
+}
+
 // FieldRules encapsulates options to change the redacted values of any type of field.
 // Depending on the field, the correct type value should be used.
 type FieldRules struct {
@@ -51,6 +105,10 @@ type FieldRules struct {
 	//	*FieldRules_Message
 	//	*FieldRules_Element
 	//	*FieldRules_Regex
+	//	*FieldRules_Mask
+	//	*FieldRules_Hash
+	//	*FieldRules_Email
+	//	*FieldRules_Truncate
 	Values        isFieldRules_Values `protobuf_oneof:"values"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -264,6 +322,42 @@ func (x *FieldRules) GetRegex() *RegexRules {
 	return nil
 }
 
+func (x *FieldRules) GetMask() *MaskRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Mask); ok {
+			return x.Mask
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetHash() *HashRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Hash); ok {
+			return x.Hash
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetEmail() *EmailRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Email); ok {
+			return x.Email
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetTruncate() *TruncateRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Truncate); ok {
+			return x.Truncate
+		}
+	}
+	return nil
+}
+
 type isFieldRules_Values interface {
 	isFieldRules_Values()
 }
@@ -348,6 +442,26 @@ type FieldRules_Regex struct {
 	Regex *RegexRules `protobuf:"bytes,21,opt,name=regex,proto3,oneof"`
 }
 
+type FieldRules_Mask struct {
+	// Mask defines position-based masking for string fields (e.g. keep first 3, last 4)
+	Mask *MaskRules `protobuf:"bytes,22,opt,name=mask,proto3,oneof"`
+}
+
+type FieldRules_Hash struct {
+	// Hash defines one-way hashing for string fields (MD5/SHA1/SHA256)
+	Hash *HashRules `protobuf:"bytes,23,opt,name=hash,proto3,oneof"`
+}
+
+type FieldRules_Email struct {
+	// Email defines email-specific masking (mask local part and/or domain)
+	Email *EmailRules `protobuf:"bytes,24,opt,name=email,proto3,oneof"`
+}
+
+type FieldRules_Truncate struct {
+	// Truncate defines truncation for string fields (keep first N chars + suffix)
+	Truncate *TruncateRules `protobuf:"bytes,25,opt,name=truncate,proto3,oneof"`
+}
+
 func (*FieldRules_Float) isFieldRules_Values() {}
 
 func (*FieldRules_Double) isFieldRules_Values() {}
@@ -385,6 +499,14 @@ func (*FieldRules_Message) isFieldRules_Values() {}
 func (*FieldRules_Element) isFieldRules_Values() {}
 
 func (*FieldRules_Regex) isFieldRules_Values() {}
+
+func (*FieldRules_Mask) isFieldRules_Values() {}
+
+func (*FieldRules_Hash) isFieldRules_Values() {}
+
+func (*FieldRules_Email) isFieldRules_Values() {}
+
+func (*FieldRules_Truncate) isFieldRules_Values() {}
 
 // RegexRules describe regex-based partial masking for string fields.
 // The regex pattern is compiled at package init time and applied via
@@ -450,6 +572,239 @@ func (x *RegexRules) GetReplacement() string {
 	return ""
 }
 
+// MaskRules describe position-based masking for string fields.
+// Unlike regex, this provides a simple keep-first / keep-last approach
+// that covers most common masking scenarios.
+type MaskRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// KeepFirst is the number of characters to keep at the beginning.
+	KeepFirst uint32 `protobuf:"varint,1,opt,name=keep_first,json=keepFirst,proto3" json:"keep_first,omitempty"`
+	// KeepLast is the number of characters to keep at the end.
+	KeepLast uint32 `protobuf:"varint,2,opt,name=keep_last,json=keepLast,proto3" json:"keep_last,omitempty"`
+	// MaskChar is the character used for masking (default: "*").
+	MaskChar      string `protobuf:"bytes,3,opt,name=mask_char,json=maskChar,proto3" json:"mask_char,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MaskRules) Reset() {
+	*x = MaskRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MaskRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MaskRules) ProtoMessage() {}
+
+func (x *MaskRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MaskRules.ProtoReflect.Descriptor instead.
+func (*MaskRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *MaskRules) GetKeepFirst() uint32 {
+	if x != nil {
+		return x.KeepFirst
+	}
+	return 0
+}
+
+func (x *MaskRules) GetKeepLast() uint32 {
+	if x != nil {
+		return x.KeepLast
+	}
+	return 0
+}
+
+func (x *MaskRules) GetMaskChar() string {
+	if x != nil {
+		return x.MaskChar
+	}
+	return ""
+}
+
+type HashRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Algo specifies the hash algorithm.
+	Algo          HashAlgo `protobuf:"varint,1,opt,name=algo,proto3,enum=redact.v3.HashAlgo" json:"algo,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HashRules) Reset() {
+	*x = HashRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HashRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HashRules) ProtoMessage() {}
+
+func (x *HashRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HashRules.ProtoReflect.Descriptor instead.
+func (*HashRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *HashRules) GetAlgo() HashAlgo {
+	if x != nil {
+		return x.Algo
+	}
+	return HashAlgo_HASH_UNSPECIFIED
+}
+
+// EmailRules describe email-specific masking for string fields.
+// It splits on '@' and masks the local part and/or domain separately.
+type EmailRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// KeepLocalFirst is the number of characters to keep at the beginning
+	// of the local part (before '@'). The rest of the local part is masked.
+	KeepLocalFirst uint32 `protobuf:"varint,1,opt,name=keep_local_first,json=keepLocalFirst,proto3" json:"keep_local_first,omitempty"`
+	// MaskDomain, if true, replaces the entire domain (after '@') with mask chars.
+	MaskDomain bool `protobuf:"varint,2,opt,name=mask_domain,json=maskDomain,proto3" json:"mask_domain,omitempty"`
+	// MaskChar is the character used for masking (default: "*").
+	MaskChar      string `protobuf:"bytes,3,opt,name=mask_char,json=maskChar,proto3" json:"mask_char,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EmailRules) Reset() {
+	*x = EmailRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EmailRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EmailRules) ProtoMessage() {}
+
+func (x *EmailRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EmailRules.ProtoReflect.Descriptor instead.
+func (*EmailRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *EmailRules) GetKeepLocalFirst() uint32 {
+	if x != nil {
+		return x.KeepLocalFirst
+	}
+	return 0
+}
+
+func (x *EmailRules) GetMaskDomain() bool {
+	if x != nil {
+		return x.MaskDomain
+	}
+	return false
+}
+
+func (x *EmailRules) GetMaskChar() string {
+	if x != nil {
+		return x.MaskChar
+	}
+	return ""
+}
+
+// TruncateRules describe truncation for string fields.
+// Only the first N characters are kept, optionally followed by a suffix.
+type TruncateRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Length is the number of characters to keep.
+	Length uint32 `protobuf:"varint,1,opt,name=length,proto3" json:"length,omitempty"`
+	// Suffix is appended after the truncated string (default: "...").
+	Suffix        string `protobuf:"bytes,2,opt,name=suffix,proto3" json:"suffix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TruncateRules) Reset() {
+	*x = TruncateRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TruncateRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TruncateRules) ProtoMessage() {}
+
+func (x *TruncateRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TruncateRules.ProtoReflect.Descriptor instead.
+func (*TruncateRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *TruncateRules) GetLength() uint32 {
+	if x != nil {
+		return x.Length
+	}
+	return 0
+}
+
+func (x *TruncateRules) GetSuffix() string {
+	if x != nil {
+		return x.Suffix
+	}
+	return ""
+}
+
 // MessageRules describe the constraints applied to embedded message for redaction.
 // For message-type fields, rules are performed recursively.
 type MessageRules struct {
@@ -468,7 +823,7 @@ type MessageRules struct {
 
 func (x *MessageRules) Reset() {
 	*x = MessageRules{}
-	mi := &file_redact_v3_redact_proto_msgTypes[2]
+	mi := &file_redact_v3_redact_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +835,7 @@ func (x *MessageRules) String() string {
 func (*MessageRules) ProtoMessage() {}
 
 func (x *MessageRules) ProtoReflect() protoreflect.Message {
-	mi := &file_redact_v3_redact_proto_msgTypes[2]
+	mi := &file_redact_v3_redact_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +848,7 @@ func (x *MessageRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageRules.ProtoReflect.Descriptor instead.
 func (*MessageRules) Descriptor() ([]byte, []int) {
-	return file_redact_v3_redact_proto_rawDescGZIP(), []int{2}
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *MessageRules) GetSkip() bool {
@@ -541,7 +896,7 @@ type ElementRules struct {
 
 func (x *ElementRules) Reset() {
 	*x = ElementRules{}
-	mi := &file_redact_v3_redact_proto_msgTypes[3]
+	mi := &file_redact_v3_redact_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -553,7 +908,7 @@ func (x *ElementRules) String() string {
 func (*ElementRules) ProtoMessage() {}
 
 func (x *ElementRules) ProtoReflect() protoreflect.Message {
-	mi := &file_redact_v3_redact_proto_msgTypes[3]
+	mi := &file_redact_v3_redact_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -566,7 +921,7 @@ func (x *ElementRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementRules.ProtoReflect.Descriptor instead.
 func (*ElementRules) Descriptor() ([]byte, []int) {
-	return file_redact_v3_redact_proto_rawDescGZIP(), []int{3}
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ElementRules) GetEmpty() bool {
@@ -787,7 +1142,7 @@ var File_redact_v3_redact_proto protoreflect.FileDescriptor
 
 const file_redact_v3_redact_proto_rawDesc = "" +
 	"\n" +
-	"\x16redact/v3/redact.proto\x12\tredact.v3\x1a google/protobuf/descriptor.proto\"\xcb\x04\n" +
+	"\x16redact/v3/redact.proto\x12\tredact.v3\x1a google/protobuf/descriptor.proto\"\x8a\x06\n" +
 	"\n" +
 	"FieldRules\x12\x16\n" +
 	"\x05float\x18\x02 \x01(\x02H\x00R\x05float\x12\x18\n" +
@@ -809,12 +1164,32 @@ const file_redact_v3_redact_proto_rawDesc = "" +
 	"\x04enum\x18\x11 \x01(\x05H\x00R\x04enum\x123\n" +
 	"\amessage\x18\x13 \x01(\v2\x17.redact.v3.MessageRulesH\x00R\amessage\x123\n" +
 	"\aelement\x18\x14 \x01(\v2\x17.redact.v3.ElementRulesH\x00R\aelement\x12-\n" +
-	"\x05regex\x18\x15 \x01(\v2\x15.redact.v3.RegexRulesH\x00R\x05regexB\b\n" +
+	"\x05regex\x18\x15 \x01(\v2\x15.redact.v3.RegexRulesH\x00R\x05regex\x12*\n" +
+	"\x04mask\x18\x16 \x01(\v2\x14.redact.v3.MaskRulesH\x00R\x04mask\x12*\n" +
+	"\x04hash\x18\x17 \x01(\v2\x14.redact.v3.HashRulesH\x00R\x04hash\x12-\n" +
+	"\x05email\x18\x18 \x01(\v2\x15.redact.v3.EmailRulesH\x00R\x05email\x126\n" +
+	"\btruncate\x18\x19 \x01(\v2\x18.redact.v3.TruncateRulesH\x00R\btruncateB\b\n" +
 	"\x06values\"H\n" +
 	"\n" +
 	"RegexRules\x12\x18\n" +
 	"\apattern\x18\x01 \x01(\tR\apattern\x12 \n" +
-	"\vreplacement\x18\x02 \x01(\tR\vreplacement\"`\n" +
+	"\vreplacement\x18\x02 \x01(\tR\vreplacement\"d\n" +
+	"\tMaskRules\x12\x1d\n" +
+	"\n" +
+	"keep_first\x18\x01 \x01(\rR\tkeepFirst\x12\x1b\n" +
+	"\tkeep_last\x18\x02 \x01(\rR\bkeepLast\x12\x1b\n" +
+	"\tmask_char\x18\x03 \x01(\tR\bmaskChar\"4\n" +
+	"\tHashRules\x12'\n" +
+	"\x04algo\x18\x01 \x01(\x0e2\x13.redact.v3.HashAlgoR\x04algo\"t\n" +
+	"\n" +
+	"EmailRules\x12(\n" +
+	"\x10keep_local_first\x18\x01 \x01(\rR\x0ekeepLocalFirst\x12\x1f\n" +
+	"\vmask_domain\x18\x02 \x01(\bR\n" +
+	"maskDomain\x12\x1b\n" +
+	"\tmask_char\x18\x03 \x01(\tR\bmaskChar\"?\n" +
+	"\rTruncateRules\x12\x16\n" +
+	"\x06length\x18\x01 \x01(\rR\x06length\x12\x16\n" +
+	"\x06suffix\x18\x02 \x01(\tR\x06suffix\"`\n" +
 	"\fMessageRules\x12\x12\n" +
 	"\x04skip\x18\x01 \x01(\bR\x04skip\x12\x14\n" +
 	"\x05empty\x18\x02 \x01(\bR\x05empty\x12\x10\n" +
@@ -823,7 +1198,13 @@ const file_redact_v3_redact_proto_rawDesc = "" +
 	"\fElementRules\x12\x14\n" +
 	"\x05empty\x18\x01 \x01(\bR\x05empty\x12\x16\n" +
 	"\x06nested\x18\x02 \x01(\bR\x06nested\x12)\n" +
-	"\x04item\x18\x03 \x01(\v2\x15.redact.v3.FieldRulesR\x04item:;\n" +
+	"\x04item\x18\x03 \x01(\v2\x15.redact.v3.FieldRulesR\x04item*?\n" +
+	"\bHashAlgo\x12\x14\n" +
+	"\x10HASH_UNSPECIFIED\x10\x00\x12\a\n" +
+	"\x03MD5\x10\x01\x12\b\n" +
+	"\x04SHA1\x10\x02\x12\n" +
+	"\n" +
+	"\x06SHA256\x10\x03:;\n" +
 	"\tfile_skip\x12\x1c.google.protobuf.FileOptions\x18\xf6\xbf\x05 \x01(\bR\bfileSkip:D\n" +
 	"\fservice_skip\x12\x1f.google.protobuf.ServiceOptions\x18\xeb\xa6\x03 \x01(\bR\vserviceSkip:L\n" +
 	"\x10internal_service\x12\x1f.google.protobuf.ServiceOptions\x18\xec\xa6\x03 \x01(\bR\x0finternalService:U\n" +
@@ -851,42 +1232,53 @@ func file_redact_v3_redact_proto_rawDescGZIP() []byte {
 	return file_redact_v3_redact_proto_rawDescData
 }
 
-var file_redact_v3_redact_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_redact_v3_redact_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_redact_v3_redact_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_redact_v3_redact_proto_goTypes = []any{
-	(*FieldRules)(nil),                  // 0: redact.v3.FieldRules
-	(*RegexRules)(nil),                  // 1: redact.v3.RegexRules
-	(*MessageRules)(nil),                // 2: redact.v3.MessageRules
-	(*ElementRules)(nil),                // 3: redact.v3.ElementRules
-	(*descriptorpb.FileOptions)(nil),    // 4: google.protobuf.FileOptions
-	(*descriptorpb.ServiceOptions)(nil), // 5: google.protobuf.ServiceOptions
-	(*descriptorpb.MethodOptions)(nil),  // 6: google.protobuf.MethodOptions
-	(*descriptorpb.MessageOptions)(nil), // 7: google.protobuf.MessageOptions
-	(*descriptorpb.FieldOptions)(nil),   // 8: google.protobuf.FieldOptions
+	(HashAlgo)(0),                       // 0: redact.v3.HashAlgo
+	(*FieldRules)(nil),                  // 1: redact.v3.FieldRules
+	(*RegexRules)(nil),                  // 2: redact.v3.RegexRules
+	(*MaskRules)(nil),                   // 3: redact.v3.MaskRules
+	(*HashRules)(nil),                   // 4: redact.v3.HashRules
+	(*EmailRules)(nil),                  // 5: redact.v3.EmailRules
+	(*TruncateRules)(nil),               // 6: redact.v3.TruncateRules
+	(*MessageRules)(nil),                // 7: redact.v3.MessageRules
+	(*ElementRules)(nil),                // 8: redact.v3.ElementRules
+	(*descriptorpb.FileOptions)(nil),    // 9: google.protobuf.FileOptions
+	(*descriptorpb.ServiceOptions)(nil), // 10: google.protobuf.ServiceOptions
+	(*descriptorpb.MethodOptions)(nil),  // 11: google.protobuf.MethodOptions
+	(*descriptorpb.MessageOptions)(nil), // 12: google.protobuf.MessageOptions
+	(*descriptorpb.FieldOptions)(nil),   // 13: google.protobuf.FieldOptions
 }
 var file_redact_v3_redact_proto_depIdxs = []int32{
-	2,  // 0: redact.v3.FieldRules.message:type_name -> redact.v3.MessageRules
-	3,  // 1: redact.v3.FieldRules.element:type_name -> redact.v3.ElementRules
-	1,  // 2: redact.v3.FieldRules.regex:type_name -> redact.v3.RegexRules
-	0,  // 3: redact.v3.ElementRules.item:type_name -> redact.v3.FieldRules
-	4,  // 4: redact.v3.file_skip:extendee -> google.protobuf.FileOptions
-	5,  // 5: redact.v3.service_skip:extendee -> google.protobuf.ServiceOptions
-	5,  // 6: redact.v3.internal_service:extendee -> google.protobuf.ServiceOptions
-	5,  // 7: redact.v3.internal_service_code:extendee -> google.protobuf.ServiceOptions
-	5,  // 8: redact.v3.internal_service_err_message:extendee -> google.protobuf.ServiceOptions
-	6,  // 9: redact.v3.method_skip:extendee -> google.protobuf.MethodOptions
-	6,  // 10: redact.v3.internal_method:extendee -> google.protobuf.MethodOptions
-	6,  // 11: redact.v3.internal_method_code:extendee -> google.protobuf.MethodOptions
-	6,  // 12: redact.v3.internal_method_err_message:extendee -> google.protobuf.MethodOptions
-	7,  // 13: redact.v3.nil:extendee -> google.protobuf.MessageOptions
-	7,  // 14: redact.v3.empty:extendee -> google.protobuf.MessageOptions
-	7,  // 15: redact.v3.ignored:extendee -> google.protobuf.MessageOptions
-	8,  // 16: redact.v3.value:extendee -> google.protobuf.FieldOptions
-	0,  // 17: redact.v3.value:type_name -> redact.v3.FieldRules
-	18, // [18:18] is the sub-list for method output_type
-	18, // [18:18] is the sub-list for method input_type
-	17, // [17:18] is the sub-list for extension type_name
-	4,  // [4:17] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	7,  // 0: redact.v3.FieldRules.message:type_name -> redact.v3.MessageRules
+	8,  // 1: redact.v3.FieldRules.element:type_name -> redact.v3.ElementRules
+	2,  // 2: redact.v3.FieldRules.regex:type_name -> redact.v3.RegexRules
+	3,  // 3: redact.v3.FieldRules.mask:type_name -> redact.v3.MaskRules
+	4,  // 4: redact.v3.FieldRules.hash:type_name -> redact.v3.HashRules
+	5,  // 5: redact.v3.FieldRules.email:type_name -> redact.v3.EmailRules
+	6,  // 6: redact.v3.FieldRules.truncate:type_name -> redact.v3.TruncateRules
+	0,  // 7: redact.v3.HashRules.algo:type_name -> redact.v3.HashAlgo
+	1,  // 8: redact.v3.ElementRules.item:type_name -> redact.v3.FieldRules
+	9,  // 9: redact.v3.file_skip:extendee -> google.protobuf.FileOptions
+	10, // 10: redact.v3.service_skip:extendee -> google.protobuf.ServiceOptions
+	10, // 11: redact.v3.internal_service:extendee -> google.protobuf.ServiceOptions
+	10, // 12: redact.v3.internal_service_code:extendee -> google.protobuf.ServiceOptions
+	10, // 13: redact.v3.internal_service_err_message:extendee -> google.protobuf.ServiceOptions
+	11, // 14: redact.v3.method_skip:extendee -> google.protobuf.MethodOptions
+	11, // 15: redact.v3.internal_method:extendee -> google.protobuf.MethodOptions
+	11, // 16: redact.v3.internal_method_code:extendee -> google.protobuf.MethodOptions
+	11, // 17: redact.v3.internal_method_err_message:extendee -> google.protobuf.MethodOptions
+	12, // 18: redact.v3.nil:extendee -> google.protobuf.MessageOptions
+	12, // 19: redact.v3.empty:extendee -> google.protobuf.MessageOptions
+	12, // 20: redact.v3.ignored:extendee -> google.protobuf.MessageOptions
+	13, // 21: redact.v3.value:extendee -> google.protobuf.FieldOptions
+	1,  // 22: redact.v3.value:type_name -> redact.v3.FieldRules
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	22, // [22:23] is the sub-list for extension type_name
+	9,  // [9:22] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_redact_v3_redact_proto_init() }
@@ -914,19 +1306,24 @@ func file_redact_v3_redact_proto_init() {
 		(*FieldRules_Message)(nil),
 		(*FieldRules_Element)(nil),
 		(*FieldRules_Regex)(nil),
+		(*FieldRules_Mask)(nil),
+		(*FieldRules_Hash)(nil),
+		(*FieldRules_Email)(nil),
+		(*FieldRules_Truncate)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_redact_v3_redact_proto_rawDesc), len(file_redact_v3_redact_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      1,
+			NumMessages:   8,
 			NumExtensions: 13,
 			NumServices:   0,
 		},
 		GoTypes:           file_redact_v3_redact_proto_goTypes,
 		DependencyIndexes: file_redact_v3_redact_proto_depIdxs,
+		EnumInfos:         file_redact_v3_redact_proto_enumTypes,
 		MessageInfos:      file_redact_v3_redact_proto_msgTypes,
 		ExtensionInfos:    file_redact_v3_redact_proto_extTypes,
 	}.Build()

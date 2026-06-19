@@ -12,6 +12,14 @@ type ProtoFileData struct {
 	// RegexDeclarations holds all precompiled regex variable declarations
 	// needed by the generated code. Each entry is unique by VarName.
 	RegexDeclarations []RegexDecl
+
+	// --- Helper function flags ---
+	NeedMaskHelper     bool // _redactMask
+	NeedEmailHelper    bool // _redactEmail
+	NeedTruncateHelper bool // _redactTruncate
+	NeedHashMD5        bool // _redactHashMD5
+	NeedHashSHA1       bool // _redactHashSHA1
+	NeedHashSHA256     bool // _redactHashSHA256
 }
 
 // RegexDecl represents a package-level precompiled regex variable
@@ -120,4 +128,27 @@ type FieldData struct {
 	// RegexReplacement: the Go string literal for the replacement,
 	// already escaped via strconv.Quote
 	RegexReplacement string
+
+	// --- Mask-based redaction fields ---
+	IsMask        bool
+	MaskKeepFirst uint32
+	MaskKeepLast  uint32
+	MaskChar      string // already quoted via strconv.Quote
+
+	// --- Email-based redaction fields ---
+	IsEmail             bool
+	EmailKeepLocalFirst uint32
+	EmailMaskDomain     bool
+	EmailMaskChar       string // already quoted via strconv.Quote
+
+	// --- Truncate-based redaction fields ---
+	IsTruncate     bool
+	TruncateLength uint32
+	TruncateSuffix string // already quoted via strconv.Quote
+
+	// --- Hash-based redaction fields ---
+	IsHash   bool
+	HashAlgo string // "md5", "sha1", "sha256"
+	// HashFuncName is the generated helper function name, e.g. "_redactHashMD5"
+	HashFuncName string
 }

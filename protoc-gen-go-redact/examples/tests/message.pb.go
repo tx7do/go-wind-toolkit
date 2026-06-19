@@ -102,9 +102,21 @@ type TestMessage struct {
 	Map2ItemSkip  map[string]*emptypb.Empty `protobuf:"bytes,45,rep,name=map2_item_skip,json=map2ItemSkip,proto3" json:"map2_item_skip,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Map2ItemEmpty map[string]*emptypb.Empty `protobuf:"bytes,46,rep,name=map2_item_empty,json=map2ItemEmpty,proto3" json:"map2_item_empty,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Regex-based masking
-	PhoneRegex    string   `protobuf:"bytes,47,opt,name=phone_regex,json=phoneRegex,proto3" json:"phone_regex,omitempty"`
-	EmailRegex    *string  `protobuf:"bytes,48,opt,name=email_regex,json=emailRegex,proto3,oneof" json:"email_regex,omitempty"`
-	TagsRegex     []string `protobuf:"bytes,49,rep,name=tags_regex,json=tagsRegex,proto3" json:"tags_regex,omitempty"`
+	PhoneRegex string   `protobuf:"bytes,47,opt,name=phone_regex,json=phoneRegex,proto3" json:"phone_regex,omitempty"`
+	EmailRegex *string  `protobuf:"bytes,48,opt,name=email_regex,json=emailRegex,proto3,oneof" json:"email_regex,omitempty"`
+	TagsRegex  []string `protobuf:"bytes,49,rep,name=tags_regex,json=tagsRegex,proto3" json:"tags_regex,omitempty"`
+	// Mask-based redaction
+	MaskPhone  string   `protobuf:"bytes,50,opt,name=mask_phone,json=maskPhone,proto3" json:"mask_phone,omitempty"`
+	MaskIdCard *string  `protobuf:"bytes,51,opt,name=mask_id_card,json=maskIdCard,proto3,oneof" json:"mask_id_card,omitempty"`
+	MaskEmails []string `protobuf:"bytes,52,rep,name=mask_emails,json=maskEmails,proto3" json:"mask_emails,omitempty"`
+	// Email-based redaction
+	EmailAddr  string  `protobuf:"bytes,53,opt,name=email_addr,json=emailAddr,proto3" json:"email_addr,omitempty"`
+	EmailAddr2 *string `protobuf:"bytes,54,opt,name=email_addr2,json=emailAddr2,proto3,oneof" json:"email_addr2,omitempty"`
+	// Truncate-based redaction
+	TruncateName string `protobuf:"bytes,55,opt,name=truncate_name,json=truncateName,proto3" json:"truncate_name,omitempty"`
+	// Hash-based redaction
+	HashToken     string   `protobuf:"bytes,56,opt,name=hash_token,json=hashToken,proto3" json:"hash_token,omitempty"`
+	HashTokens    []string `protobuf:"bytes,57,rep,name=hash_tokens,json=hashTokens,proto3" json:"hash_tokens,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -349,6 +361,62 @@ func (x *TestMessage) GetTagsRegex() []string {
 	return nil
 }
 
+func (x *TestMessage) GetMaskPhone() string {
+	if x != nil {
+		return x.MaskPhone
+	}
+	return ""
+}
+
+func (x *TestMessage) GetMaskIdCard() string {
+	if x != nil && x.MaskIdCard != nil {
+		return *x.MaskIdCard
+	}
+	return ""
+}
+
+func (x *TestMessage) GetMaskEmails() []string {
+	if x != nil {
+		return x.MaskEmails
+	}
+	return nil
+}
+
+func (x *TestMessage) GetEmailAddr() string {
+	if x != nil {
+		return x.EmailAddr
+	}
+	return ""
+}
+
+func (x *TestMessage) GetEmailAddr2() string {
+	if x != nil && x.EmailAddr2 != nil {
+		return *x.EmailAddr2
+	}
+	return ""
+}
+
+func (x *TestMessage) GetTruncateName() string {
+	if x != nil {
+		return x.TruncateName
+	}
+	return ""
+}
+
+func (x *TestMessage) GetHashToken() string {
+	if x != nil {
+		return x.HashToken
+	}
+	return ""
+}
+
+func (x *TestMessage) GetHashTokens() []string {
+	if x != nil {
+		return x.HashTokens
+	}
+	return nil
+}
+
 // OneofMessage demonstrates oneof field handling
 type OneofMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -382,7 +450,16 @@ type OneofMessage struct {
 	// Types that are valid to be assigned to Credential:
 	//
 	//	*OneofMessage_ApiKey
-	Credential    isOneofMessage_Credential `protobuf_oneof:"credential"`
+	Credential isOneofMessage_Credential `protobuf_oneof:"credential"`
+	// Oneof with mask/email/truncate/hash
+	//
+	// Types that are valid to be assigned to Pii:
+	//
+	//	*OneofMessage_SsnMask
+	//	*OneofMessage_EmailMask
+	//	*OneofMessage_NameTrunc
+	//	*OneofMessage_SecretHash
+	Pii           isOneofMessage_Pii `protobuf_oneof:"pii"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -542,6 +619,49 @@ func (x *OneofMessage) GetApiKey() string {
 	return ""
 }
 
+func (x *OneofMessage) GetPii() isOneofMessage_Pii {
+	if x != nil {
+		return x.Pii
+	}
+	return nil
+}
+
+func (x *OneofMessage) GetSsnMask() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_SsnMask); ok {
+			return x.SsnMask
+		}
+	}
+	return ""
+}
+
+func (x *OneofMessage) GetEmailMask() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_EmailMask); ok {
+			return x.EmailMask
+		}
+	}
+	return ""
+}
+
+func (x *OneofMessage) GetNameTrunc() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_NameTrunc); ok {
+			return x.NameTrunc
+		}
+	}
+	return ""
+}
+
+func (x *OneofMessage) GetSecretHash() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_SecretHash); ok {
+			return x.SecretHash
+		}
+	}
+	return ""
+}
+
 type isOneofMessage_Contact interface {
 	isOneofMessage_Contact()
 }
@@ -617,6 +737,34 @@ type OneofMessage_ApiKey struct {
 }
 
 func (*OneofMessage_ApiKey) isOneofMessage_Credential() {}
+
+type isOneofMessage_Pii interface {
+	isOneofMessage_Pii()
+}
+
+type OneofMessage_SsnMask struct {
+	SsnMask string `protobuf:"bytes,12,opt,name=ssn_mask,json=ssnMask,proto3,oneof"`
+}
+
+type OneofMessage_EmailMask struct {
+	EmailMask string `protobuf:"bytes,13,opt,name=email_mask,json=emailMask,proto3,oneof"`
+}
+
+type OneofMessage_NameTrunc struct {
+	NameTrunc string `protobuf:"bytes,14,opt,name=name_trunc,json=nameTrunc,proto3,oneof"`
+}
+
+type OneofMessage_SecretHash struct {
+	SecretHash string `protobuf:"bytes,15,opt,name=secret_hash,json=secretHash,proto3,oneof"`
+}
+
+func (*OneofMessage_SsnMask) isOneofMessage_Pii() {}
+
+func (*OneofMessage_EmailMask) isOneofMessage_Pii() {}
+
+func (*OneofMessage_NameTrunc) isOneofMessage_Pii() {}
+
+func (*OneofMessage_SecretHash) isOneofMessage_Pii() {}
 
 type RepeatedM struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
@@ -1074,7 +1222,7 @@ var File_examples_tests_message_proto protoreflect.FileDescriptor
 
 const file_examples_tests_message_proto_rawDesc = "" +
 	"\n" +
-	"\x1cexamples/tests/message.proto\x12\x05tests\x1a\x1bgoogle/protobuf/empty.proto\x1a\x16redact/v3/redact.proto\"\xc3\x13\n" +
+	"\x1cexamples/tests/message.proto\x12\x05tests\x1a\x1bgoogle/protobuf/empty.proto\x1a\x16redact/v3/redact.proto\"\xe4\x16\n" +
 	"\vTestMessage\x12*\n" +
 	"\vfloat_value\x18\x02 \x01(\x02B\tڶ\x1a\x05\x15\xcd\xccL@R\n" +
 	"floatValue\x120\n" +
@@ -1127,7 +1275,25 @@ const file_examples_tests_message_proto_rawDesc = "" +
 	"\n" +
 	"tags_regex\x181 \x03(\tB\x13ڶ\x1a\x0f\xa2\x01\f\x1a\n" +
 	"\xaa\x01\a\n" +
-	"\x02\\d\x12\x01*R\ttagsRegex\x1a<\n" +
+	"\x02\\d\x12\x01*R\ttagsRegex\x12*\n" +
+	"\n" +
+	"mask_phone\x182 \x01(\tB\vڶ\x1a\a\xb2\x01\x04\b\x03\x10\x04R\tmaskPhone\x125\n" +
+	"\fmask_id_card\x183 \x01(\tB\x0eڶ\x1a\n" +
+	"\xb2\x01\a\b\x06\x10\x04\x1a\x01XH\x01R\n" +
+	"maskIdCard\x88\x01\x01\x12/\n" +
+	"\vmask_emails\x184 \x03(\tB\x0eڶ\x1a\n" +
+	"\xa2\x01\a\x1a\x05\xb2\x01\x02\b\x02R\n" +
+	"maskEmails\x12(\n" +
+	"\n" +
+	"email_addr\x185 \x01(\tB\tڶ\x1a\x05\xc2\x01\x02\b\x02R\temailAddr\x121\n" +
+	"\vemail_addr2\x186 \x01(\tB\vڶ\x1a\a\xc2\x01\x04\b\x01\x10\x01H\x02R\n" +
+	"emailAddr2\x88\x01\x01\x122\n" +
+	"\rtruncate_name\x187 \x01(\tB\rڶ\x1a\t\xca\x01\x06\b\x01\x12\x02**R\ftruncateName\x12(\n" +
+	"\n" +
+	"hash_token\x188 \x01(\tB\tڶ\x1a\x05\xba\x01\x02\b\x03R\thashToken\x12/\n" +
+	"\vhash_tokens\x189 \x03(\tB\x0eڶ\x1a\n" +
+	"\xa2\x01\a\x1a\x05\xba\x01\x02\b\x01R\n" +
+	"hashTokens\x1a<\n" +
 	"\x0eMap1EmptyEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x03R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aT\n" +
@@ -1152,7 +1318,9 @@ const file_examples_tests_message_proto_rawDesc = "" +
 	"\x12Map2ItemEmptyEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
 	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.EmptyR\x05value:\x028\x01B\x0e\n" +
-	"\f_email_regex\"\xae\x04\n" +
+	"\f_email_regexB\x0f\n" +
+	"\r_mask_id_cardB\x0e\n" +
+	"\f_email_addr2\"\xe3\x05\n" +
 	"\fOneofMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12&\n" +
 	"\x05email\x18\x02 \x01(\tB\x0eڶ\x1a\n" +
@@ -1172,13 +1340,21 @@ const file_examples_tests_message_proto_rawDesc = "" +
 	" \x01(\x03B\x06ڶ\x1a\x02(\x00H\x02R\n" +
 	"internalId\x12@\n" +
 	"\aapi_key\x18\v \x01(\tB%ڶ\x1a!\xaa\x01\x1e\n" +
-	"\x0e(.{4}).*(.{4})\x12\f${1}****${2}H\x03R\x06apiKeyB\t\n" +
+	"\x0e(.{4}).*(.{4})\x12\f${1}****${2}H\x03R\x06apiKey\x12&\n" +
+	"\bssn_mask\x18\f \x01(\tB\tڶ\x1a\x05\xb2\x01\x02\x10\x04H\x04R\assnMask\x12*\n" +
+	"\n" +
+	"email_mask\x18\r \x01(\tB\tڶ\x1a\x05\xc2\x01\x02\b\x01H\x04R\temailMask\x12*\n" +
+	"\n" +
+	"name_trunc\x18\x0e \x01(\tB\tڶ\x1a\x05\xca\x01\x02\b\x02H\x04R\tnameTrunc\x12,\n" +
+	"\vsecret_hash\x18\x0f \x01(\tB\tڶ\x1a\x05\xba\x01\x02\b\x02H\x04R\n" +
+	"secretHashB\t\n" +
 	"\acontactB\t\n" +
 	"\apayloadB\f\n" +
 	"\n" +
 	"identifierB\f\n" +
 	"\n" +
-	"credential\"\xc3\x18\n" +
+	"credentialB\x05\n" +
+	"\x03pii\"\xc3\x18\n" +
 	"\tRepeatedM\x129\n" +
 	"\x13float_value_empties\x18\x02 \x03(\x02B\tڶ\x1a\x05\xa2\x01\x02\b\x01R\x11floatValueEmpties\x127\n" +
 	"\x12float_value_nested\x18\x03 \x03(\x02B\tڶ\x1a\x05\xa2\x01\x02\x10\x01R\x10floatValueNested\x121\n" +
@@ -1327,6 +1503,10 @@ func file_examples_tests_message_proto_init() {
 		(*OneofMessage_PublicId)(nil),
 		(*OneofMessage_InternalId)(nil),
 		(*OneofMessage_ApiKey)(nil),
+		(*OneofMessage_SsnMask)(nil),
+		(*OneofMessage_EmailMask)(nil),
+		(*OneofMessage_NameTrunc)(nil),
+		(*OneofMessage_SecretHash)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

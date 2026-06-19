@@ -74,6 +74,34 @@ func (m *Module) hasRedactUsage(file pgs.File) bool {
 	return false
 }
 
+// collectHelperFlags inspects a single FieldData and sets the corresponding
+// helper-function flags on ProtoFileData so the template knows which helpers
+// and imports to generate.
+func collectHelperFlags(data *ProtoFileData, fld *FieldData) {
+	if fld == nil {
+		return
+	}
+	if fld.IsMask {
+		data.NeedMaskHelper = true
+	}
+	if fld.IsEmail {
+		data.NeedEmailHelper = true
+	}
+	if fld.IsTruncate {
+		data.NeedTruncateHelper = true
+	}
+	if fld.IsHash {
+		switch fld.HashAlgo {
+		case "md5":
+			data.NeedHashMD5 = true
+		case "sha1":
+			data.NeedHashSHA1 = true
+		case "sha256":
+			data.NeedHashSHA256 = true
+		}
+	}
+}
+
 // regexDeclCollector is used during message processing to collect
 // all unique regex variable declarations needed by the generated file.
 
@@ -166,12 +194,43 @@ func (m *Module) Process(file pgs.File) {
 		}
 	}
 
+	// Collect helper function flags and imports for mask/email/truncate/hash
+	for _, msg := range data.Messages {
+		for _, fld := range msg.Fields {
+			collectHelperFlags(data, fld)
+		}
+		for _, oneof := range msg.Oneofs {
+			for _, fld := range oneof.Fields {
+				collectHelperFlags(data, fld.FieldData)
+			}
+		}
+	}
+
+	// Ensure imports map is initialized
+	if data.Imports == nil {
+		data.Imports = map[string]string{}
+	}
+
 	// Add regexp import if any regex declarations are needed
 	if len(data.RegexDeclarations) > 0 {
-		if data.Imports == nil {
-			data.Imports = map[string]string{}
-		}
 		data.Imports["regexp"] = "regexp"
+	}
+
+	// Add imports based on helper flags
+	if data.NeedMaskHelper || data.NeedEmailHelper || data.NeedTruncateHelper {
+		data.Imports["strings"] = "strings"
+	}
+	if data.NeedHashMD5 || data.NeedHashSHA1 || data.NeedHashSHA256 {
+		data.Imports["fmt"] = "fmt"
+		if data.NeedHashMD5 {
+			data.Imports["md5"] = "crypto/md5"
+		}
+		if data.NeedHashSHA1 {
+			data.Imports["sha1"] = "crypto/sha1"
+		}
+		if data.NeedHashSHA256 {
+			data.Imports["sha256"] = "crypto/sha256"
+		}
 	}
 
 	// render file in the template

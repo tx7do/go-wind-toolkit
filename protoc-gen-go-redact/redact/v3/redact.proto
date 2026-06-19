@@ -104,6 +104,18 @@ message FieldRules {
 
     // Regex defines regex-based masking for string fields (e.g. phone: 138****8888)
     RegexRules regex = 21;
+
+    // Mask defines position-based masking for string fields (e.g. keep first 3, last 4)
+    MaskRules mask = 22;
+
+    // Hash defines one-way hashing for string fields (MD5/SHA1/SHA256)
+    HashRules hash = 23;
+
+    // Email defines email-specific masking (mask local part and/or domain)
+    EmailRules email = 24;
+
+    // Truncate defines truncation for string fields (keep first N chars + suffix)
+    TruncateRules truncate = 25;
   }
 }
 
@@ -122,6 +134,58 @@ message RegexRules {
   //   replacement:  "${1}****${2}"
   //   13812345678 -> 138****5678
   string replacement = 2;
+}
+
+// MaskRules describe position-based masking for string fields.
+// Unlike regex, this provides a simple keep-first / keep-last approach
+// that covers most common masking scenarios.
+message MaskRules {
+  // KeepFirst is the number of characters to keep at the beginning.
+  uint32 keep_first = 1;
+
+  // KeepLast is the number of characters to keep at the end.
+  uint32 keep_last = 2;
+
+  // MaskChar is the character used for masking (default: "*").
+  string mask_char = 3;
+}
+
+// HashRules describe one-way hashing for string fields.
+// The field value is replaced with its hex-encoded hash digest.
+enum HashAlgo {
+  HASH_UNSPECIFIED = 0;
+  MD5 = 1;
+  SHA1 = 2;
+  SHA256 = 3;
+}
+
+message HashRules {
+  // Algo specifies the hash algorithm.
+  HashAlgo algo = 1;
+}
+
+// EmailRules describe email-specific masking for string fields.
+// It splits on '@' and masks the local part and/or domain separately.
+message EmailRules {
+  // KeepLocalFirst is the number of characters to keep at the beginning
+  // of the local part (before '@'). The rest of the local part is masked.
+  uint32 keep_local_first = 1;
+
+  // MaskDomain, if true, replaces the entire domain (after '@') with mask chars.
+  bool mask_domain = 2;
+
+  // MaskChar is the character used for masking (default: "*").
+  string mask_char = 3;
+}
+
+// TruncateRules describe truncation for string fields.
+// Only the first N characters are kept, optionally followed by a suffix.
+message TruncateRules {
+  // Length is the number of characters to keep.
+  uint32 length = 1;
+
+  // Suffix is appended after the truncated string (default: "...").
+  string suffix = 2;
 }
 
 // MessageRules describe the constraints applied to embedded message for redaction.

@@ -51,6 +51,22 @@ message TestMessage {
   string phone = 18 [(redact.v3.value).regex = { pattern: "^(\\d{3})\\d{4}(\\d{4})$" replacement: "${1}****${2}" }];
   optional string ssn = 19 [(redact.v3.value).regex = { pattern: "\\d" replacement: "*" }];
   repeated string id_cards = 20 [(redact.v3.value).element.item.regex = { pattern: "(\\d{4})\\d{10}(\\d{4})" replacement: "${1}**********${2}" }];
+
+  // Mask-based redaction
+  string mask_phone = 21 [(redact.v3.value).mask = { keep_first: 3 keep_last: 4 }];
+  optional string mask_ssn = 22 [(redact.v3.value).mask = { keep_first: 0 keep_last: 4 mask_char: "X" }];
+  repeated string mask_emails = 23 [(redact.v3.value).element.item.mask = { keep_first: 2 keep_last: 0 }];
+
+  // Email-based redaction
+  string email_addr = 24 [(redact.v3.value).email = { keep_local_first: 2 mask_domain: false }];
+  optional string email_addr2 = 25 [(redact.v3.value).email = { keep_local_first: 1 mask_domain: true }];
+
+  // Truncate-based redaction
+  string truncate_name = 26 [(redact.v3.value).truncate = { length: 1 suffix: "**" }];
+
+  // Hash-based redaction
+  string hash_token = 27 [(redact.v3.value).hash = { algo: SHA256 }];
+  repeated string hash_tokens = 28 [(redact.v3.value).element.item.hash = { algo: MD5 }];
 }
 
 // Profile message with its own redaction rules
@@ -169,5 +185,13 @@ message OneofMessage {
   // Oneof with regex masking
   oneof secret {
     string api_key = 11 [(redact.v3.value).regex = { pattern: "(.{4}).*(.{4})" replacement: "${1}****${2}" }];
+  }
+
+  // Oneof with mask/email/truncate/hash
+  oneof pii {
+    string mask_ssn_val = 12 [(redact.v3.value).mask = { keep_first: 0 keep_last: 4 }];
+    string mask_email_val = 13 [(redact.v3.value).email = { keep_local_first: 1 }];
+    string trunc_name_val = 14 [(redact.v3.value).truncate = { length: 2 }];
+    string hash_secret_val = 15 [(redact.v3.value).hash = { algo: SHA1 }];
   }
 }
