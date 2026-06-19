@@ -126,7 +126,15 @@ func getRegexRules(typ pgs.FieldType, fr *redact.FieldRules) *redact.RegexRules 
 			if rr, ok := item.Values.(*redact.FieldRules_Regex); ok {
 				return rr.Regex
 			}
+			// Regex nested in element.item.condition.rules
+			if cr, ok := item.Values.(*redact.FieldRules_Condition); ok && cr.Condition != nil {
+				return getRegexRules(typ, cr.Condition.GetRules())
+			}
 		}
+	}
+	// Regex nested in condition.rules
+	if cr, ok := fr.Values.(*redact.FieldRules_Condition); ok && cr.Condition != nil {
+		return getRegexRules(typ, cr.Condition.GetRules())
 	}
 	return nil
 }
@@ -258,6 +266,80 @@ func (m *Module) redactedCustomValue(
 		flData.IsHash = true
 		flData.HashAlgo = info.HashAlgo
 		flData.HashFuncName = hashFuncName(info.HashAlgo)
+		return
+	}
+	if info.IsUUID {
+		flData.IsUUID = true
+		return
+	}
+	if info.IsIP {
+		flData.IsIP = true
+		ir, ok := fieldRules.Values.(*redact.FieldRules_Ip)
+		if !ok || ir.Ip == nil {
+			m.Failf("Invalid ip rule for field %s", field.Name())
+			return
+		}
+		mc := ir.Ip.GetMaskChar()
+		if mc == "" {
+			mc = "x"
+		}
+		flData.IPKeepOctets = ir.Ip.GetKeepOctets()
+		flData.IPMaskChar = strconv.Quote(mc)
+		return
+	}
+	if info.IsURL {
+		flData.IsURL = true
+		ur, ok := fieldRules.Values.(*redact.FieldRules_Url)
+		if !ok || ur.Url == nil {
+			m.Failf("Invalid url rule for field %s", field.Name())
+			return
+		}
+		mc := ur.Url.GetMaskChar()
+		if mc == "" {
+			mc = "*"
+		}
+		flData.URLMaskQuery = ur.Url.GetMaskQuery()
+		flData.URLMaskChar = strconv.Quote(mc)
+		return
+	}
+	if info.IsFixedLength {
+		flData.IsFixedLength = true
+		fr, ok := fieldRules.Values.(*redact.FieldRules_FixedLength)
+		if !ok || fr.FixedLength == nil {
+			m.Failf("Invalid fixed_length rule for field %s", field.Name())
+			return
+		}
+		c := fr.FixedLength.GetChar()
+		if c == "" {
+			c = "X"
+		}
+		flData.FixedLengthChar = strconv.Quote(c)
+		return
+	}
+	if info.IsCustom {
+		flData.IsCustom = true
+		cr, ok := fieldRules.Values.(*redact.FieldRules_Custom)
+		if !ok || cr.Custom == nil {
+			m.Failf("Invalid custom rule for field %s", field.Name())
+			return
+		}
+		flData.CustomFuncName = strconv.Quote(cr.Custom.GetName())
+		return
+	}
+	if info.IsCondition {
+		flData.IsCondition = true
+		cr, ok := fieldRules.Values.(*redact.FieldRules_Condition)
+		if !ok || cr.Condition == nil {
+			m.Failf("Invalid condition rule for field %s", field.Name())
+			return
+		}
+		flData.CondEnvVar = strconv.Quote(cr.Condition.GetEnvVar())
+		flData.CondEnvVal = strconv.Quote(cr.Condition.GetEnvVal())
+		// Recursively process the inner rules
+		innerRules := cr.Condition.GetRules()
+		if innerRules != nil && innerRules.Values != nil {
+			m.redactedCustomValue(flData, field, innerRules)
+		}
 		return
 	}
 
@@ -413,6 +495,88 @@ func (m *Module) redactedCustomValue(
 			flData.HashFuncName = hashFuncName(flData.HashAlgo)
 			return
 		}
+		if _, ok := rules.Values.(*redact.FieldRules_Uuid); ok {
+			flData.IsUUID = true
+			flData.Iterate = true
+			return
+		}
+		if _, ok := rules.Values.(*redact.FieldRules_Ip); ok {
+			flData.IsIP = true
+			flData.Iterate = true
+			ir := rules.GetIp()
+			if ir == nil {
+				m.Failf("Invalid ip rule for field %s", field.Name())
+				return
+			}
+			mc := ir.GetMaskChar()
+			if mc == "" {
+				mc = "x"
+			}
+			flData.IPKeepOctets = ir.GetKeepOctets()
+			flData.IPMaskChar = strconv.Quote(mc)
+			return
+		}
+		if _, ok := rules.Values.(*redact.FieldRules_Url); ok {
+			flData.IsURL = true
+			flData.Iterate = true
+			ur := rules.GetUrl()
+			if ur == nil {
+				m.Failf("Invalid url rule for field %s", field.Name())
+				return
+			}
+			mc := ur.GetMaskChar()
+			if mc == "" {
+				mc = "*"
+			}
+			flData.URLMaskQuery = ur.GetMaskQuery()
+			flData.URLMaskChar = strconv.Quote(mc)
+			return
+		}
+		if _, ok := rules.Values.(*redact.FieldRules_FixedLength); ok {
+			flData.IsFixedLength = true
+			flData.Iterate = true
+			fr := rules.GetFixedLength()
+			if fr == nil {
+				m.Failf("Invalid fixed_length rule for field %s", field.Name())
+				return
+			}
+			c := fr.GetChar()
+			if c == "" {
+				c = "X"
+			}
+			flData.FixedLengthChar = strconv.Quote(c)
+			return
+		}
+		if _, ok := rules.Values.(*redact.FieldRules_Custom); ok {
+			flData.IsCustom = true
+			flData.Iterate = true
+			cr := rules.GetCustom()
+			if cr == nil {
+				m.Failf("Invalid custom rule for field %s", field.Name())
+				return
+			}
+			flData.CustomFuncName = strconv.Quote(cr.GetName())
+			return
+		}
+		if _, ok := rules.Values.(*redact.FieldRules_Condition); ok {
+			flData.IsCondition = true
+			flData.Iterate = true
+			cond := rules.GetCondition()
+			if cond == nil {
+				m.Failf("Invalid condition rule for field %s", field.Name())
+				return
+			}
+			flData.CondEnvVar = strconv.Quote(cond.GetEnvVar())
+			flData.CondEnvVal = strconv.Quote(cond.GetEnvVal())
+			// Recursively process the inner rules for the item
+			innerRules := cond.GetRules()
+			if innerRules != nil && innerRules.Values != nil {
+				// Temporarily clear Iterate to let inner rule processing set flags
+				// Iterate is already true and will remain
+				m.redactedCustomValue(flData, field, innerRules)
+			}
+			return
+		}
 		info := m.RuleInformation(rules)
 		// match types
 		if info.ProtoType != typ.Element().ProtoType() {
@@ -469,6 +633,18 @@ type RuleInfo struct {
 	IsHash bool
 	// HashAlgo stores the hash algorithm name ("md5", "sha1", "sha256")
 	HashAlgo string
+	// IsUUID indicates the rule is deterministic UUID replacement
+	IsUUID bool
+	// IsIP indicates the rule is IP address masking
+	IsIP bool
+	// IsURL indicates the rule is URL masking
+	IsURL bool
+	// IsFixedLength indicates the rule is fixed-length masking
+	IsFixedLength bool
+	// IsCustom indicates the rule uses a user-registered redactor
+	IsCustom bool
+	// IsCondition indicates the rule is condition-based
+	IsCondition bool
 }
 
 // RuleInformation returns required information from the redact.FieldRules
@@ -573,6 +749,44 @@ func (m *Module) RuleInformation(rules *redact.FieldRules) (res RuleInfo) {
 		res.IsTruncate = true
 		if rule == nil || rule.Truncate == nil {
 			m.Fail("(redact.custom).truncate is nil, no option defined")
+			return // unreachable
+		}
+	case *redact.FieldRules_Uuid:
+		res.ProtoType = pgs.StringT
+		res.IsUUID = true
+	case *redact.FieldRules_Ip:
+		res.ProtoType = pgs.StringT
+		res.IsIP = true
+		if rule == nil || rule.Ip == nil {
+			m.Fail("(redact.custom).ip is nil, no option defined")
+			return // unreachable
+		}
+	case *redact.FieldRules_Url:
+		res.ProtoType = pgs.StringT
+		res.IsURL = true
+		if rule == nil || rule.Url == nil {
+			m.Fail("(redact.custom).url is nil, no option defined")
+			return // unreachable
+		}
+	case *redact.FieldRules_FixedLength:
+		res.ProtoType = pgs.StringT
+		res.IsFixedLength = true
+		if rule == nil || rule.FixedLength == nil {
+			m.Fail("(redact.custom).fixed_length is nil, no option defined")
+			return // unreachable
+		}
+	case *redact.FieldRules_Custom:
+		res.ProtoType = pgs.StringT
+		res.IsCustom = true
+		if rule == nil || rule.Custom == nil {
+			m.Fail("(redact.custom).custom is nil, no option defined")
+			return // unreachable
+		}
+	case *redact.FieldRules_Condition:
+		res.ProtoType = pgs.StringT
+		res.IsCondition = true
+		if rule == nil || rule.Condition == nil {
+			m.Fail("(redact.custom).condition is nil, no option defined")
 			return // unreachable
 		}
 	case *redact.FieldRules_Element:

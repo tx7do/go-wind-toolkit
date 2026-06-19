@@ -7,6 +7,11 @@ import "redact/v3/redact.proto";
 
 option go_package = "github.com/menta2k/protoc-gen-redact/v3/examples/tests;tests";
 
+option (redact.v3.auto_detect) = {
+  patterns: ["password", "secret"]
+  default_action: { mask: { keep_first: 2 keep_last: 2 } }
+};
+
 enum TestEnum {
   ValueZero = 0;
   ValueOne = 1;
@@ -81,6 +86,30 @@ message TestMessage {
   // Hash-based redaction
   string hash_token = 56 [(redact.v3.value).hash = { algo: SHA256 }];
   repeated string hash_tokens = 57 [(redact.v3.value).element.item.hash = { algo: MD5 }];
+
+  // UUID-based redaction
+  string uuid_user_id = 58 [(redact.v3.value).uuid = {}];
+  repeated string uuid_tokens = 59 [(redact.v3.value).element.item.uuid = {}];
+
+  // IP-based redaction
+  string ip_address = 60 [(redact.v3.value).ip = { keep_octets: 2 }];
+  optional string ip_address2 = 61 [(redact.v3.value).ip = { keep_octets: 3 mask_char: "0" }];
+
+  // URL-based redaction
+  string callback_url = 62 [(redact.v3.value).url = { mask_query: true }];
+
+  // FixedLength-based redaction
+  string bank_account = 63 [(redact.v3.value).fixed_length = { char: "X" }];
+
+  // Custom-based redaction
+  string custom_ssn = 64 [(redact.v3.value).custom = { name: "myRedactor" }];
+
+  // Condition-based redaction (wrapping mask)
+  string cond_phone = 65 [(redact.v3.value).condition = { env_var: "APP_ENV" env_val: "production" rules: { mask: { keep_first: 3 keep_last: 4 } } }];
+
+  // AutoDetect fields (no explicit rule, caught by file-level auto_detect)
+  string user_password = 66;
+  string user_secret = 67;
 }
 
 // OneofMessage demonstrates oneof field handling
@@ -119,6 +148,12 @@ message OneofMessage {
     string email_mask = 13 [(redact.v3.value).email = { keep_local_first: 1 }];
     string name_trunc = 14 [(redact.v3.value).truncate = { length: 2 }];
     string secret_hash = 15 [(redact.v3.value).hash = { algo: SHA1 }];
+    string uuid_pii = 16 [(redact.v3.value).uuid = {}];
+    string ip_pii = 17 [(redact.v3.value).ip = { keep_octets: 1 }];
+    string url_pii = 18 [(redact.v3.value).url = { mask_query: true }];
+    string fixed_pii = 19 [(redact.v3.value).fixed_length = { char: "#" }];
+    string custom_pii = 20 [(redact.v3.value).custom = { name: "myRedactor" }];
+    string cond_pii = 21 [(redact.v3.value).condition = { env_var: "DEBUG" env_val: "" rules: { mask: { keep_first: 1 keep_last: 1 } } }];
   }
 }
 

@@ -32,3 +32,27 @@ func (w Wrapper) CheckInternal(ctx context.Context) bool { return w(ctx) }
 var Falsy = Wrapper(func(_ context.Context) bool {
 	return false
 })
+
+// --- Custom Redactor Registry ---
+
+// CustomRedactor is a user-supplied function that transforms a string value.
+type CustomRedactor func(string) string
+
+var customRedactors = map[string]CustomRedactor{}
+
+// RegisterCustomRedactor registers a named redactor function.
+// Call this at init time (or early in program startup) so that generated
+// code can reference it via the `custom` field rule.
+func RegisterCustomRedactor(name string, fn CustomRedactor) {
+	customRedactors[name] = fn
+}
+
+// ApplyCustomRedactor looks up and invokes a registered redactor by name.
+// If no redactor is registered with the given name, the value is returned
+// unchanged.
+func ApplyCustomRedactor(name string, value string) string {
+	if fn, ok := customRedactors[name]; ok {
+		return fn(value)
+	}
+	return value
+}

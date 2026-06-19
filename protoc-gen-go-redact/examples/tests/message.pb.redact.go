@@ -14,6 +14,9 @@ import (
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	net "net"
+	url "net/url"
+	os "os"
 	regexp "regexp"
 	strings "strings"
 )
@@ -76,6 +79,57 @@ func _redactHashSHA1(s string) string {
 func _redactHashSHA256(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return fmt.Sprintf("%x", h[:])
+}
+func _redactUUID(s string) string {
+	h := sha1.Sum([]byte(s))
+	h[6] = (h[6] & 0x0f) | 0x50 // version 5
+	h[8] = (h[8] & 0x3f) | 0x80 // variant RFC 4122
+	return fmt.Sprintf("%x-%x-%x-%x-%x", h[0:4], h[4:6], h[6:8], h[8:10], h[10:16])
+}
+func _redactIP(s string, keepOctets int, maskChar string) string {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return s
+	}
+	if ip.To4() != nil {
+		parts := strings.Split(s, ".")
+		for i := keepOctets; i < 4 && i < len(parts); i++ {
+			parts[i] = maskChar
+		}
+		return strings.Join(parts, ".")
+	}
+	parts := strings.Split(ip.String(), ":")
+	for i := keepOctets; i < len(parts); i++ {
+		parts[i] = maskChar
+	}
+	return strings.Join(parts, ":")
+}
+func _redactURL(s string, maskQuery bool, maskChar string) string {
+	u, err := url.Parse(s)
+	if err != nil || u == nil {
+		return s
+	}
+	if maskQuery && u.RawQuery != "" {
+		vals, _ := url.ParseQuery(u.RawQuery)
+		for k := range vals {
+			vals.Set(k, strings.Repeat(maskChar, len(vals.Get(k))))
+		}
+		u.RawQuery = vals.Encode()
+	}
+	return u.String()
+}
+func _redactFixedLength(s string, char string) string {
+	if char == "" {
+		char = "X"
+	}
+	return strings.Repeat(char, len(s))
+}
+func _redactCondCheck(envVar, envVal string) bool {
+	v := os.Getenv(envVar)
+	if envVal == "" {
+		return v != ""
+	}
+	return v == envVal
 }
 
 // Ensure TestMessage implements the Redactor interface at compile time.
@@ -225,6 +279,43 @@ func (x *TestMessage) Redact() {
 	for _hashIdx := range x.HashTokens {
 		x.HashTokens[_hashIdx] = _redactHashMD5(x.HashTokens[_hashIdx])
 	}
+
+	// Redacting field: UuidUserId
+	x.UuidUserId = _redactUUID(x.UuidUserId)
+
+	// Redacting field: UuidTokens
+	for _uuidIdx := range x.UuidTokens {
+		x.UuidTokens[_uuidIdx] = _redactUUID(x.UuidTokens[_uuidIdx])
+	}
+
+	// Redacting field: IpAddress
+	x.IpAddress = _redactIP(x.IpAddress, 2, "x")
+
+	// Redacting field: IpAddress2
+	if x.IpAddress2 != nil {
+		IpAddress2IPTmp := _redactIP(*x.IpAddress2, 3, "0")
+		x.IpAddress2 = &IpAddress2IPTmp
+	}
+
+	// Redacting field: CallbackUrl
+	x.CallbackUrl = _redactURL(x.CallbackUrl, true, "*")
+
+	// Redacting field: BankAccount
+	x.BankAccount = _redactFixedLength(x.BankAccount, "X")
+
+	// Redacting field: CustomSsn
+	x.CustomSsn = redact.ApplyCustomRedactor("myRedactor", x.CustomSsn)
+
+	// Redacting field: CondPhone
+	if _redactCondCheck("APP_ENV", "production") {
+		x.CondPhone = _redactMask(x.CondPhone, 3, 4, "*")
+	}
+
+	// Redacting field: UserPassword
+	x.UserPassword = _redactMask(x.UserPassword, 2, 2, "*")
+
+	// Redacting field: UserSecret
+	x.UserSecret = _redactMask(x.UserSecret, 2, 2, "*")
 }
 
 // Ensure OneofMessage implements the Redactor interface at compile time.
@@ -277,6 +368,20 @@ func (x *OneofMessage) Redact() {
 		v.NameTrunc = _redactTruncate(v.NameTrunc, 2, "...")
 	case *OneofMessage_SecretHash:
 		v.SecretHash = _redactHashSHA1(v.SecretHash)
+	case *OneofMessage_UuidPii:
+		v.UuidPii = _redactUUID(v.UuidPii)
+	case *OneofMessage_IpPii:
+		v.IpPii = _redactIP(v.IpPii, 1, "x")
+	case *OneofMessage_UrlPii:
+		v.UrlPii = _redactURL(v.UrlPii, true, "*")
+	case *OneofMessage_FixedPii:
+		v.FixedPii = _redactFixedLength(v.FixedPii, "#")
+	case *OneofMessage_CustomPii:
+		v.CustomPii = redact.ApplyCustomRedactor("myRedactor", v.CustomPii)
+	case *OneofMessage_CondPii:
+		if _redactCondCheck("DEBUG", "") {
+			v.CondPii = _redactMask(v.CondPii, 1, 1, "*")
+		}
 	}
 }
 

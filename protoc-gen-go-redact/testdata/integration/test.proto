@@ -67,6 +67,24 @@ message TestMessage {
   // Hash-based redaction
   string hash_token = 27 [(redact.v3.value).hash = { algo: SHA256 }];
   repeated string hash_tokens = 28 [(redact.v3.value).element.item.hash = { algo: MD5 }];
+
+  // UUID-based redaction
+  string uuid_user_id = 29 [(redact.v3.value).uuid = {}];
+
+  // IP-based redaction
+  string ip_address = 30 [(redact.v3.value).ip = { keep_octets: 2 }];
+
+  // URL-based redaction
+  string callback_url = 31 [(redact.v3.value).url = { mask_query: true }];
+
+  // FixedLength-based redaction
+  string bank_account = 32 [(redact.v3.value).fixed_length = { char: "X" }];
+
+  // Custom-based redaction
+  string custom_ssn = 33 [(redact.v3.value).custom = { name: "myRedactor" }];
+
+  // Condition-based redaction
+  string cond_phone = 34 [(redact.v3.value).condition = { env_var: "APP_ENV" env_val: "production" rules: { mask: { keep_first: 3 keep_last: 4 } } }];
 }
 
 // Profile message with its own redaction rules
@@ -193,5 +211,10 @@ message OneofMessage {
     string mask_email_val = 13 [(redact.v3.value).email = { keep_local_first: 1 }];
     string trunc_name_val = 14 [(redact.v3.value).truncate = { length: 2 }];
     string hash_secret_val = 15 [(redact.v3.value).hash = { algo: SHA1 }];
+    string uuid_pii = 16 [(redact.v3.value).uuid = {}];
+    string ip_pii = 17 [(redact.v3.value).ip = { keep_octets: 1 }];
+    string url_pii = 18 [(redact.v3.value).url = { mask_query: true }];
+    string fixed_pii = 19 [(redact.v3.value).fixed_length = { char: "#" }];
+    string custom_pii = 20 [(redact.v3.value).custom = { name: "myRedactor" }];
   }
 }

@@ -109,6 +109,12 @@ type FieldRules struct {
 	//	*FieldRules_Hash
 	//	*FieldRules_Email
 	//	*FieldRules_Truncate
+	//	*FieldRules_Uuid
+	//	*FieldRules_Ip
+	//	*FieldRules_Url
+	//	*FieldRules_FixedLength
+	//	*FieldRules_Custom
+	//	*FieldRules_Condition
 	Values        isFieldRules_Values `protobuf_oneof:"values"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -358,6 +364,60 @@ func (x *FieldRules) GetTruncate() *TruncateRules {
 	return nil
 }
 
+func (x *FieldRules) GetUuid() *UUIDRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Uuid); ok {
+			return x.Uuid
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetIp() *IPRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Ip); ok {
+			return x.Ip
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetUrl() *URLRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Url); ok {
+			return x.Url
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetFixedLength() *FixedLengthRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_FixedLength); ok {
+			return x.FixedLength
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetCustom() *CustomRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Custom); ok {
+			return x.Custom
+		}
+	}
+	return nil
+}
+
+func (x *FieldRules) GetCondition() *ConditionRules {
+	if x != nil {
+		if x, ok := x.Values.(*FieldRules_Condition); ok {
+			return x.Condition
+		}
+	}
+	return nil
+}
+
 type isFieldRules_Values interface {
 	isFieldRules_Values()
 }
@@ -462,6 +522,37 @@ type FieldRules_Truncate struct {
 	Truncate *TruncateRules `protobuf:"bytes,25,opt,name=truncate,proto3,oneof"`
 }
 
+type FieldRules_Uuid struct {
+	// UUID replaces the field with a deterministic UUID v5 (namespace-based).
+	// Same input always produces the same UUID, enabling anonymization.
+	Uuid *UUIDRules `protobuf:"bytes,26,opt,name=uuid,proto3,oneof"`
+}
+
+type FieldRules_Ip struct {
+	// IP masks an IP address (IPv4 or IPv6), keeping the first N octets/hextets.
+	Ip *IPRules `protobuf:"bytes,27,opt,name=ip,proto3,oneof"`
+}
+
+type FieldRules_Url struct {
+	// URL masks parts of a URL (query parameters, path, etc.).
+	Url *URLRules `protobuf:"bytes,28,opt,name=url,proto3,oneof"`
+}
+
+type FieldRules_FixedLength struct {
+	// FixedLength replaces the entire value with a fixed-length mask of the same length.
+	FixedLength *FixedLengthRules `protobuf:"bytes,29,opt,name=fixed_length,json=fixedLength,proto3,oneof"`
+}
+
+type FieldRules_Custom struct {
+	// Custom invokes a user-registered redactor function at runtime.
+	Custom *CustomRules `protobuf:"bytes,30,opt,name=custom,proto3,oneof"`
+}
+
+type FieldRules_Condition struct {
+	// Condition applies inner rules only when an environment variable matches.
+	Condition *ConditionRules `protobuf:"bytes,31,opt,name=condition,proto3,oneof"`
+}
+
 func (*FieldRules_Float) isFieldRules_Values() {}
 
 func (*FieldRules_Double) isFieldRules_Values() {}
@@ -507,6 +598,18 @@ func (*FieldRules_Hash) isFieldRules_Values() {}
 func (*FieldRules_Email) isFieldRules_Values() {}
 
 func (*FieldRules_Truncate) isFieldRules_Values() {}
+
+func (*FieldRules_Uuid) isFieldRules_Values() {}
+
+func (*FieldRules_Ip) isFieldRules_Values() {}
+
+func (*FieldRules_Url) isFieldRules_Values() {}
+
+func (*FieldRules_FixedLength) isFieldRules_Values() {}
+
+func (*FieldRules_Custom) isFieldRules_Values() {}
+
+func (*FieldRules_Condition) isFieldRules_Values() {}
 
 // RegexRules describe regex-based partial masking for string fields.
 // The regex pattern is compiled at package init time and applied via
@@ -805,6 +908,374 @@ func (x *TruncateRules) GetSuffix() string {
 	return ""
 }
 
+// UUIDRules replaces a string with a deterministic UUID v5.
+// The same input always yields the same UUID, preserving uniqueness
+// while being irreversible.
+type UUIDRules struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UUIDRules) Reset() {
+	*x = UUIDRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UUIDRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UUIDRules) ProtoMessage() {}
+
+func (x *UUIDRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UUIDRules.ProtoReflect.Descriptor instead.
+func (*UUIDRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{6}
+}
+
+// IPRules masks an IP address (IPv4 or IPv6).
+type IPRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// KeepOctets is the number of leading octets (IPv4) or hextets (IPv6)
+	// to preserve. The rest are replaced with mask_char.
+	// Default: 2 for IPv4, 4 for IPv6.
+	KeepOctets uint32 `protobuf:"varint,1,opt,name=keep_octets,json=keepOctets,proto3" json:"keep_octets,omitempty"`
+	// MaskChar is the character used for masked octets (default: "x").
+	MaskChar      string `protobuf:"bytes,2,opt,name=mask_char,json=maskChar,proto3" json:"mask_char,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IPRules) Reset() {
+	*x = IPRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IPRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IPRules) ProtoMessage() {}
+
+func (x *IPRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IPRules.ProtoReflect.Descriptor instead.
+func (*IPRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *IPRules) GetKeepOctets() uint32 {
+	if x != nil {
+		return x.KeepOctets
+	}
+	return 0
+}
+
+func (x *IPRules) GetMaskChar() string {
+	if x != nil {
+		return x.MaskChar
+	}
+	return ""
+}
+
+// URLRules masks parts of a URL.
+type URLRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// MaskQuery, if true, masks all query parameter values.
+	MaskQuery bool `protobuf:"varint,1,opt,name=mask_query,json=maskQuery,proto3" json:"mask_query,omitempty"`
+	// MaskChar is the character used for masking (default: "*").
+	MaskChar      string `protobuf:"bytes,2,opt,name=mask_char,json=maskChar,proto3" json:"mask_char,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *URLRules) Reset() {
+	*x = URLRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *URLRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*URLRules) ProtoMessage() {}
+
+func (x *URLRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use URLRules.ProtoReflect.Descriptor instead.
+func (*URLRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *URLRules) GetMaskQuery() bool {
+	if x != nil {
+		return x.MaskQuery
+	}
+	return false
+}
+
+func (x *URLRules) GetMaskChar() string {
+	if x != nil {
+		return x.MaskChar
+	}
+	return ""
+}
+
+// FixedLengthRules replaces the entire value with a mask of the same length.
+type FixedLengthRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Char is the character used for the mask (default: "X").
+	Char          string `protobuf:"bytes,1,opt,name=char,proto3" json:"char,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FixedLengthRules) Reset() {
+	*x = FixedLengthRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FixedLengthRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FixedLengthRules) ProtoMessage() {}
+
+func (x *FixedLengthRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FixedLengthRules.ProtoReflect.Descriptor instead.
+func (*FixedLengthRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *FixedLengthRules) GetChar() string {
+	if x != nil {
+		return x.Char
+	}
+	return ""
+}
+
+// CustomRules invokes a user-registered redactor function.
+// Register functions via redact.RegisterCustomRedactor(name, func).
+type CustomRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Name is the registered redactor function name.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CustomRules) Reset() {
+	*x = CustomRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CustomRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CustomRules) ProtoMessage() {}
+
+func (x *CustomRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CustomRules.ProtoReflect.Descriptor instead.
+func (*CustomRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CustomRules) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+// ConditionRules applies inner rules only when an environment variable
+// matches the expected value. This enables environment-specific redaction
+// (e.g., only mask in production).
+type ConditionRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// EnvVar is the environment variable name to check.
+	EnvVar string `protobuf:"bytes,1,opt,name=env_var,json=envVar,proto3" json:"env_var,omitempty"`
+	// EnvVal is the expected value. If empty, checks that the variable is
+	// set to any non-empty value.
+	EnvVal string `protobuf:"bytes,2,opt,name=env_val,json=envVal,proto3" json:"env_val,omitempty"`
+	// Rules are the redaction rules to apply when the condition is met.
+	Rules         *FieldRules `protobuf:"bytes,3,opt,name=rules,proto3" json:"rules,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConditionRules) Reset() {
+	*x = ConditionRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConditionRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConditionRules) ProtoMessage() {}
+
+func (x *ConditionRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConditionRules.ProtoReflect.Descriptor instead.
+func (*ConditionRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ConditionRules) GetEnvVar() string {
+	if x != nil {
+		return x.EnvVar
+	}
+	return ""
+}
+
+func (x *ConditionRules) GetEnvVal() string {
+	if x != nil {
+		return x.EnvVal
+	}
+	return ""
+}
+
+func (x *ConditionRules) GetRules() *FieldRules {
+	if x != nil {
+		return x.Rules
+	}
+	return nil
+}
+
+// AutoDetectRules enables automatic redaction based on field name patterns.
+type AutoDetectRules struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Patterns is a list of substrings to match against field names
+	// (case-insensitive). If a field name contains any pattern, the
+	// default_action rules are automatically applied.
+	Patterns []string `protobuf:"bytes,1,rep,name=patterns,proto3" json:"patterns,omitempty"`
+	// DefaultAction specifies the redaction rules to apply to matched fields.
+	DefaultAction *FieldRules `protobuf:"bytes,2,opt,name=default_action,json=defaultAction,proto3" json:"default_action,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AutoDetectRules) Reset() {
+	*x = AutoDetectRules{}
+	mi := &file_redact_v3_redact_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AutoDetectRules) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AutoDetectRules) ProtoMessage() {}
+
+func (x *AutoDetectRules) ProtoReflect() protoreflect.Message {
+	mi := &file_redact_v3_redact_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AutoDetectRules.ProtoReflect.Descriptor instead.
+func (*AutoDetectRules) Descriptor() ([]byte, []int) {
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AutoDetectRules) GetPatterns() []string {
+	if x != nil {
+		return x.Patterns
+	}
+	return nil
+}
+
+func (x *AutoDetectRules) GetDefaultAction() *FieldRules {
+	if x != nil {
+		return x.DefaultAction
+	}
+	return nil
+}
+
 // MessageRules describe the constraints applied to embedded message for redaction.
 // For message-type fields, rules are performed recursively.
 type MessageRules struct {
@@ -823,7 +1294,7 @@ type MessageRules struct {
 
 func (x *MessageRules) Reset() {
 	*x = MessageRules{}
-	mi := &file_redact_v3_redact_proto_msgTypes[6]
+	mi := &file_redact_v3_redact_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -835,7 +1306,7 @@ func (x *MessageRules) String() string {
 func (*MessageRules) ProtoMessage() {}
 
 func (x *MessageRules) ProtoReflect() protoreflect.Message {
-	mi := &file_redact_v3_redact_proto_msgTypes[6]
+	mi := &file_redact_v3_redact_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -848,7 +1319,7 @@ func (x *MessageRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageRules.ProtoReflect.Descriptor instead.
 func (*MessageRules) Descriptor() ([]byte, []int) {
-	return file_redact_v3_redact_proto_rawDescGZIP(), []int{6}
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *MessageRules) GetSkip() bool {
@@ -896,7 +1367,7 @@ type ElementRules struct {
 
 func (x *ElementRules) Reset() {
 	*x = ElementRules{}
-	mi := &file_redact_v3_redact_proto_msgTypes[7]
+	mi := &file_redact_v3_redact_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -908,7 +1379,7 @@ func (x *ElementRules) String() string {
 func (*ElementRules) ProtoMessage() {}
 
 func (x *ElementRules) ProtoReflect() protoreflect.Message {
-	mi := &file_redact_v3_redact_proto_msgTypes[7]
+	mi := &file_redact_v3_redact_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -921,7 +1392,7 @@ func (x *ElementRules) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementRules.ProtoReflect.Descriptor instead.
 func (*ElementRules) Descriptor() ([]byte, []int) {
-	return file_redact_v3_redact_proto_rawDescGZIP(), []int{7}
+	return file_redact_v3_redact_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ElementRules) GetEmpty() bool {
@@ -952,6 +1423,14 @@ var file_redact_v3_redact_proto_extTypes = []protoimpl.ExtensionInfo{
 		Field:         90102,
 		Name:          "redact.v3.file_skip",
 		Tag:           "varint,90102,opt,name=file_skip",
+		Filename:      "redact/v3/redact.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FileOptions)(nil),
+		ExtensionType: (*AutoDetectRules)(nil),
+		Field:         90103,
+		Name:          "redact.v3.auto_detect",
+		Tag:           "bytes,90103,opt,name=auto_detect",
 		Filename:      "redact/v3/redact.proto",
 	},
 	{
@@ -1058,6 +1537,12 @@ var (
 	//
 	// optional bool file_skip = 90102;
 	E_FileSkip = &file_redact_v3_redact_proto_extTypes[0]
+	// AutoDetect enables automatic redaction based on field name patterns.
+	// Fields whose names match any of the patterns will automatically have
+	// the default_action rules applied, unless they already have explicit rules.
+	//
+	// optional redact.v3.AutoDetectRules auto_detect = 90103;
+	E_AutoDetect = &file_redact_v3_redact_proto_extTypes[1]
 )
 
 // Extension fields to descriptorpb.ServiceOptions.
@@ -1065,7 +1550,7 @@ var (
 	// ServiceSkip is used to skip the redaction in grpc service in the server
 	//
 	// optional bool service_skip = 54123;
-	E_ServiceSkip = &file_redact_v3_redact_proto_extTypes[1]
+	E_ServiceSkip = &file_redact_v3_redact_proto_extTypes[2]
 	// InternalService will make this service private and client will not be
 	// able to receive any response for any of it's method, (unless skipped
 	// explicitly) and will get PermissionDenied(7) error by default, to set
@@ -1075,11 +1560,11 @@ var (
 	// corresponding service name or method name, respectively.
 	//
 	// optional bool internal_service = 54124;
-	E_InternalService = &file_redact_v3_redact_proto_extTypes[2]
+	E_InternalService = &file_redact_v3_redact_proto_extTypes[3]
 	// optional uint32 internal_service_code = 54125;
-	E_InternalServiceCode = &file_redact_v3_redact_proto_extTypes[3]
+	E_InternalServiceCode = &file_redact_v3_redact_proto_extTypes[4]
 	// optional string internal_service_err_message = 54126;
-	E_InternalServiceErrMessage = &file_redact_v3_redact_proto_extTypes[4]
+	E_InternalServiceErrMessage = &file_redact_v3_redact_proto_extTypes[5]
 )
 
 // Extension fields to descriptorpb.MethodOptions.
@@ -1087,7 +1572,7 @@ var (
 	// MethodSkip is used to skip the redactions for this method in the grpc server
 	//
 	// optional bool method_skip = 54123;
-	E_MethodSkip = &file_redact_v3_redact_proto_extTypes[5]
+	E_MethodSkip = &file_redact_v3_redact_proto_extTypes[6]
 	// InternalMethod, InternalMethodCode and InternalMethodErrMessage works same
 	// as that of service level options: InternalService, InternalServiceCode and
 	// InternalServiceErrMessage, but at Method level. All the validations and
@@ -1095,11 +1580,11 @@ var (
 	// whenever both are specified.
 	//
 	// optional bool internal_method = 54124;
-	E_InternalMethod = &file_redact_v3_redact_proto_extTypes[6]
+	E_InternalMethod = &file_redact_v3_redact_proto_extTypes[7]
 	// optional uint32 internal_method_code = 54125;
-	E_InternalMethodCode = &file_redact_v3_redact_proto_extTypes[7]
+	E_InternalMethodCode = &file_redact_v3_redact_proto_extTypes[8]
 	// optional string internal_method_err_message = 54126;
-	E_InternalMethodErrMessage = &file_redact_v3_redact_proto_extTypes[8]
+	E_InternalMethodErrMessage = &file_redact_v3_redact_proto_extTypes[9]
 )
 
 // Extension fields to descriptorpb.MessageOptions.
@@ -1107,15 +1592,15 @@ var (
 	// Nil will redact message to nil (can be override by field level, `empty` option)
 	//
 	// optional bool nil = 54123;
-	E_Nil = &file_redact_v3_redact_proto_extTypes[9]
+	E_Nil = &file_redact_v3_redact_proto_extTypes[10]
 	// Empty will redact message to it's empty object
 	//
 	// optional bool empty = 54124;
-	E_Empty = &file_redact_v3_redact_proto_extTypes[10]
+	E_Empty = &file_redact_v3_redact_proto_extTypes[11]
 	// Ignored skips generation of any redaction for this message.
 	//
 	// optional bool ignored = 54125;
-	E_Ignored = &file_redact_v3_redact_proto_extTypes[11]
+	E_Ignored = &file_redact_v3_redact_proto_extTypes[12]
 )
 
 // Extension fields to descriptorpb.FieldOptions.
@@ -1135,14 +1620,14 @@ var (
 	// And if Custom value is to be assigned, one can skip the Redact field.
 	//
 	// optional redact.v3.FieldRules value = 54123;
-	E_Value = &file_redact_v3_redact_proto_extTypes[12]
+	E_Value = &file_redact_v3_redact_proto_extTypes[13]
 )
 
 var File_redact_v3_redact_proto protoreflect.FileDescriptor
 
 const file_redact_v3_redact_proto_rawDesc = "" +
 	"\n" +
-	"\x16redact/v3/redact.proto\x12\tredact.v3\x1a google/protobuf/descriptor.proto\"\x8a\x06\n" +
+	"\x16redact/v3/redact.proto\x12\tredact.v3\x1a google/protobuf/descriptor.proto\"\xb4\b\n" +
 	"\n" +
 	"FieldRules\x12\x16\n" +
 	"\x05float\x18\x02 \x01(\x02H\x00R\x05float\x12\x18\n" +
@@ -1168,7 +1653,13 @@ const file_redact_v3_redact_proto_rawDesc = "" +
 	"\x04mask\x18\x16 \x01(\v2\x14.redact.v3.MaskRulesH\x00R\x04mask\x12*\n" +
 	"\x04hash\x18\x17 \x01(\v2\x14.redact.v3.HashRulesH\x00R\x04hash\x12-\n" +
 	"\x05email\x18\x18 \x01(\v2\x15.redact.v3.EmailRulesH\x00R\x05email\x126\n" +
-	"\btruncate\x18\x19 \x01(\v2\x18.redact.v3.TruncateRulesH\x00R\btruncateB\b\n" +
+	"\btruncate\x18\x19 \x01(\v2\x18.redact.v3.TruncateRulesH\x00R\btruncate\x12*\n" +
+	"\x04uuid\x18\x1a \x01(\v2\x14.redact.v3.UUIDRulesH\x00R\x04uuid\x12$\n" +
+	"\x02ip\x18\x1b \x01(\v2\x12.redact.v3.IPRulesH\x00R\x02ip\x12'\n" +
+	"\x03url\x18\x1c \x01(\v2\x13.redact.v3.URLRulesH\x00R\x03url\x12@\n" +
+	"\ffixed_length\x18\x1d \x01(\v2\x1b.redact.v3.FixedLengthRulesH\x00R\vfixedLength\x120\n" +
+	"\x06custom\x18\x1e \x01(\v2\x16.redact.v3.CustomRulesH\x00R\x06custom\x129\n" +
+	"\tcondition\x18\x1f \x01(\v2\x19.redact.v3.ConditionRulesH\x00R\tconditionB\b\n" +
 	"\x06values\"H\n" +
 	"\n" +
 	"RegexRules\x12\x18\n" +
@@ -1189,7 +1680,27 @@ const file_redact_v3_redact_proto_rawDesc = "" +
 	"\tmask_char\x18\x03 \x01(\tR\bmaskChar\"?\n" +
 	"\rTruncateRules\x12\x16\n" +
 	"\x06length\x18\x01 \x01(\rR\x06length\x12\x16\n" +
-	"\x06suffix\x18\x02 \x01(\tR\x06suffix\"`\n" +
+	"\x06suffix\x18\x02 \x01(\tR\x06suffix\"\v\n" +
+	"\tUUIDRules\"G\n" +
+	"\aIPRules\x12\x1f\n" +
+	"\vkeep_octets\x18\x01 \x01(\rR\n" +
+	"keepOctets\x12\x1b\n" +
+	"\tmask_char\x18\x02 \x01(\tR\bmaskChar\"F\n" +
+	"\bURLRules\x12\x1d\n" +
+	"\n" +
+	"mask_query\x18\x01 \x01(\bR\tmaskQuery\x12\x1b\n" +
+	"\tmask_char\x18\x02 \x01(\tR\bmaskChar\"&\n" +
+	"\x10FixedLengthRules\x12\x12\n" +
+	"\x04char\x18\x01 \x01(\tR\x04char\"!\n" +
+	"\vCustomRules\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"o\n" +
+	"\x0eConditionRules\x12\x17\n" +
+	"\aenv_var\x18\x01 \x01(\tR\x06envVar\x12\x17\n" +
+	"\aenv_val\x18\x02 \x01(\tR\x06envVal\x12+\n" +
+	"\x05rules\x18\x03 \x01(\v2\x15.redact.v3.FieldRulesR\x05rules\"k\n" +
+	"\x0fAutoDetectRules\x12\x1a\n" +
+	"\bpatterns\x18\x01 \x03(\tR\bpatterns\x12<\n" +
+	"\x0edefault_action\x18\x02 \x01(\v2\x15.redact.v3.FieldRulesR\rdefaultAction\"`\n" +
 	"\fMessageRules\x12\x12\n" +
 	"\x04skip\x18\x01 \x01(\bR\x04skip\x12\x14\n" +
 	"\x05empty\x18\x02 \x01(\bR\x05empty\x12\x10\n" +
@@ -1205,7 +1716,9 @@ const file_redact_v3_redact_proto_rawDesc = "" +
 	"\x04SHA1\x10\x02\x12\n" +
 	"\n" +
 	"\x06SHA256\x10\x03:;\n" +
-	"\tfile_skip\x12\x1c.google.protobuf.FileOptions\x18\xf6\xbf\x05 \x01(\bR\bfileSkip:D\n" +
+	"\tfile_skip\x12\x1c.google.protobuf.FileOptions\x18\xf6\xbf\x05 \x01(\bR\bfileSkip:[\n" +
+	"\vauto_detect\x12\x1c.google.protobuf.FileOptions\x18\xf7\xbf\x05 \x01(\v2\x1a.redact.v3.AutoDetectRulesR\n" +
+	"autoDetect:D\n" +
 	"\fservice_skip\x12\x1f.google.protobuf.ServiceOptions\x18\xeb\xa6\x03 \x01(\bR\vserviceSkip:L\n" +
 	"\x10internal_service\x12\x1f.google.protobuf.ServiceOptions\x18\xec\xa6\x03 \x01(\bR\x0finternalService:U\n" +
 	"\x15internal_service_code\x12\x1f.google.protobuf.ServiceOptions\x18\xed\xa6\x03 \x01(\rR\x13internalServiceCode:b\n" +
@@ -1233,7 +1746,7 @@ func file_redact_v3_redact_proto_rawDescGZIP() []byte {
 }
 
 var file_redact_v3_redact_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_redact_v3_redact_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_redact_v3_redact_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_redact_v3_redact_proto_goTypes = []any{
 	(HashAlgo)(0),                       // 0: redact.v3.HashAlgo
 	(*FieldRules)(nil),                  // 1: redact.v3.FieldRules
@@ -1242,43 +1755,60 @@ var file_redact_v3_redact_proto_goTypes = []any{
 	(*HashRules)(nil),                   // 4: redact.v3.HashRules
 	(*EmailRules)(nil),                  // 5: redact.v3.EmailRules
 	(*TruncateRules)(nil),               // 6: redact.v3.TruncateRules
-	(*MessageRules)(nil),                // 7: redact.v3.MessageRules
-	(*ElementRules)(nil),                // 8: redact.v3.ElementRules
-	(*descriptorpb.FileOptions)(nil),    // 9: google.protobuf.FileOptions
-	(*descriptorpb.ServiceOptions)(nil), // 10: google.protobuf.ServiceOptions
-	(*descriptorpb.MethodOptions)(nil),  // 11: google.protobuf.MethodOptions
-	(*descriptorpb.MessageOptions)(nil), // 12: google.protobuf.MessageOptions
-	(*descriptorpb.FieldOptions)(nil),   // 13: google.protobuf.FieldOptions
+	(*UUIDRules)(nil),                   // 7: redact.v3.UUIDRules
+	(*IPRules)(nil),                     // 8: redact.v3.IPRules
+	(*URLRules)(nil),                    // 9: redact.v3.URLRules
+	(*FixedLengthRules)(nil),            // 10: redact.v3.FixedLengthRules
+	(*CustomRules)(nil),                 // 11: redact.v3.CustomRules
+	(*ConditionRules)(nil),              // 12: redact.v3.ConditionRules
+	(*AutoDetectRules)(nil),             // 13: redact.v3.AutoDetectRules
+	(*MessageRules)(nil),                // 14: redact.v3.MessageRules
+	(*ElementRules)(nil),                // 15: redact.v3.ElementRules
+	(*descriptorpb.FileOptions)(nil),    // 16: google.protobuf.FileOptions
+	(*descriptorpb.ServiceOptions)(nil), // 17: google.protobuf.ServiceOptions
+	(*descriptorpb.MethodOptions)(nil),  // 18: google.protobuf.MethodOptions
+	(*descriptorpb.MessageOptions)(nil), // 19: google.protobuf.MessageOptions
+	(*descriptorpb.FieldOptions)(nil),   // 20: google.protobuf.FieldOptions
 }
 var file_redact_v3_redact_proto_depIdxs = []int32{
-	7,  // 0: redact.v3.FieldRules.message:type_name -> redact.v3.MessageRules
-	8,  // 1: redact.v3.FieldRules.element:type_name -> redact.v3.ElementRules
+	14, // 0: redact.v3.FieldRules.message:type_name -> redact.v3.MessageRules
+	15, // 1: redact.v3.FieldRules.element:type_name -> redact.v3.ElementRules
 	2,  // 2: redact.v3.FieldRules.regex:type_name -> redact.v3.RegexRules
 	3,  // 3: redact.v3.FieldRules.mask:type_name -> redact.v3.MaskRules
 	4,  // 4: redact.v3.FieldRules.hash:type_name -> redact.v3.HashRules
 	5,  // 5: redact.v3.FieldRules.email:type_name -> redact.v3.EmailRules
 	6,  // 6: redact.v3.FieldRules.truncate:type_name -> redact.v3.TruncateRules
-	0,  // 7: redact.v3.HashRules.algo:type_name -> redact.v3.HashAlgo
-	1,  // 8: redact.v3.ElementRules.item:type_name -> redact.v3.FieldRules
-	9,  // 9: redact.v3.file_skip:extendee -> google.protobuf.FileOptions
-	10, // 10: redact.v3.service_skip:extendee -> google.protobuf.ServiceOptions
-	10, // 11: redact.v3.internal_service:extendee -> google.protobuf.ServiceOptions
-	10, // 12: redact.v3.internal_service_code:extendee -> google.protobuf.ServiceOptions
-	10, // 13: redact.v3.internal_service_err_message:extendee -> google.protobuf.ServiceOptions
-	11, // 14: redact.v3.method_skip:extendee -> google.protobuf.MethodOptions
-	11, // 15: redact.v3.internal_method:extendee -> google.protobuf.MethodOptions
-	11, // 16: redact.v3.internal_method_code:extendee -> google.protobuf.MethodOptions
-	11, // 17: redact.v3.internal_method_err_message:extendee -> google.protobuf.MethodOptions
-	12, // 18: redact.v3.nil:extendee -> google.protobuf.MessageOptions
-	12, // 19: redact.v3.empty:extendee -> google.protobuf.MessageOptions
-	12, // 20: redact.v3.ignored:extendee -> google.protobuf.MessageOptions
-	13, // 21: redact.v3.value:extendee -> google.protobuf.FieldOptions
-	1,  // 22: redact.v3.value:type_name -> redact.v3.FieldRules
-	23, // [23:23] is the sub-list for method output_type
-	23, // [23:23] is the sub-list for method input_type
-	22, // [22:23] is the sub-list for extension type_name
-	9,  // [9:22] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	7,  // 7: redact.v3.FieldRules.uuid:type_name -> redact.v3.UUIDRules
+	8,  // 8: redact.v3.FieldRules.ip:type_name -> redact.v3.IPRules
+	9,  // 9: redact.v3.FieldRules.url:type_name -> redact.v3.URLRules
+	10, // 10: redact.v3.FieldRules.fixed_length:type_name -> redact.v3.FixedLengthRules
+	11, // 11: redact.v3.FieldRules.custom:type_name -> redact.v3.CustomRules
+	12, // 12: redact.v3.FieldRules.condition:type_name -> redact.v3.ConditionRules
+	0,  // 13: redact.v3.HashRules.algo:type_name -> redact.v3.HashAlgo
+	1,  // 14: redact.v3.ConditionRules.rules:type_name -> redact.v3.FieldRules
+	1,  // 15: redact.v3.AutoDetectRules.default_action:type_name -> redact.v3.FieldRules
+	1,  // 16: redact.v3.ElementRules.item:type_name -> redact.v3.FieldRules
+	16, // 17: redact.v3.file_skip:extendee -> google.protobuf.FileOptions
+	16, // 18: redact.v3.auto_detect:extendee -> google.protobuf.FileOptions
+	17, // 19: redact.v3.service_skip:extendee -> google.protobuf.ServiceOptions
+	17, // 20: redact.v3.internal_service:extendee -> google.protobuf.ServiceOptions
+	17, // 21: redact.v3.internal_service_code:extendee -> google.protobuf.ServiceOptions
+	17, // 22: redact.v3.internal_service_err_message:extendee -> google.protobuf.ServiceOptions
+	18, // 23: redact.v3.method_skip:extendee -> google.protobuf.MethodOptions
+	18, // 24: redact.v3.internal_method:extendee -> google.protobuf.MethodOptions
+	18, // 25: redact.v3.internal_method_code:extendee -> google.protobuf.MethodOptions
+	18, // 26: redact.v3.internal_method_err_message:extendee -> google.protobuf.MethodOptions
+	19, // 27: redact.v3.nil:extendee -> google.protobuf.MessageOptions
+	19, // 28: redact.v3.empty:extendee -> google.protobuf.MessageOptions
+	19, // 29: redact.v3.ignored:extendee -> google.protobuf.MessageOptions
+	20, // 30: redact.v3.value:extendee -> google.protobuf.FieldOptions
+	13, // 31: redact.v3.auto_detect:type_name -> redact.v3.AutoDetectRules
+	1,  // 32: redact.v3.value:type_name -> redact.v3.FieldRules
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	31, // [31:33] is the sub-list for extension type_name
+	17, // [17:31] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_redact_v3_redact_proto_init() }
@@ -1310,6 +1840,12 @@ func file_redact_v3_redact_proto_init() {
 		(*FieldRules_Hash)(nil),
 		(*FieldRules_Email)(nil),
 		(*FieldRules_Truncate)(nil),
+		(*FieldRules_Uuid)(nil),
+		(*FieldRules_Ip)(nil),
+		(*FieldRules_Url)(nil),
+		(*FieldRules_FixedLength)(nil),
+		(*FieldRules_Custom)(nil),
+		(*FieldRules_Condition)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1317,8 +1853,8 @@ func file_redact_v3_redact_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_redact_v3_redact_proto_rawDesc), len(file_redact_v3_redact_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
-			NumExtensions: 13,
+			NumMessages:   15,
+			NumExtensions: 14,
 			NumServices:   0,
 		},
 		GoTypes:           file_redact_v3_redact_proto_goTypes,

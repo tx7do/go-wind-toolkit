@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	pgs "github.com/lyft/protoc-gen-star/v2"
@@ -41,6 +42,12 @@ func (m *Module) hasRedactUsage(file pgs.File) bool {
 				return true
 			}
 		}
+	}
+
+	// File-level auto_detect option
+	var ad redact.AutoDetectRules
+	if m.must(file.Extension(redact.E_AutoDetect, &ad)) {
+		return true
 	}
 
 	// Message-level & field-level annotations
@@ -99,6 +106,24 @@ func collectHelperFlags(data *ProtoFileData, fld *FieldData) {
 		case "sha256":
 			data.NeedHashSHA256 = true
 		}
+	}
+	if fld.IsUUID {
+		data.NeedUUIDHelper = true
+	}
+	if fld.IsIP {
+		data.NeedIPHelper = true
+	}
+	if fld.IsURL {
+		data.NeedURLHelper = true
+	}
+	if fld.IsFixedLength {
+		data.NeedFixedLengthHelper = true
+	}
+	if fld.IsCondition {
+		data.NeedConditionHelper = true
+	}
+	if fld.IsCustom {
+		data.NeedCustomHelper = true
 	}
 }
 
@@ -169,6 +194,9 @@ func (m *Module) Process(file pgs.File) {
 		data.Messages = append(data.Messages, m.processMessage(msg, nameWithAlias, true))
 	}
 
+	// Apply auto-detect rules (file-level option)
+	m.applyAutoDetect(file, data, nameWithAlias)
+
 	// Collect regex variable declarations from all messages
 	seen := map[string]bool{}
 	for _, msg := range data.Messages {
@@ -231,6 +259,39 @@ func (m *Module) Process(file pgs.File) {
 		if data.NeedHashSHA256 {
 			data.Imports["sha256"] = "crypto/sha256"
 		}
+	}
+
+	// UUID helper needs crypto/sha1 and fmt
+	if data.NeedUUIDHelper {
+		data.Imports["sha1"] = "crypto/sha1"
+		data.Imports["fmt"] = "fmt"
+	}
+
+	// IP helper needs net and strings
+	if data.NeedIPHelper {
+		data.Imports["net"] = "net"
+		data.Imports["strings"] = "strings"
+	}
+
+	// URL helper needs net/url and strings
+	if data.NeedURLHelper {
+		data.Imports["url"] = "net/url"
+		data.Imports["strings"] = "strings"
+	}
+
+	// FixedLength helper needs strings
+	if data.NeedFixedLengthHelper {
+		data.Imports["strings"] = "strings"
+	}
+
+	// Condition helper needs os
+	if data.NeedConditionHelper {
+		data.Imports["os"] = "os"
+	}
+
+	// Custom helper needs the redact package
+	if data.NeedCustomHelper {
+		data.Imports["redact"] = "github.com/menta2k/protoc-gen-redact/v3/redact/v3"
 	}
 
 	// render file in the template
@@ -351,6 +412,83 @@ func (m *Module) processService(
 		methData.Internal = srvInternal || methInternal
 	}
 	return srvData
+}
+
+// applyAutoDetect scans all string fields in the file for names matching
+// the auto_detect patterns and applies the default_action rules to them.
+// Fields that already have explicit redaction rules are left unchanged.
+func (m *Module) applyAutoDetect(
+	file pgs.File,
+	data *ProtoFileData,
+	nameWithAlias func(n pgs.Entity) string,
+) {
+	var ad redact.AutoDetectRules
+	if !m.must(file.Extension(redact.E_AutoDetect, &ad)) {
+		return
+	}
+	if ad.DefaultAction == nil || ad.DefaultAction.Values == nil || len(ad.Patterns) == 0 {
+		return
+	}
+
+	// Build a lookup map: message name -> field name -> *FieldData
+	msgFieldMap := make(map[string]map[string]*FieldData)
+	for _, msg := range data.Messages {
+		fm := make(map[string]*FieldData)
+		for _, fld := range msg.Fields {
+			fm[fld.Name] = fld
+		}
+		for _, oneof := range msg.Oneofs {
+			for _, fld := range oneof.Fields {
+				fm[fld.Name] = fld.FieldData
+			}
+		}
+		msgFieldMap[msg.Name] = fm
+	}
+
+	for _, msg := range file.AllMessages() {
+		msgName := m.ctx.Name(msg).String()
+		fm, ok := msgFieldMap[msgName]
+		if !ok {
+			continue
+		}
+		for _, field := range msg.Fields() {
+			fieldName := m.ctx.Name(field).String()
+			fld, ok := fm[fieldName]
+			if !ok || fld == nil || fld.Redact {
+				continue
+			}
+			// Auto-detect only applies to scalar string fields
+			typ := field.Type()
+			if typ == nil || typ.ProtoType() != pgs.StringT {
+				continue
+			}
+			// Check name against patterns (case-insensitive contains)
+			lowerName := strings.ToLower(field.Name().String())
+			matched := false
+			for _, p := range ad.Patterns {
+				if strings.Contains(lowerName, strings.ToLower(p)) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+			// Apply default action
+			fld.Redact = true
+			fld.RedactionValue = RedactionDefaults(pgs.StringT, false)
+			m.redactedCustomValue(fld, field, ad.DefaultAction)
+			// Handle regex var name setup
+			if fld.IsRegex {
+				var pattern string
+				if rr := getRegexRules(typ, ad.DefaultAction); rr != nil {
+					pattern = rr.GetPattern()
+				}
+				fld.RegexVarName = regexVarName(msgName, fld.Name)
+				fld.RegexPatternLiteral = strconv.Quote(pattern)
+			}
+		}
+	}
 }
 
 // processMessage extracts all pgs.Message and their pgs.Field(s) information and

@@ -186,7 +186,7 @@ var (
 )
 {{ end }}
 
-{{ if or $data.NeedMaskHelper $data.NeedEmailHelper $data.NeedTruncateHelper $data.NeedHashMD5 $data.NeedHashSHA1 $data.NeedHashSHA256 }}
+{{ if or $data.NeedMaskHelper $data.NeedEmailHelper $data.NeedTruncateHelper $data.NeedHashMD5 $data.NeedHashSHA1 $data.NeedHashSHA256 $data.NeedUUIDHelper $data.NeedIPHelper $data.NeedURLHelper $data.NeedFixedLengthHelper $data.NeedConditionHelper }}
 // Redaction helper functions
 {{- if $data.NeedMaskHelper }}
 func _redactMask(s string, keepFirst, keepLast int, maskChar string) string {
@@ -237,6 +237,61 @@ func _redactHashSHA1(s string) string {
 func _redactHashSHA256(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return fmt.Sprintf("%x", h[:])
+}
+{{- end }}
+{{- if $data.NeedUUIDHelper }}
+func _redactUUID(s string) string {
+	h := sha1.Sum([]byte(s))
+	h[6] = (h[6] & 0x0f) | 0x50 // version 5
+	h[8] = (h[8] & 0x3f) | 0x80 // variant RFC 4122
+	return fmt.Sprintf("%x-%x-%x-%x-%x", h[0:4], h[4:6], h[6:8], h[8:10], h[10:16])
+}
+{{- end }}
+{{- if $data.NeedIPHelper }}
+func _redactIP(s string, keepOctets int, maskChar string) string {
+	ip := net.ParseIP(s)
+	if ip == nil { return s }
+	if ip.To4() != nil {
+		parts := strings.Split(s, ".")
+		for i := keepOctets; i < 4 && i < len(parts); i++ {
+			parts[i] = maskChar
+		}
+		return strings.Join(parts, ".")
+	}
+	parts := strings.Split(ip.String(), ":")
+	for i := keepOctets; i < len(parts); i++ {
+		parts[i] = maskChar
+	}
+	return strings.Join(parts, ":")
+}
+{{- end }}
+{{- if $data.NeedURLHelper }}
+func _redactURL(s string, maskQuery bool, maskChar string) string {
+	u, err := url.Parse(s)
+	if err != nil || u == nil { return s }
+	if maskQuery && u.RawQuery != "" {
+		vals, _ := url.ParseQuery(u.RawQuery)
+		for k := range vals {
+			vals.Set(k, strings.Repeat(maskChar, len(vals.Get(k))))
+		}
+		u.RawQuery = vals.Encode()
+	}
+	return u.String()
+}
+{{- end }}
+{{- if $data.NeedFixedLengthHelper }}
+func _redactFixedLength(s string, char string) string {
+	if char == "" { char = "X" }
+	return strings.Repeat(char, len(s))
+}
+{{- end }}
+{{- if $data.NeedConditionHelper }}
+func _redactCondCheck(envVar, envVal string) bool {
+	v := os.Getenv(envVar)
+	if envVal == "" {
+		return v != ""
+	}
+	return v == envVal
 }
 {{- end }}
 {{ end }}
@@ -375,6 +430,9 @@ func _redactHashSHA256(s string) string {
 			{{- range $field := $msg.Fields }}
 				{{ if $field.Redact }}
 					// Redacting field: {{ $field.Name }}
+					{{- if $field.IsCondition }}
+						if _redactCondCheck({{ $field.CondEnvVar }}, {{ $field.CondEnvVal }}) {
+					{{- end }}
 					{{- if $field.IsRegex }}
 						{{- if $field.IsOptional }}
 							if x.{{ $field.Name }} != nil {
@@ -440,6 +498,71 @@ func _redactHashSHA256(s string) string {
 						{{- else }}
 							x.{{ $field.Name }} = {{ $field.HashFuncName }}(x.{{ $field.Name }})
 						{{- end }}
+					{{- else if $field.IsUUID }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}UUIDTmp := _redactUUID(*x.{{ $field.Name }})
+								x.{{ $field.Name }} = &{{ $field.Name }}UUIDTmp
+							}
+						{{- else if $field.Iterate }}
+							for _uuidIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_uuidIdx] = _redactUUID(x.{{ $field.Name }}[_uuidIdx])
+							}
+						{{- else }}
+							x.{{ $field.Name }} = _redactUUID(x.{{ $field.Name }})
+						{{- end }}
+					{{- else if $field.IsIP }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}IPTmp := _redactIP(*x.{{ $field.Name }}, {{ $field.IPKeepOctets }}, {{ $field.IPMaskChar }})
+								x.{{ $field.Name }} = &{{ $field.Name }}IPTmp
+							}
+						{{- else if $field.Iterate }}
+							for _ipIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_ipIdx] = _redactIP(x.{{ $field.Name }}[_ipIdx], {{ $field.IPKeepOctets }}, {{ $field.IPMaskChar }})
+							}
+						{{- else }}
+							x.{{ $field.Name }} = _redactIP(x.{{ $field.Name }}, {{ $field.IPKeepOctets }}, {{ $field.IPMaskChar }})
+						{{- end }}
+					{{- else if $field.IsURL }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}URLTmp := _redactURL(*x.{{ $field.Name }}, {{ $field.URLMaskQuery }}, {{ $field.URLMaskChar }})
+								x.{{ $field.Name }} = &{{ $field.Name }}URLTmp
+							}
+						{{- else if $field.Iterate }}
+							for _urlIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_urlIdx] = _redactURL(x.{{ $field.Name }}[_urlIdx], {{ $field.URLMaskQuery }}, {{ $field.URLMaskChar }})
+							}
+						{{- else }}
+							x.{{ $field.Name }} = _redactURL(x.{{ $field.Name }}, {{ $field.URLMaskQuery }}, {{ $field.URLMaskChar }})
+						{{- end }}
+					{{- else if $field.IsFixedLength }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}FixTmp := _redactFixedLength(*x.{{ $field.Name }}, {{ $field.FixedLengthChar }})
+								x.{{ $field.Name }} = &{{ $field.Name }}FixTmp
+							}
+						{{- else if $field.Iterate }}
+							for _fixIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_fixIdx] = _redactFixedLength(x.{{ $field.Name }}[_fixIdx], {{ $field.FixedLengthChar }})
+							}
+						{{- else }}
+							x.{{ $field.Name }} = _redactFixedLength(x.{{ $field.Name }}, {{ $field.FixedLengthChar }})
+						{{- end }}
+					{{- else if $field.IsCustom }}
+						{{- if $field.IsOptional }}
+							if x.{{ $field.Name }} != nil {
+								{{ $field.Name }}CustomTmp := redact.ApplyCustomRedactor({{ $field.CustomFuncName }}, *x.{{ $field.Name }})
+								x.{{ $field.Name }} = &{{ $field.Name }}CustomTmp
+							}
+						{{- else if $field.Iterate }}
+							for _customIdx := range x.{{ $field.Name }} {
+								x.{{ $field.Name }}[_customIdx] = redact.ApplyCustomRedactor({{ $field.CustomFuncName }}, x.{{ $field.Name }}[_customIdx])
+							}
+						{{- else }}
+							x.{{ $field.Name }} = redact.ApplyCustomRedactor({{ $field.CustomFuncName }}, x.{{ $field.Name }})
+						{{- end }}
 					{{- else if $field.Iterate }}
 						{{- if $field.NestedEmbedCall }}
 							for k := range x.{{ $field.Name }} {
@@ -473,6 +596,9 @@ func _redactHashSHA256(s string) string {
 							x.{{ $field.Name }} = {{ $field.RedactionValue }}
 						{{- end }}
 					{{- end }}
+					{{- if $field.IsCondition }}
+						}
+					{{- end }}
 				{{- else }}
 					// Safe field: {{ $field.Name }}
 				{{- end }}
@@ -484,6 +610,9 @@ func _redactHashSHA256(s string) string {
 				{{- range $field := $oneof.Fields }}
 					{{- if $field.Redact }}
 					case *{{ $field.WrapperTypeName }}:
+						{{- if $field.IsCondition }}
+							if _redactCondCheck({{ $field.CondEnvVar }}, {{ $field.CondEnvVal }}) {
+						{{- end }}
 						{{- if $field.IsRegex }}
 							v.{{ $field.Name }} = {{ $field.RegexVarName }}.ReplaceAllString(v.{{ $field.Name }}, {{ $field.RegexReplacement }})
 						{{- else if $field.IsMask }}
@@ -494,6 +623,16 @@ func _redactHashSHA256(s string) string {
 							v.{{ $field.Name }} = _redactTruncate(v.{{ $field.Name }}, {{ $field.TruncateLength }}, {{ $field.TruncateSuffix }})
 						{{- else if $field.IsHash }}
 							v.{{ $field.Name }} = {{ $field.HashFuncName }}(v.{{ $field.Name }})
+						{{- else if $field.IsUUID }}
+							v.{{ $field.Name }} = _redactUUID(v.{{ $field.Name }})
+						{{- else if $field.IsIP }}
+							v.{{ $field.Name }} = _redactIP(v.{{ $field.Name }}, {{ $field.IPKeepOctets }}, {{ $field.IPMaskChar }})
+						{{- else if $field.IsURL }}
+							v.{{ $field.Name }} = _redactURL(v.{{ $field.Name }}, {{ $field.URLMaskQuery }}, {{ $field.URLMaskChar }})
+						{{- else if $field.IsFixedLength }}
+							v.{{ $field.Name }} = _redactFixedLength(v.{{ $field.Name }}, {{ $field.FixedLengthChar }})
+						{{- else if $field.IsCustom }}
+							v.{{ $field.Name }} = redact.ApplyCustomRedactor({{ $field.CustomFuncName }}, v.{{ $field.Name }})
 						{{- else if $field.IsMessage }}
 							{{- if $field.NestedEmbedCall }}
 								redact.Apply(v.{{ $field.Name }})
@@ -504,6 +643,9 @@ func _redactHashSHA256(s string) string {
 							{{- end }}
 						{{- else }}
 							v.{{ $field.Name }} = {{ $field.RedactionValue }}
+						{{- end }}
+						{{- if $field.IsCondition }}
+							}
 						{{- end }}
 					{{- end }}
 				{{- end }}

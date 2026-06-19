@@ -14,12 +14,18 @@ type ProtoFileData struct {
 	RegexDeclarations []RegexDecl
 
 	// --- Helper function flags ---
-	NeedMaskHelper     bool // _redactMask
-	NeedEmailHelper    bool // _redactEmail
-	NeedTruncateHelper bool // _redactTruncate
-	NeedHashMD5        bool // _redactHashMD5
-	NeedHashSHA1       bool // _redactHashSHA1
-	NeedHashSHA256     bool // _redactHashSHA256
+	NeedMaskHelper        bool // _redactMask
+	NeedEmailHelper       bool // _redactEmail
+	NeedTruncateHelper    bool // _redactTruncate
+	NeedHashMD5           bool // _redactHashMD5
+	NeedHashSHA1          bool // _redactHashSHA1
+	NeedHashSHA256        bool // _redactHashSHA256
+	NeedUUIDHelper        bool // _redactUUID
+	NeedIPHelper          bool // _redactIP
+	NeedURLHelper         bool // _redactURL
+	NeedFixedLengthHelper bool // _redactFixedLength
+	NeedConditionHelper   bool // _redactCondCheck
+	NeedCustomHelper      bool // _redactCustom (wraps redact.ApplyCustomRedactor)
 }
 
 // RegexDecl represents a package-level precompiled regex variable
@@ -151,4 +157,32 @@ type FieldData struct {
 	HashAlgo string // "md5", "sha1", "sha256"
 	// HashFuncName is the generated helper function name, e.g. "_redactHashMD5"
 	HashFuncName string
+
+	// --- UUID-based redaction fields ---
+	IsUUID bool
+
+	// --- IP-based redaction fields ---
+	IsIP         bool
+	IPKeepOctets uint32
+	IPMaskChar   string // already quoted via strconv.Quote
+
+	// --- URL-based redaction fields ---
+	IsURL        bool
+	URLMaskQuery bool
+	URLMaskChar  string // already quoted via strconv.Quote
+
+	// --- FixedLength-based redaction fields ---
+	IsFixedLength   bool
+	FixedLengthChar string // already quoted via strconv.Quote
+
+	// --- Custom redaction fields ---
+	IsCustom       bool
+	CustomFuncName string // registered redactor name, already quoted
+
+	// --- Condition-based redaction fields ---
+	IsCondition bool
+	// CondEnvVar is the Go string literal for the env var name
+	CondEnvVar string // already quoted via strconv.Quote
+	// CondEnvVal is the Go string literal for the expected env var value
+	CondEnvVal string // already quoted via strconv.Quote
 }

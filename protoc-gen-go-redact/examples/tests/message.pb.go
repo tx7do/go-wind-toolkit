@@ -115,8 +115,25 @@ type TestMessage struct {
 	// Truncate-based redaction
 	TruncateName string `protobuf:"bytes,55,opt,name=truncate_name,json=truncateName,proto3" json:"truncate_name,omitempty"`
 	// Hash-based redaction
-	HashToken     string   `protobuf:"bytes,56,opt,name=hash_token,json=hashToken,proto3" json:"hash_token,omitempty"`
-	HashTokens    []string `protobuf:"bytes,57,rep,name=hash_tokens,json=hashTokens,proto3" json:"hash_tokens,omitempty"`
+	HashToken  string   `protobuf:"bytes,56,opt,name=hash_token,json=hashToken,proto3" json:"hash_token,omitempty"`
+	HashTokens []string `protobuf:"bytes,57,rep,name=hash_tokens,json=hashTokens,proto3" json:"hash_tokens,omitempty"`
+	// UUID-based redaction
+	UuidUserId string   `protobuf:"bytes,58,opt,name=uuid_user_id,json=uuidUserId,proto3" json:"uuid_user_id,omitempty"`
+	UuidTokens []string `protobuf:"bytes,59,rep,name=uuid_tokens,json=uuidTokens,proto3" json:"uuid_tokens,omitempty"`
+	// IP-based redaction
+	IpAddress  string  `protobuf:"bytes,60,opt,name=ip_address,json=ipAddress,proto3" json:"ip_address,omitempty"`
+	IpAddress2 *string `protobuf:"bytes,61,opt,name=ip_address2,json=ipAddress2,proto3,oneof" json:"ip_address2,omitempty"`
+	// URL-based redaction
+	CallbackUrl string `protobuf:"bytes,62,opt,name=callback_url,json=callbackUrl,proto3" json:"callback_url,omitempty"`
+	// FixedLength-based redaction
+	BankAccount string `protobuf:"bytes,63,opt,name=bank_account,json=bankAccount,proto3" json:"bank_account,omitempty"`
+	// Custom-based redaction
+	CustomSsn string `protobuf:"bytes,64,opt,name=custom_ssn,json=customSsn,proto3" json:"custom_ssn,omitempty"`
+	// Condition-based redaction (wrapping mask)
+	CondPhone string `protobuf:"bytes,65,opt,name=cond_phone,json=condPhone,proto3" json:"cond_phone,omitempty"`
+	// AutoDetect fields (no explicit rule, caught by file-level auto_detect)
+	UserPassword  string `protobuf:"bytes,66,opt,name=user_password,json=userPassword,proto3" json:"user_password,omitempty"`
+	UserSecret    string `protobuf:"bytes,67,opt,name=user_secret,json=userSecret,proto3" json:"user_secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -417,6 +434,76 @@ func (x *TestMessage) GetHashTokens() []string {
 	return nil
 }
 
+func (x *TestMessage) GetUuidUserId() string {
+	if x != nil {
+		return x.UuidUserId
+	}
+	return ""
+}
+
+func (x *TestMessage) GetUuidTokens() []string {
+	if x != nil {
+		return x.UuidTokens
+	}
+	return nil
+}
+
+func (x *TestMessage) GetIpAddress() string {
+	if x != nil {
+		return x.IpAddress
+	}
+	return ""
+}
+
+func (x *TestMessage) GetIpAddress2() string {
+	if x != nil && x.IpAddress2 != nil {
+		return *x.IpAddress2
+	}
+	return ""
+}
+
+func (x *TestMessage) GetCallbackUrl() string {
+	if x != nil {
+		return x.CallbackUrl
+	}
+	return ""
+}
+
+func (x *TestMessage) GetBankAccount() string {
+	if x != nil {
+		return x.BankAccount
+	}
+	return ""
+}
+
+func (x *TestMessage) GetCustomSsn() string {
+	if x != nil {
+		return x.CustomSsn
+	}
+	return ""
+}
+
+func (x *TestMessage) GetCondPhone() string {
+	if x != nil {
+		return x.CondPhone
+	}
+	return ""
+}
+
+func (x *TestMessage) GetUserPassword() string {
+	if x != nil {
+		return x.UserPassword
+	}
+	return ""
+}
+
+func (x *TestMessage) GetUserSecret() string {
+	if x != nil {
+		return x.UserSecret
+	}
+	return ""
+}
+
 // OneofMessage demonstrates oneof field handling
 type OneofMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -459,6 +546,12 @@ type OneofMessage struct {
 	//	*OneofMessage_EmailMask
 	//	*OneofMessage_NameTrunc
 	//	*OneofMessage_SecretHash
+	//	*OneofMessage_UuidPii
+	//	*OneofMessage_IpPii
+	//	*OneofMessage_UrlPii
+	//	*OneofMessage_FixedPii
+	//	*OneofMessage_CustomPii
+	//	*OneofMessage_CondPii
 	Pii           isOneofMessage_Pii `protobuf_oneof:"pii"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -662,6 +755,60 @@ func (x *OneofMessage) GetSecretHash() string {
 	return ""
 }
 
+func (x *OneofMessage) GetUuidPii() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_UuidPii); ok {
+			return x.UuidPii
+		}
+	}
+	return ""
+}
+
+func (x *OneofMessage) GetIpPii() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_IpPii); ok {
+			return x.IpPii
+		}
+	}
+	return ""
+}
+
+func (x *OneofMessage) GetUrlPii() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_UrlPii); ok {
+			return x.UrlPii
+		}
+	}
+	return ""
+}
+
+func (x *OneofMessage) GetFixedPii() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_FixedPii); ok {
+			return x.FixedPii
+		}
+	}
+	return ""
+}
+
+func (x *OneofMessage) GetCustomPii() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_CustomPii); ok {
+			return x.CustomPii
+		}
+	}
+	return ""
+}
+
+func (x *OneofMessage) GetCondPii() string {
+	if x != nil {
+		if x, ok := x.Pii.(*OneofMessage_CondPii); ok {
+			return x.CondPii
+		}
+	}
+	return ""
+}
+
 type isOneofMessage_Contact interface {
 	isOneofMessage_Contact()
 }
@@ -758,6 +905,30 @@ type OneofMessage_SecretHash struct {
 	SecretHash string `protobuf:"bytes,15,opt,name=secret_hash,json=secretHash,proto3,oneof"`
 }
 
+type OneofMessage_UuidPii struct {
+	UuidPii string `protobuf:"bytes,16,opt,name=uuid_pii,json=uuidPii,proto3,oneof"`
+}
+
+type OneofMessage_IpPii struct {
+	IpPii string `protobuf:"bytes,17,opt,name=ip_pii,json=ipPii,proto3,oneof"`
+}
+
+type OneofMessage_UrlPii struct {
+	UrlPii string `protobuf:"bytes,18,opt,name=url_pii,json=urlPii,proto3,oneof"`
+}
+
+type OneofMessage_FixedPii struct {
+	FixedPii string `protobuf:"bytes,19,opt,name=fixed_pii,json=fixedPii,proto3,oneof"`
+}
+
+type OneofMessage_CustomPii struct {
+	CustomPii string `protobuf:"bytes,20,opt,name=custom_pii,json=customPii,proto3,oneof"`
+}
+
+type OneofMessage_CondPii struct {
+	CondPii string `protobuf:"bytes,21,opt,name=cond_pii,json=condPii,proto3,oneof"`
+}
+
 func (*OneofMessage_SsnMask) isOneofMessage_Pii() {}
 
 func (*OneofMessage_EmailMask) isOneofMessage_Pii() {}
@@ -765,6 +936,18 @@ func (*OneofMessage_EmailMask) isOneofMessage_Pii() {}
 func (*OneofMessage_NameTrunc) isOneofMessage_Pii() {}
 
 func (*OneofMessage_SecretHash) isOneofMessage_Pii() {}
+
+func (*OneofMessage_UuidPii) isOneofMessage_Pii() {}
+
+func (*OneofMessage_IpPii) isOneofMessage_Pii() {}
+
+func (*OneofMessage_UrlPii) isOneofMessage_Pii() {}
+
+func (*OneofMessage_FixedPii) isOneofMessage_Pii() {}
+
+func (*OneofMessage_CustomPii) isOneofMessage_Pii() {}
+
+func (*OneofMessage_CondPii) isOneofMessage_Pii() {}
 
 type RepeatedM struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
@@ -1222,7 +1405,7 @@ var File_examples_tests_message_proto protoreflect.FileDescriptor
 
 const file_examples_tests_message_proto_rawDesc = "" +
 	"\n" +
-	"\x1cexamples/tests/message.proto\x12\x05tests\x1a\x1bgoogle/protobuf/empty.proto\x1a\x16redact/v3/redact.proto\"\xe4\x16\n" +
+	"\x1cexamples/tests/message.proto\x12\x05tests\x1a\x1bgoogle/protobuf/empty.proto\x1a\x16redact/v3/redact.proto\"\xc9\x1a\n" +
 	"\vTestMessage\x12*\n" +
 	"\vfloat_value\x18\x02 \x01(\x02B\tڶ\x1a\x05\x15\xcd\xccL@R\n" +
 	"floatValue\x120\n" +
@@ -1293,7 +1476,30 @@ const file_examples_tests_message_proto_rawDesc = "" +
 	"hash_token\x188 \x01(\tB\tڶ\x1a\x05\xba\x01\x02\b\x03R\thashToken\x12/\n" +
 	"\vhash_tokens\x189 \x03(\tB\x0eڶ\x1a\n" +
 	"\xa2\x01\a\x1a\x05\xba\x01\x02\b\x01R\n" +
-	"hashTokens\x1a<\n" +
+	"hashTokens\x12)\n" +
+	"\fuuid_user_id\x18: \x01(\tB\aڶ\x1a\x03\xd2\x01\x00R\n" +
+	"uuidUserId\x12-\n" +
+	"\vuuid_tokens\x18; \x03(\tB\fڶ\x1a\b\xa2\x01\x05\x1a\x03\xd2\x01\x00R\n" +
+	"uuidTokens\x12(\n" +
+	"\n" +
+	"ip_address\x18< \x01(\tB\tڶ\x1a\x05\xda\x01\x02\b\x02R\tipAddress\x122\n" +
+	"\vip_address2\x18= \x01(\tB\fڶ\x1a\b\xda\x01\x05\b\x03\x12\x010H\x03R\n" +
+	"ipAddress2\x88\x01\x01\x12,\n" +
+	"\fcallback_url\x18> \x01(\tB\tڶ\x1a\x05\xe2\x01\x02\b\x01R\vcallbackUrl\x12-\n" +
+	"\fbank_account\x18? \x01(\tB\n" +
+	"ڶ\x1a\x06\xea\x01\x03\n" +
+	"\x01XR\vbankAccount\x122\n" +
+	"\n" +
+	"custom_ssn\x18@ \x01(\tB\x13ڶ\x1a\x0f\xf2\x01\f\n" +
+	"\n" +
+	"myRedactorR\tcustomSsn\x12D\n" +
+	"\n" +
+	"cond_phone\x18A \x01(\tB%ڶ\x1a!\xfa\x01\x1e\n" +
+	"\aAPP_ENV\x12\n" +
+	"production\x1a\a\xb2\x01\x04\b\x03\x10\x04R\tcondPhone\x12#\n" +
+	"\ruser_password\x18B \x01(\tR\fuserPassword\x12\x1f\n" +
+	"\vuser_secret\x18C \x01(\tR\n" +
+	"userSecret\x1a<\n" +
 	"\x0eMap1EmptyEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x03R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aT\n" +
@@ -1320,7 +1526,8 @@ const file_examples_tests_message_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.EmptyR\x05value:\x028\x01B\x0e\n" +
 	"\f_email_regexB\x0f\n" +
 	"\r_mask_id_cardB\x0e\n" +
-	"\f_email_addr2\"\xe3\x05\n" +
+	"\f_email_addr2B\x0e\n" +
+	"\f_ip_address2\"\xea\a\n" +
 	"\fOneofMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12&\n" +
 	"\x05email\x18\x02 \x01(\tB\x0eڶ\x1a\n" +
@@ -1347,7 +1554,19 @@ const file_examples_tests_message_proto_rawDesc = "" +
 	"\n" +
 	"name_trunc\x18\x0e \x01(\tB\tڶ\x1a\x05\xca\x01\x02\b\x02H\x04R\tnameTrunc\x12,\n" +
 	"\vsecret_hash\x18\x0f \x01(\tB\tڶ\x1a\x05\xba\x01\x02\b\x02H\x04R\n" +
-	"secretHashB\t\n" +
+	"secretHash\x12$\n" +
+	"\buuid_pii\x18\x10 \x01(\tB\aڶ\x1a\x03\xd2\x01\x00H\x04R\auuidPii\x12\"\n" +
+	"\x06ip_pii\x18\x11 \x01(\tB\tڶ\x1a\x05\xda\x01\x02\b\x01H\x04R\x05ipPii\x12$\n" +
+	"\aurl_pii\x18\x12 \x01(\tB\tڶ\x1a\x05\xe2\x01\x02\b\x01H\x04R\x06urlPii\x12)\n" +
+	"\tfixed_pii\x18\x13 \x01(\tB\n" +
+	"ڶ\x1a\x06\xea\x01\x03\n" +
+	"\x01#H\x04R\bfixedPii\x124\n" +
+	"\n" +
+	"custom_pii\x18\x14 \x01(\tB\x13ڶ\x1a\x0f\xf2\x01\f\n" +
+	"\n" +
+	"myRedactorH\x04R\tcustomPii\x124\n" +
+	"\bcond_pii\x18\x15 \x01(\tB\x17ڶ\x1a\x13\xfa\x01\x10\n" +
+	"\x05DEBUG\x1a\a\xb2\x01\x04\b\x01\x10\x01H\x04R\acondPiiB\t\n" +
 	"\acontactB\t\n" +
 	"\apayloadB\f\n" +
 	"\n" +
@@ -1421,7 +1640,9 @@ const file_examples_tests_message_proto_rawDesc = "" +
 	"\bTestEnum\x12\r\n" +
 	"\tValueZero\x10\x00\x12\f\n" +
 	"\bValueOne\x10\x01\x12\f\n" +
-	"\bValueTwo\x10\x02B>Z<github.com/menta2k/protoc-gen-redact/v3/examples/tests;testsb\x06proto3"
+	"\bValueTwo\x10\x02B]\xba\xff+\x1b\n" +
+	"\bpassword\n" +
+	"\x06secret\x12\a\xb2\x01\x04\b\x02\x10\x02Z<github.com/menta2k/protoc-gen-redact/v3/examples/tests;testsb\x06proto3"
 
 var (
 	file_examples_tests_message_proto_rawDescOnce sync.Once
@@ -1507,6 +1728,12 @@ func file_examples_tests_message_proto_init() {
 		(*OneofMessage_EmailMask)(nil),
 		(*OneofMessage_NameTrunc)(nil),
 		(*OneofMessage_SecretHash)(nil),
+		(*OneofMessage_UuidPii)(nil),
+		(*OneofMessage_IpPii)(nil),
+		(*OneofMessage_UrlPii)(nil),
+		(*OneofMessage_FixedPii)(nil),
+		(*OneofMessage_CustomPii)(nil),
+		(*OneofMessage_CondPii)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

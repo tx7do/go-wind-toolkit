@@ -11,6 +11,11 @@ option go_package = "github.com/menta2k/protoc-gen-redact/v3/redact/v3;redact";
 extend google.protobuf.FileOptions {
   // FileSkip is used to skip generation of any redaction for proto file
   bool file_skip = 90102;
+
+  // AutoDetect enables automatic redaction based on field name patterns.
+  // Fields whose names match any of the patterns will automatically have
+  // the default_action rules applied, unless they already have explicit rules.
+  AutoDetectRules auto_detect = 90103;
 }
 
 // Redaction rules applied at the service level
@@ -116,6 +121,25 @@ message FieldRules {
 
     // Truncate defines truncation for string fields (keep first N chars + suffix)
     TruncateRules truncate = 25;
+
+    // UUID replaces the field with a deterministic UUID v5 (namespace-based).
+    // Same input always produces the same UUID, enabling anonymization.
+    UUIDRules uuid = 26;
+
+    // IP masks an IP address (IPv4 or IPv6), keeping the first N octets/hextets.
+    IPRules ip = 27;
+
+    // URL masks parts of a URL (query parameters, path, etc.).
+    URLRules url = 28;
+
+    // FixedLength replaces the entire value with a fixed-length mask of the same length.
+    FixedLengthRules fixed_length = 29;
+
+    // Custom invokes a user-registered redactor function at runtime.
+    CustomRules custom = 30;
+
+    // Condition applies inner rules only when an environment variable matches.
+    ConditionRules condition = 31;
   }
 }
 
@@ -186,6 +210,70 @@ message TruncateRules {
 
   // Suffix is appended after the truncated string (default: "...").
   string suffix = 2;
+}
+
+// UUIDRules replaces a string with a deterministic UUID v5.
+// The same input always yields the same UUID, preserving uniqueness
+// while being irreversible.
+message UUIDRules {}
+
+// IPRules masks an IP address (IPv4 or IPv6).
+message IPRules {
+  // KeepOctets is the number of leading octets (IPv4) or hextets (IPv6)
+  // to preserve. The rest are replaced with mask_char.
+  // Default: 2 for IPv4, 4 for IPv6.
+  uint32 keep_octets = 1;
+
+  // MaskChar is the character used for masked octets (default: "x").
+  string mask_char = 2;
+}
+
+// URLRules masks parts of a URL.
+message URLRules {
+  // MaskQuery, if true, masks all query parameter values.
+  bool mask_query = 1;
+
+  // MaskChar is the character used for masking (default: "*").
+  string mask_char = 2;
+}
+
+// FixedLengthRules replaces the entire value with a mask of the same length.
+message FixedLengthRules {
+  // Char is the character used for the mask (default: "X").
+  string char = 1;
+}
+
+// CustomRules invokes a user-registered redactor function.
+// Register functions via redact.RegisterCustomRedactor(name, func).
+message CustomRules {
+  // Name is the registered redactor function name.
+  string name = 1;
+}
+
+// ConditionRules applies inner rules only when an environment variable
+// matches the expected value. This enables environment-specific redaction
+// (e.g., only mask in production).
+message ConditionRules {
+  // EnvVar is the environment variable name to check.
+  string env_var = 1;
+
+  // EnvVal is the expected value. If empty, checks that the variable is
+  // set to any non-empty value.
+  string env_val = 2;
+
+  // Rules are the redaction rules to apply when the condition is met.
+  FieldRules rules = 3;
+}
+
+// AutoDetectRules enables automatic redaction based on field name patterns.
+message AutoDetectRules {
+  // Patterns is a list of substrings to match against field names
+  // (case-insensitive). If a field name contains any pattern, the
+  // default_action rules are automatically applied.
+  repeated string patterns = 1;
+
+  // DefaultAction specifies the redaction rules to apply to matched fields.
+  FieldRules default_action = 2;
 }
 
 // MessageRules describe the constraints applied to embedded message for redaction.
