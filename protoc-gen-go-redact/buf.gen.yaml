@@ -1,0 +1,17 @@
+# buf.gen.yaml - Configuration for buf generate
+# Copyright 2025 Contributors
+# Licensed under the Apache License, Version 2.0
+
+version: v1
+plugins:
+  # Generate Go protobuf code
+  - plugin: go
+    out: .
+    opt:
+      - paths=source_relative
+
+  # Generate Go gRPC code
+  - plugin: go-grpc
+    out: .
+    opt:
+      - paths=source_relative

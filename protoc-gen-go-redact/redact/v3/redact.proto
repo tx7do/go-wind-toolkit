@@ -1,0 +1,155 @@
+syntax = "proto3";
+
+// Package redact provides interfaces and methods to help implement redaction.
+package redact.v3;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/menta2k/protoc-gen-redact/v3/redact/v3;redact";
+
+// Redaction rules applied at the file level
+extend google.protobuf.FileOptions {
+  // FileSkip is used to skip generation of any redaction for proto file
+  bool file_skip = 90102;
+}
+
+// Redaction rules applied at the service level
+extend google.protobuf.ServiceOptions {
+  // ServiceSkip is used to skip the redaction in grpc service in the server
+  bool service_skip = 54123;
+
+  // InternalService will make this service private and client will not be
+  // able to receive any response for any of it's method, (unless skipped
+  // explicitly) and will get PermissionDenied(7) error by default, to set
+  // any other code set it in InternalServiceCode, it should be one of the
+  // defined GRPC status code, and InternalServiceErrMessage for error
+  // message, in which, one can use `%service%` or `%method%` tags to include
+  // corresponding service name or method name, respectively.
+  bool internal_service = 54124;
+  uint32 internal_service_code = 54125;
+  string internal_service_err_message = 54126;
+}
+
+// Redaction rules applied at the method level
+extend google.protobuf.MethodOptions {
+  // MethodSkip is used to skip the redactions for this method in the grpc server
+  bool method_skip = 54123;
+
+  // InternalMethod, InternalMethodCode and InternalMethodErrMessage works same
+  // as that of service level options: InternalService, InternalServiceCode and
+  // InternalServiceErrMessage, but at Method level. All the validations and
+  // functionalities are same for both. But the method level options will be used
+  // whenever both are specified.
+  bool internal_method = 54124;
+  uint32 internal_method_code = 54125;
+  string internal_method_err_message = 54126;
+}
+
+// Redaction rules applied at the message level
+extend google.protobuf.MessageOptions {
+  // Nil will redact message to nil (can be override by field level, `empty` option)
+  bool nil = 54123;
+
+  // Empty will redact message to it's empty object
+  bool empty = 54124;
+
+  // Ignored skips generation of any redaction for this message.
+  bool ignored = 54125;
+}
+
+// Redaction rules applied at the field level
+extend google.protobuf.FieldOptions {
+  // Redact: it redact the field with predefined defaults:
+  //  * `0` for any number type
+  //  * `"REDACTED"` for string type
+  //  * `nil` for byte type
+  //  * `0th value` for enum type
+  //  * `nil` map for map type
+  //  * `nil` for repeated field type
+  //  * for message type, redaction is applied inside the message type
+  // bool redact = 54123;
+  // Custom: specify the different values to be used for redaction on this field. By
+  // default, if Custom value is not defined Redact should be true to apply redaction.
+  // And if Custom value is to be assigned, one can skip the Redact field.
+  FieldRules value = 54123;
+}
+
+// FieldRules encapsulates options to change the redacted values of any type of field.
+// Depending on the field, the correct type value should be used.
+message FieldRules {
+  // values for redacted field
+  oneof values {
+    // Scalar Field Types values
+    float float = 2;
+    double double = 3;
+    int32 int32 = 4;
+    int64 int64 = 5;
+    uint32 uint32 = 6;
+    uint64 uint64 = 7;
+    sint32 sint32 = 8;
+    sint64 sint64 = 9;
+    fixed32 fixed32 = 10;
+    fixed64 fixed64 = 11;
+    sfixed32 sfixed32 = 12;
+    sfixed64 sfixed64 = 13;
+    bool bool = 14;
+    string string = 15;
+    bytes bytes = 16;
+    int32 enum = 17;
+
+    // Message defines rules for singular message type fields only
+    MessageRules message = 19;
+    // Element defines rules for repeated or map type fields
+    ElementRules element = 20;
+
+    // Regex defines regex-based masking for string fields (e.g. phone: 138****8888)
+    RegexRules regex = 21;
+  }
+}
+
+// RegexRules describe regex-based partial masking for string fields.
+// The regex pattern is compiled at package init time and applied via
+// regexp.ReplaceAllString at redaction time.
+message RegexRules {
+  // Pattern is the regular expression (RE2 syntax) to match against
+  // the field value. Capture groups can be referenced in Replacement
+  // via ${1}, ${2}, etc.
+  string pattern = 1;
+
+  // Replacement is the replacement string. Use ${1}, ${2}, etc. to
+  // reference captured groups. For example:
+  //   pattern:      "^(\\d{3})\\d{4}(\\d{4})$"
+  //   replacement:  "${1}****${2}"
+  //   13812345678 -> 138****5678
+  string replacement = 2;
+}
+
+// MessageRules describe the constraints applied to embedded message for redaction.
+// For message-type fields, rules are performed recursively.
+message MessageRules {
+  // Skip specifies that the redaction rules of this field should not be evaluated
+  bool skip = 1;
+
+  // Empty specifies that after redaction this field should be set to empty object
+  bool empty = 2;
+
+  // Nil specifies that after redaction this field should be set to nil object
+  bool nil = 3;
+
+  // Apply specifies that redaction is to be called for the message type
+  bool apply = 4;
+}
+
+// ElementRules describe the constraints applied to `repeated` or `map` values
+message ElementRules {
+  // Empty specifies that after redaction the list/map will be empty
+  bool empty = 1;
+
+  // Nested specifies that default rules is to be applied `recursively` on each
+  // item of map/list
+  bool nested = 2;
+
+  // Item specifies that some custom redaction rules to be applied `recursively`
+  // on each item in map/list.
+  FieldRules item = 3;
+}

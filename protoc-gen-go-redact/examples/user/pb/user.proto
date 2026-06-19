@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package user;
+
+import "google/protobuf/empty.proto";
+import "redact/v3/redact.proto";
+
+option go_package = "github.com/menta2k/protoc-gen-redact/v3/examples/user/pb;pb";
+
+message User {
+  // User credentials
+  string username = 1;
+  string password = 2 [(redact.v3.value).string = ""]; // default redaction
+
+  // User information
+  string email = 3 [(redact.v3.value).string = "r*d@ct*d"];
+  string name = 4;
+  Location home = 5;
+  message Location {
+    double lat = 1;
+    double lng = 2;
+  }
+  string opt = 6;
+}
+
+service Chat {
+  rpc AddUser(User) returns (User) {
+    option (redact.v3.internal_method) = true;
+  }
+  rpc GetUser(GetUserRequest) returns (User) {}
+  rpc ListUsers(google.protobuf.Empty) returns (ListUsersResponse) {
+    option (redact.v3.internal_method) = true;
+    option (redact.v3.internal_method_code) = 14; // codes.Unavailable
+    option (redact.v3.internal_method_err_message) = "%service%.%method% unavailable";
+  }
+}
+
+message GetUserRequest {
+  string username = 1;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+}

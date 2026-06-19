@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package testdata;
+
+import "redact/v3/redact.proto";
+
+option go_package = "github.com/menta2k/protoc-gen-redact/v3/testdata/integration;testdata";
+
+// TestMessage contains various field types and options for comprehensive testing
+message TestMessage {
+  // Required fields (not optional in proto3)
+  string id = 1;
+  string name = 2;
+
+  // Redacted string field with default redaction
+  string password = 3 [(redact.v3.value).string = "REDACTED"];
+
+  // Optional fields (proto3 explicit optional)
+  optional string email = 4 [(redact.v3.value).string = "r*d@ct*d"];
+  optional int32 age = 5 [(redact.v3.value).int32 = 0];
+  optional bool is_active = 6 [(redact.v3.value).bool = false];
+
+  // Optional bytes field
+  optional bytes signature = 7 [(redact.v3.value).bytes = ""];
+
+  // Optional message field with nested redaction
+  optional Profile profile = 8;
+
+  // Optional message field set to nil
+  optional Settings settings = 9 [(redact.v3.value).message.nil = true];
+
+  // Optional message field set to empty
+  optional Metadata metadata = 10 [(redact.v3.value).message.empty = true];
+
+  // Repeated fields
+  repeated string tags = 11 [(redact.v3.value).element.nested = true];
+  repeated int32 scores = 12 [(redact.v3.value).element.item.int32 = 0];
+
+  // Repeated message field
+  repeated Address addresses = 13 [(redact.v3.value).element.nested = true];
+
+  // Map fields
+  map<string, string> attributes = 14 [(redact.v3.value).element.empty = true];
+  map<string, Profile> profiles_map = 15 [(redact.v3.value).element.nested = true];
+
+  // Non-redacted fields
+  string public_info = 16;
+  repeated string public_tags = 17;
+
+  // Regex-based masking fields
+  string phone = 18 [(redact.v3.value).regex = { pattern: "^(\\d{3})\\d{4}(\\d{4})$" replacement: "${1}****${2}" }];
+  optional string ssn = 19 [(redact.v3.value).regex = { pattern: "\\d" replacement: "*" }];
+  repeated string id_cards = 20 [(redact.v3.value).element.item.regex = { pattern: "(\\d{4})\\d{10}(\\d{4})" replacement: "${1}**********${2}" }];
+}
+
+// Profile message with its own redaction rules
+message Profile {
+  string username = 1;
+  string bio = 2 [(redact.v3.value).string = "[REDACTED BIO]"];
+  optional string phone = 3 [(redact.v3.value).string = "XXX-XXX-XXXX"];
+  optional int64 created_at = 4;
+}
+
+// Settings message that can be set to nil
+message Settings {
+  bool notifications_enabled = 1;
+  string theme = 2;
+  optional int32 font_size = 3;
+}
+
+// Metadata message that can be set to empty
+message Metadata {
+  string version = 1;
+  optional string description = 2;
+  repeated string tags = 3;
+}
+
+// Address message for repeated fields
+message Address {
+  string street = 1 [(redact.v3.value).string = "REDACTED"];
+  string city = 2;
+  string country = 3;
+  optional string postal_code = 4 [(redact.v3.value).string = "XXXXX"];
+}
+
+// TestService demonstrates service-level redaction
+service TestService {
+  // Normal RPC with response redaction
+  rpc GetUser(GetUserRequest) returns (TestMessage);
+
+  // Internal method that returns error
+  rpc AdminOperation(GetUserRequest) returns (TestMessage) {
+    option (redact.v3.internal_method) = true;
+  }
+
+  // Skipped method (no redaction)
+  rpc HealthCheck(GetUserRequest) returns (TestMessage) {
+    option (redact.v3.method_skip) = true;
+  }
+
+  // Server streaming
+  rpc StreamUsers(GetUserRequest) returns (stream TestMessage);
+}
+
+message GetUserRequest {
+  string user_id = 1;
+  optional string token = 2 [(redact.v3.value).string = "[TOKEN]"];
+}
+
+// Message with all options ignored
+message PublicData {
+  option (redact.v3.ignored) = true;
+
+  string data = 1;
+  string more_data = 2;
+}
+
+// Message that should be nil
+message SensitiveData {
+  option (redact.v3.nil) = true;
+
+  string secret = 1;
+  bytes key = 2;
+}
+
+// Message that should be empty
+message EmptyData {
+  option (redact.v3.empty) = true;
+
+  string field1 = 1;
+  string field2 = 2;
+}
+
+// Complex nested structure
+message ComplexMessage {
+  optional TestMessage user = 1;
+  repeated TestMessage users = 2 [(redact.v3.value).element.nested = true];
+  map<string, TestMessage> user_map = 3 [(redact.v3.value).element.nested = true];
+
+  optional Profile optional_profile = 4 [(redact.v3.value).message.nil = true];
+  optional Settings optional_settings = 5 [(redact.v3.value).message.empty = true];
+}
+
+// OneofMessage demonstrates oneof field redaction
+message OneofMessage {
+  string id = 1;
+
+  // Oneof with scalar fields that need redaction
+  oneof contact {
+    string email = 2 [(redact.v3.value).string = "r*d@ct*d"];
+    string phone = 3 [(redact.v3.value).string = "XXX-XXX-XXXX"];
+    int32 phone_code = 4 [(redact.v3.value).int32 = 0];
+  }
+
+  // Oneof with a message field
+  oneof payload {
+    Profile user_profile = 5 [(redact.v3.value).message.apply = true];
+    Settings user_settings = 6 [(redact.v3.value).message.nil = true];
+    string raw_data = 7 [(redact.v3.value).string = "REDACTED"];
+  }
+
+  // Oneof with mixed redacted and non-redacted fields
+  oneof identifier {
+    string username = 8 [(redact.v3.value).string = "REDACTED"];
+    string public_id = 9;
+    int64 internal_id = 10 [(redact.v3.value).int64 = 0];
+  }
+
+  // Oneof with regex masking
+  oneof secret {
+    string api_key = 11 [(redact.v3.value).regex = { pattern: "(.{4}).*(.{4})" replacement: "${1}****${2}" }];
+  }
+}

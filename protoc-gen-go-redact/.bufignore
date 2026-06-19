@@ -1,0 +1,6 @@
+# Buf ignore file
+# Ignore test and example files from buf linting
+
+# Test data - examples and tests can have non-standard formatting
+testdata
+examples

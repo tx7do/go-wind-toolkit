@@ -1,0 +1,159 @@
+# golangci-lint configuration for protoc-gen-redact
+# Copyright 2025 Contributors
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Go vet
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Go static analysis
+    - unused        # Check for unused code
+    - gofmt         # Check code formatting
+    - goimports     # Check import formatting
+    - misspell      # Check for misspelled words
+    - gocritic      # The most opinionated linter
+    - revive        # Fast, configurable, extensible linter
+    - gosec         # Security-focused linter
+    - bodyclose     # Check for HTTP response body closes
+    - unconvert     # Remove unnecessary type conversions
+    - dupl          # Check for duplicate code
+    - prealloc      # Find slice declarations that could be preallocated
+    - nolintlint    # Ensure nolint directives are used correctly
+    - whitespace    # Check for unnecessary whitespace
+    - stylecheck    # Check code style
+
+  disable:
+    - exhaustruct   # Too strict for this project
+    - cyclop        # Cyclomatic complexity can be complex for generated code
+    - gochecknoglobals # We use some global vars intentionally
+    - gomnd         # Deprecated linter
+    - exportloopref # Deprecated since Go 1.22 loopvar
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow  # Too many false positives
+      - fieldalignment  # Not critical for correctness
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/menta2k/protoc-gen-redact
+
+  misspell:
+    locale: US
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+    disabled-checks:
+      - commentFormatting # Allow flexible comment styles
+      - whyNoLint         # Don't require explanation for nolint
+      - hugeParam         # Not critical for this project
+      - octalLiteral      # Old style is fine
+      - commentedOutCode  # Sometimes useful for reference
+
+  revive:
+    confidence: 0.8
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G404  # Use of weak random number generator acceptable for non-crypto
+      - G304  # File inclusion via variable is intentional for template loading
+
+  dupl:
+    threshold: 100  # Tokens threshold for duplicate code detection
+
+  stylecheck:
+    checks: ["all", "-ST1000", "-ST1003"]  # Allow flexible naming
+
+  staticcheck:
+    checks: ["all", "-SA1019"]  # Exclude deprecation warnings
+
+issues:
+  exclude-use-default: false
+  exclude-rules:
+    # Exclude some linters from test files
+    - path: _test\.go
+      linters:
+        - dupl
+        - gosec
+        - errcheck
+        - govet  # Exclude unusedwrite and other test-specific issues
+
+    # Exclude protobuf generated files
+    - path: \.pb\.go$
+      linters:
+        - all
+
+    - path: \.pb\.redact\.go$
+      linters:
+        - all
+
+    # Exclude example code from strict checks
+    - path: examples/
+      linters:
+        - errcheck
+        - gosec
+
+    # Allow unused parameters in interface implementations
+    - text: "parameter .* seems to be unused"
+      linters:
+        - revive
+
+    # Allow "magic numbers" in tests
+    - path: _test\.go
+      text: "mnd: Magic number"
+      linters:
+        - gomnd
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true

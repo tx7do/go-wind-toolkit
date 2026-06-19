@@ -1,0 +1,170 @@
+syntax = "proto3";
+
+package tests;
+
+import "google/protobuf/empty.proto";
+import "redact/v3/redact.proto";
+
+option go_package = "github.com/menta2k/protoc-gen-redact/v3/examples/tests;tests";
+
+enum TestEnum {
+  ValueZero = 0;
+  ValueOne = 1;
+  ValueTwo = 2;
+}
+
+message TestMessage {
+  float float_value = 2 [(redact.v3.value).float = 3.2];
+
+  double double_value = 4 [(redact.v3.value).double = 6.4];
+
+  int32 int32_value = 6 [(redact.v3.value).int32 = 32];
+
+  int64 int64_value = 8 [(redact.v3.value).int64 = 64];
+
+  uint32 uint32_value = 10 [(redact.v3.value).uint32 = 32];
+
+  uint64 uint64_value = 12 [(redact.v3.value).uint64 = 64];
+
+  sint32 sint32_value = 14 [(redact.v3.value).sint32 = 32];
+
+  sint64 sint64_value = 16 [(redact.v3.value).sint64 = 64];
+
+  fixed32 fixed32_value = 18 [(redact.v3.value).fixed32 = 32];
+
+  fixed64 fixed64_value = 20 [(redact.v3.value).fixed64 = 64];
+
+  sfixed32 sfixed32_value = 22 [(redact.v3.value).sfixed32 = 32];
+
+  sfixed64 sfixed64_value = 24 [(redact.v3.value).sfixed64 = 64];
+
+  bool bool_value = 26 [(redact.v3.value).bool = true];
+
+  string string_value = 28 [(redact.v3.value).string = "redacted-value-value"];
+
+  bytes bytes_value = 30 [(redact.v3.value).bytes = "redacted-value-value"];
+
+  TestEnum enum_value = 32 [(redact.v3.value).enum = 2];
+
+  TestMessage message_nil = 34 [(redact.v3.value).message.nil = true];
+  TestMessage message_skip = 35 [(redact.v3.value).message.skip = true];
+  TestMessage message_empty = 36 [(redact.v3.value).message.empty = true];
+
+  map<int64, string> map1_empty = 39 [(redact.v3.value).element.empty = true];
+  map<string, google.protobuf.Empty> map2_empty = 40 [(redact.v3.value).element.empty = true];
+
+  map<int64, string> map1_nested = 41 [(redact.v3.value).element.nested = true];
+  map<string, google.protobuf.Empty> map2_nested = 42 [(redact.v3.value).element.nested = true];
+
+  map<int64, string> map1_item = 43 [(redact.v3.value).element.item.string = "3"];
+  map<string, google.protobuf.Empty> map2_item_nil = 44 [(redact.v3.value).element.item.message.nil = true];
+  map<string, google.protobuf.Empty> map2_item_skip = 45 [(redact.v3.value).element.item.message.skip = true];
+  map<string, google.protobuf.Empty> map2_item_empty = 46 [(redact.v3.value).element.item.message.empty = true];
+
+  // Regex-based masking
+  string phone_regex = 47 [(redact.v3.value).regex = { pattern: "^(\\d{3})\\d{4}(\\d{4})$" replacement: "${1}****${2}" }];
+  optional string email_regex = 48 [(redact.v3.value).regex = { pattern: "(^.).*(@.+$)" replacement: "${1}***${2}" }];
+  repeated string tags_regex = 49 [(redact.v3.value).element.item.regex = { pattern: "\\d" replacement: "*" }];
+}
+
+// OneofMessage demonstrates oneof field handling
+message OneofMessage {
+  string id = 1;
+
+  // Oneof with all fields redacted
+  oneof contact {
+    string email = 2 [(redact.v3.value).string = "r*d@ct*d"];
+    string phone = 3 [(redact.v3.value).string = "XXX-XXX-XXXX"];
+    int32 phone_code = 4 [(redact.v3.value).int32 = 0];
+  }
+
+  // Oneof with a message field
+  oneof payload {
+    TestMessage nested_msg = 5 [(redact.v3.value).message.apply = true];
+    TestMessage nil_msg = 6 [(redact.v3.value).message.nil = true];
+    string raw_data = 7 [(redact.v3.value).string = "REDACTED"];
+  }
+
+  // Oneof with mixed redacted and non-redacted fields
+  oneof identifier {
+    string username = 8 [(redact.v3.value).string = "REDACTED"];
+    string public_id = 9;
+    int64 internal_id = 10 [(redact.v3.value).int64 = 0];
+  }
+
+  // Oneof with regex masking
+  oneof credential {
+    string api_key = 11 [(redact.v3.value).regex = { pattern: "(.{4}).*(.{4})" replacement: "${1}****${2}" }];
+  }
+}
+
+message RepeatedM {
+  repeated float float_value_empties = 2 [(redact.v3.value).element.empty = true];
+  repeated float float_value_nested = 3 [(redact.v3.value).element.nested = true];
+  repeated float float_values = 4 [(redact.v3.value).element.item.float = 3.2];
+
+  repeated double double_value_empties = 6 [(redact.v3.value).element.empty = true];
+  repeated double double_value_nested = 7 [(redact.v3.value).element.nested = true];
+  repeated double double_values = 8 [(redact.v3.value).element.item.double = 6.4];
+
+  repeated int32 int32_value_empties = 10 [(redact.v3.value).element.empty = true];
+  repeated int32 int32_value_nested = 11 [(redact.v3.value).element.nested = true];
+  repeated int32 int32_values = 12 [(redact.v3.value).element.item.int32 = 32];
+
+  repeated int64 int64_value_empties = 14 [(redact.v3.value).element.empty = true];
+  repeated int64 int64_value_nested = 15 [(redact.v3.value).element.nested = true];
+  repeated int64 int64_values = 16 [(redact.v3.value).element.item.int64 = 64];
+
+  repeated uint32 uint32_value_empties = 18 [(redact.v3.value).element.empty = true];
+  repeated uint32 uint32_value_nested = 19 [(redact.v3.value).element.nested = true];
+  repeated uint32 uint32_values = 20 [(redact.v3.value).element.item.uint32 = 32];
+
+  repeated uint64 uint64_value_empties = 22 [(redact.v3.value).element.empty = true];
+  repeated uint64 uint64_value_nested = 23 [(redact.v3.value).element.nested = true];
+  repeated uint64 uint64_values = 24 [(redact.v3.value).element.item.uint64 = 64];
+
+  repeated sint32 sint32_value_empties = 26 [(redact.v3.value).element.empty = true];
+  repeated sint32 sint32_value_nested = 27 [(redact.v3.value).element.nested = true];
+  repeated sint32 sint32_values = 28 [(redact.v3.value).element.item.sint32 = 32];
+
+  repeated sint64 sint64_value_empties = 30 [(redact.v3.value).element.empty = true];
+  repeated sint64 sint64_value_nested = 31 [(redact.v3.value).element.nested = true];
+  repeated sint64 sint64_values = 32 [(redact.v3.value).element.item.sint64 = 64];
+
+  repeated fixed32 fixed32_value_empties = 34 [(redact.v3.value).element.empty = true];
+  repeated fixed32 fixed32_value_nested = 35 [(redact.v3.value).element.nested = true];
+  repeated fixed32 fixed32_values = 36 [(redact.v3.value).element.item.fixed32 = 32];
+
+  repeated fixed64 fixed64_value_empties = 38 [(redact.v3.value).element.empty = true];
+  repeated fixed64 fixed64_value_nested = 39 [(redact.v3.value).element.nested = true];
+  repeated fixed64 fixed64_values = 40 [(redact.v3.value).element.item.fixed64 = 64];
+
+  repeated sfixed32 sfixed32_value_empties = 42 [(redact.v3.value).element.empty = true];
+  repeated sfixed32 sfixed32_value_nested = 43 [(redact.v3.value).element.nested = true];
+  repeated sfixed32 sfixed32_values = 44 [(redact.v3.value).element.item.sfixed32 = 32];
+
+  repeated sfixed64 sfixed64_value_empties = 46 [(redact.v3.value).element.empty = true];
+  repeated sfixed64 sfixed64_value_nested = 47 [(redact.v3.value).element.nested = true];
+  repeated sfixed64 sfixed64_values = 48 [(redact.v3.value).element.item.sfixed64 = 64];
+
+  repeated bool bool_value_empties = 50 [(redact.v3.value).element.empty = true];
+  repeated bool bool_value_nested = 51 [(redact.v3.value).element.nested = true];
+  repeated bool bool_values = 52 [(redact.v3.value).element.item.bool = true];
+
+  repeated string string_value_empties = 54 [(redact.v3.value).element.empty = true];
+  repeated string string_value_nested = 55 [(redact.v3.value).element.nested = true];
+  repeated string string_values = 56 [(redact.v3.value).element.item.string = "redacted-value-value"];
+
+  repeated bytes bytes_value_empties = 58 [(redact.v3.value).element.empty = true];
+  repeated bytes bytes_value_nested = 59 [(redact.v3.value).element.nested = true];
+  repeated bytes bytes_values = 60 [(redact.v3.value).element.item.bytes = "redacted-value-value"];
+
+  repeated TestEnum enum_value_empties = 62 [(redact.v3.value).element.empty = true];
+  repeated TestEnum enum_value_nested = 63 [(redact.v3.value).element.nested = true];
+  repeated TestEnum enum_values = 64 [(redact.v3.value).element.item.enum = 2];
+
+  repeated TestMessage message_nils = 66 [(redact.v3.value).element.item.message.nil = true];
+  repeated TestMessage message_skips = 67 [(redact.v3.value).element.item.message.skip = true];
+  repeated TestMessage message_nested = 68 [(redact.v3.value).element.item.message.apply = true];
+  repeated TestMessage message_empties = 69 [(redact.v3.value).element.item.message.empty = true];
+}
