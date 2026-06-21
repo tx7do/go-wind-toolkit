@@ -9,8 +9,8 @@ modules:
       use:
         - FILE
 
-deps:
-  - "buf.build/go-wind/redact"
+#deps:
+#  - "buf.build/go-wind/redact"
 
 breaking:
   use:

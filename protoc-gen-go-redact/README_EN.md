@@ -3,11 +3,11 @@ protoc-gen-redact (PGR)
 
 [中文](README.md) | **[English](README_EN.md)** | [日本語](README_JA.md)
 
-[![Build and Publish](https://github.com/menta2k/protoc-gen-redact/workflows/Build%20and%20Publish/badge.svg)](https://github.com/menta2k/protoc-gen-redact/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/menta2k/protoc-gen-redact/v3?dropcache)](https://goreportcard.com/report/github.com/menta2k/protoc-gen-redact/v3)
-[![Go Reference](https://pkg.go.dev/badge/github.com/menta2k/protoc-gen-redact/v3.svg)](https://pkg.go.dev/github.com/menta2k/protoc-gen-redact/v3)
+[![Build and Publish](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/workflows/Build%20and%20Publish/badge.svg)](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact?dropcache)](https://goreportcard.com/report/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact)
+[![Go Reference](https://pkg.go.dev/badge/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact.svg)](https://pkg.go.dev/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact)
 [![License](https://img.shields.io/badge/license-apache2-mildgreen.svg)](./LICENSE)
-[![GitHub release](https://img.shields.io/github/release/menta2k/protoc-gen-redact.svg)](https://github.com/menta2k/protoc-gen-redact/releases)
+[![GitHub release](https://img.shields.io/github/release/tx7do/go-wind-toolkit/protoc-gen-go-redact.svg)](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/releases)
 
 _protoc-gen-redact (PGR)_ is a protoc plugin for automatically redacting field values in gRPC responses on the server side.
 
@@ -78,7 +78,7 @@ syntax = "proto3";
 
 package user;
 
-import "redact.proto";
+import "redact/v1/redact.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/examples/user/pb;user";
@@ -329,7 +329,7 @@ string bank_account = 1 [(redact.value).fixed_length = { char: "X" }];
 Invoke a user-registered redactor function at runtime:
 
 ```go
-import "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact"
+import "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/redact/v1"
 
 func init() {
     redact.RegisterCustomRedactor("myRedactor", func(s string) string {
@@ -418,15 +418,44 @@ service MyService {
 
 Service-level options: `service_skip`, `internal_service`, `internal_service_code`, `internal_service_err_message`.
 
+### What is an "internal service / internal method"?
+
+`internal_service` and `internal_method` are access-gate options:
+
+- `internal_service = true`: all RPC methods in the service require internal access.
+- `internal_method = true`: only that RPC method requires internal access.
+
+Generated `*.pb.redact.go` wrappers call `bypass.CheckInternal(ctx)` before invoking the real handler:
+
+- `true`: allow request and call the actual service method.
+- `false`: reject request immediately (default is `PermissionDenied`; customizable with `*_code` and `*_err_message`).
+
+Notes:
+
+- If you pass `nil` as bypass during registration, generated code falls back to `redact.Falsy` (always `false`), so internal RPCs are always blocked.
+- If your `redact.Wrapper(...)` returns `true` for trusted requests (for example, requests carrying an internal gateway header), internal RPCs are allowed by design.
+- These gates (and redaction wrappers) are effective only when registering with `RegisterRedacted<Service>Server(...)`.
+
+Example:
+
+```go
+pb.RegisterRedactedMyServiceServer(s, impl,
+    redact.Wrapper(func(ctx context.Context) bool {
+        md, ok := metadata.FromIncomingContext(ctx)
+        return ok && len(md["x-internal"]) > 0
+    }),
+)
+```
+
 ---
 
 ## Custom Templates
 
 ```bash
 protoc \
-  --plugin=protoc-gen-redact=/path/to/protoc-gen-redact \
-  --redact_out=. \
-  --redact_opt=template_file=/path/to/your/template.tmpl \
+  --plugin=protoc-gen-go-redact=/path/to/protoc-gen-go-redact \
+  --go-redact_out=. \
+  --go-redact_opt=template_file=/path/to/your/template.tmpl \
   your_proto_file.proto
 ```
 
@@ -443,14 +472,27 @@ This project uses [Buf](https://buf.build/) to manage Protobuf files, run lint c
 Defines the Buf module, lint rules, and breaking change policy:
 
 ```yaml
-version: v1
-name: buf.build/menta2k-org/redact
+version: v2
+
+modules:
+  - path: .
+    lint:
+      use:
+        - STANDARD
+    breaking:
+      use:
+        - FILE
+
+deps:
+  - "buf.build/go-wind/redact"
+
 breaking:
   use:
     - FILE
+
 lint:
   use:
-    - STANDARD
+    - DEFAULT
 ```
 
 | Field | Description |
@@ -479,7 +521,7 @@ plugins:
       - paths=source_relative
 ```
 
-To also generate redaction code via Buf, add the `redact` plugin under `plugins` (requires `protoc-gen-redact` to be installed first):
+To also generate redaction code via Buf, add the `go-redact` plugin under `plugins` (requires `protoc-gen-go-redact` to be installed first):
 
 ```yaml
 version: v1
@@ -494,8 +536,8 @@ plugins:
     opt:
       - paths=source_relative
 
-  # Generate redaction code (requires protoc-gen-redact to be installed)
-  - plugin: redact
+  # Generate redaction code (requires protoc-gen-go-redact to be installed)
+  - plugin: go-redact
     out: .
     opt:
       - paths=source_relative

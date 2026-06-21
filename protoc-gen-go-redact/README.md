@@ -3,11 +3,11 @@ protoc-gen-redact (PGR)
 
 **[中文](README.md)** | [English](README_EN.md) | [日本語](README_JA.md)
 
-[![Build and Publish](https://github.com/menta2k/protoc-gen-redact/workflows/Build%20and%20Publish/badge.svg)](https://github.com/menta2k/protoc-gen-redact/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/menta2k/protoc-gen-redact/v3?dropcache)](https://goreportcard.com/report/github.com/menta2k/protoc-gen-redact/v3)
-[![Go Reference](https://pkg.go.dev/badge/github.com/menta2k/protoc-gen-redact/v3.svg)](https://pkg.go.dev/github.com/menta2k/protoc-gen-redact/v3)
+[![Build and Publish](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/workflows/Build%20and%20Publish/badge.svg)](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact?dropcache)](https://goreportcard.com/report/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact)
+[![Go Reference](https://pkg.go.dev/badge/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact.svg)](https://pkg.go.dev/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact)
 [![License](https://img.shields.io/badge/license-apache2-mildgreen.svg)](./LICENSE)
-[![GitHub release](https://img.shields.io/github/release/menta2k/protoc-gen-redact.svg)](https://github.com/menta2k/protoc-gen-redact/releases)
+[![GitHub release](https://img.shields.io/github/release/tx7do/go-wind-toolkit/protoc-gen-go-redact.svg)](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/releases)
 
 _protoc-gen-redact (PGR)_ 是一个 protoc 插件，用于在服务端对 gRPC 调用中的字段值进行自动脱敏。
 
@@ -78,7 +78,7 @@ syntax = "proto3";
 
 package user;
 
-import "redact.proto";
+import "redact/v1/redact.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/examples/user/pb;user";
@@ -364,7 +364,7 @@ string card = 2 [(redact.value).fixed_length = { char: "#" }];
 调用运行时注册的自定义脱敏函数。通过 `redact.RegisterCustomRedactor` 注册：
 
 ```go
-import "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact"
+import "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/redact/v1"
 
 func init() {
     redact.RegisterCustomRedactor("myRedactor", func(s string) string {
@@ -414,7 +414,7 @@ string debug_data = 2 [(redact.value).condition = {
 ```protobuf
 syntax = "proto3";
 
-import "redact.proto";
+import "redact/v1/redact.proto";
 
 option (redact.auto_detect) = {
     patterns: ["password", "token", "secret", "api_key"]
@@ -486,6 +486,35 @@ service MyService {
 - `internal_service_code`：自定义错误码（默认 PermissionDenied）
 - `internal_service_err_message`：自定义错误消息（支持 `%service%` 和 `%method%` 占位符）
 
+### 什么是“内部服务 / 内部方法”？
+
+`internal_service` 和 `internal_method` 本质上是“访问门禁”选项：
+
+- `internal_service = true`：整个 service 的所有方法都需要通过内部校验。
+- `internal_method = true`：仅当前方法需要通过内部校验。
+
+生成的 `*.pb.redact.go` 会在调用真实业务前执行 `bypass.CheckInternal(ctx)`：
+
+- 返回 `true`：放行，继续调用实际 handler。
+- 返回 `false`：直接返回错误（默认 `PermissionDenied`，可通过 `*_code` 和 `*_err_message` 自定义）。
+
+注意：
+
+- 如果你注册服务时传入 `nil` bypass，生成代码会使用 `redact.Falsy`（始终返回 `false`），因此内部方法会全部被拒绝。
+- 如果你使用 `redact.Wrapper(...)` 并在条件满足时返回 `true`（例如带内部网关 header），那么内部方法会被放行，这是预期行为。
+- 只有通过 `RegisterRedacted<Service>Server(...)` 注册后，这些门禁和脱敏逻辑才会生效。
+
+示例：
+
+```go
+pb.RegisterRedactedMyServiceServer(s, impl,
+    redact.Wrapper(func(ctx context.Context) bool {
+        md, ok := metadata.FromIncomingContext(ctx)
+        return ok && len(md["x-internal"]) > 0
+    }),
+)
+```
+
 ---
 
 ## 自定义模板
@@ -494,9 +523,9 @@ PGR 支持使用自定义模板进行代码生成：
 
 ```bash
 protoc \
-  --plugin=protoc-gen-redact=/path/to/protoc-gen-redact \
-  --redact_out=. \
-  --redact_opt=template_file=/path/to/your/template.tmpl \
+  --plugin=protoc-gen-go-redact=/path/to/protoc-gen-go-redact \
+  --go-redact_out=. \
+  --go-redact_opt=template_file=/path/to/your/template.tmpl \
   your_proto_file.proto
 ```
 
@@ -515,21 +544,34 @@ protoc \
 定义 Buf 模块、lint 规则和破坏性变更检查策略：
 
 ```yaml
-version: v1
-name: buf.build/menta2k-org/redact
+version: v2
+
+modules:
+  - path: .
+    lint:
+      use:
+        - STANDARD
+    breaking:
+      use:
+        - FILE
+
+deps:
+  - "buf.build/go-wind/redact"
+
 breaking:
   use:
     - FILE
+
 lint:
   use:
-    - STANDARD
+    - DEFAULT
 ```
 
-| 字段 | 说明 |
-|------|------|
-| `name` | Buf 模块的唯一标识，用于推送到 Buf Schema Registry (BSR) |
-| `breaking.use` | 破坏性变更检查级别，`FILE` 表示在文件级别检查 API 兼容性 |
-| `lint.use` | lint 规则集，`STANDARD` 为 Buf 推荐的标准规则 |
+| 字段             | 说明                                          |
+|----------------|---------------------------------------------|
+| `name`         | Buf 模块的唯一标识，用于推送到 Buf Schema Registry (BSR) |
+| `breaking.use` | 破坏性变更检查级别，`FILE` 表示在文件级别检查 API 兼容性          |
+| `lint.use`     | lint 规则集，`STANDARD` 为 Buf 推荐的标准规则           |
 
 ### buf.gen.yaml - 代码生成配置
 
@@ -551,7 +593,7 @@ plugins:
       - paths=source_relative
 ```
 
-若需通过 Buf 一并生成脱敏代码，可在 `plugins` 下添加 `redact` 插件配置（需先安装 `protoc-gen-redact`）：
+若需通过 Buf 一并生成脱敏代码，可在 `plugins` 下添加 `go-redact` 插件配置（需先安装 `protoc-gen-go-redact`）：
 
 ```yaml
 version: v1
@@ -566,8 +608,8 @@ plugins:
     opt:
       - paths=source_relative
 
-  # 生成脱敏代码（需先安装 protoc-gen-redact）
-  - plugin: redact
+  # 生成脱敏代码（需先安装 protoc-gen-go-redact）
+  - plugin: go-redact
     out: .
     opt:
       - paths=source_relative

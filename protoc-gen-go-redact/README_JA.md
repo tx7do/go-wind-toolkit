@@ -3,11 +3,11 @@ protoc-gen-redact (PGR)
 
 [中文](README.md) | [English](README_EN.md) | **[日本語](README_JA.md)**
 
-[![Build and Publish](https://github.com/menta2k/protoc-gen-redact/workflows/Build%20and%20Publish/badge.svg)](https://github.com/menta2k/protoc-gen-redact/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/menta2k/protoc-gen-redact/v3?dropcache)](https://goreportcard.com/report/github.com/menta2k/protoc-gen-redact/v3)
-[![Go Reference](https://pkg.go.dev/badge/github.com/menta2k/protoc-gen-redact/v3.svg)](https://pkg.go.dev/github.com/menta2k/protoc-gen-redact/v3)
+[![Build and Publish](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/workflows/Build%20and%20Publish/badge.svg)](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact?dropcache)](https://goreportcard.com/report/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact)
+[![Go Reference](https://pkg.go.dev/badge/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact.svg)](https://pkg.go.dev/github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact)
 [![License](https://img.shields.io/badge/license-apache2-mildgreen.svg)](./LICENSE)
-[![GitHub release](https://img.shields.io/github/release/menta2k/protoc-gen-redact.svg)](https://github.com/menta2k/protoc-gen-redact/releases)
+[![GitHub release](https://img.shields.io/github/release/tx7do/go-wind-toolkit/protoc-gen-go-redact.svg)](https://github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/releases)
 
 _protoc-gen-redact (PGR)_ は、サーバー側で gRPC レスポンスのフィールド値を自動的にマスキング（秘匿化）する protoc プラグインです。
 
@@ -78,7 +78,7 @@ syntax = "proto3";
 
 package user;
 
-import "redact.proto";
+import "redact/v1/redact.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/examples/user/pb;user";
@@ -329,7 +329,7 @@ string bank_account = 1 [(redact.value).fixed_length = { char: "X" }];
 実行時に登録されたカスタムマスキング関数を呼び出します：
 
 ```go
-import "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact"
+import "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/redact/v1"
 
 func init() {
     redact.RegisterCustomRedactor("myRedactor", func(s string) string {
@@ -416,15 +416,44 @@ service MyService {
 }
 ```
 
+### 「内部サービス / 内部メソッド」とは？
+
+`internal_service` と `internal_method` はアクセス制御用のオプションです。
+
+- `internal_service = true`: その service の全 RPC が内部アクセス判定を必須にします。
+- `internal_method = true`: その RPC メソッドだけ内部アクセス判定を必須にします。
+
+生成される `*.pb.redact.go` ラッパーは、実際のハンドラ呼び出し前に `bypass.CheckInternal(ctx)` を実行します。
+
+- `true`: リクエストを許可して実際のメソッドを呼び出します。
+- `false`: 即時に拒否します（デフォルトは `PermissionDenied`。`*_code` と `*_err_message` で変更可能）。
+
+注意点：
+
+- 登録時に bypass に `nil` を渡すと、生成コードは `redact.Falsy`（常に `false`）を使うため、内部 RPC は常に拒否されます。
+- `redact.Wrapper(...)` が信頼できるリクエストで `true` を返す場合（例: 内部ゲートウェイのヘッダーを持つリクエスト）、内部 RPC は設計どおり許可されます。
+- これらの制御（およびマスキングラッパー）は `RegisterRedacted<Service>Server(...)` で登録した場合にのみ有効です。
+
+例：
+
+```go
+pb.RegisterRedactedMyServiceServer(s, impl,
+    redact.Wrapper(func(ctx context.Context) bool {
+        md, ok := metadata.FromIncomingContext(ctx)
+        return ok && len(md["x-internal"]) > 0
+    }),
+)
+```
+
 ---
 
 ## カスタムテンプレート
 
 ```bash
 protoc \
-  --plugin=protoc-gen-redact=/path/to/protoc-gen-redact \
-  --redact_out=. \
-  --redact_opt=template_file=/path/to/your/template.tmpl \
+  --plugin=protoc-gen-go-redact=/path/to/protoc-gen-go-redact \
+  --go-redact_out=. \
+  --go-redact_opt=template_file=/path/to/your/template.tmpl \
   your_proto_file.proto
 ```
 
@@ -441,14 +470,27 @@ protoc \
 Buf モジュール、lint ルール、破壊的変更ポリシーを定義します：
 
 ```yaml
-version: v1
-name: buf.build/menta2k-org/redact
+version: v2
+
+modules:
+  - path: .
+    lint:
+      use:
+        - STANDARD
+    breaking:
+      use:
+        - FILE
+
+deps:
+  - "buf.build/go-wind/redact"
+
 breaking:
   use:
     - FILE
+
 lint:
   use:
-    - STANDARD
+    - DEFAULT
 ```
 
 | フィールド | 説明 |
@@ -477,7 +519,7 @@ plugins:
       - paths=source_relative
 ```
 
-Buf 経由でマスキングコードも生成するには、`plugins` 配下に `redact` プラグインを追加します（事前に `protoc-gen-redact` のインストールが必要）：
+Buf 経由でマスキングコードも生成するには、`plugins` 配下に `go-redact` プラグインを追加します（事前に `protoc-gen-go-redact` のインストールが必要）：
 
 ```yaml
 version: v1
@@ -492,8 +534,8 @@ plugins:
     opt:
       - paths=source_relative
 
-  # マスキングコードを生成（protoc-gen-redact のインストールが必要）
-  - plugin: redact
+  # マスキングコードを生成（protoc-gen-go-redact のインストールが必要）
+  - plugin: go-redact
     out: .
     opt:
       - paths=source_relative
