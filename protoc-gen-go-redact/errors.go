@@ -5,6 +5,8 @@ import (
 
 	pgs "github.com/lyft/protoc-gen-star/v2"
 	"google.golang.org/grpc/codes"
+
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/redact/v1"
 )
 
 // ErrorContext provides additional context for errors

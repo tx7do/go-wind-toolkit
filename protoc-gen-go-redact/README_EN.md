@@ -78,31 +78,31 @@ syntax = "proto3";
 
 package user;
 
-import "redact/v3/redact.proto";
+import "redact.proto";
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/menta2k/protoc-gen-redact/v3/examples/user/pb;user";
+option go_package = "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/examples/user/pb;user";
 
 message User {
     string username = 1;
-    string password = 2 [(redact.v3.value).string = "REDACTED"];
-    string email    = 3 [(redact.v3.value).email = { keep_local_first: 2 }];
+    string password = 2 [(redact.value).string = "REDACTED"];
+    string email    = 3 [(redact.value).email = { keep_local_first: 2 }];
     string name     = 4;
-    Location home   = 5 [(redact.v3.value).message.apply = true];
+    Location home   = 5 [(redact.value).message.apply = true];
 
     message Location {
-        double lat = 1 [(redact.v3.value).double = 0.0];
-        double lng = 2 [(redact.v3.value).double = 0.0];
+        double lat = 1 [(redact.value).double = 0.0];
+        double lng = 2 [(redact.value).double = 0.0];
     }
 }
 
 service Chat {
     rpc GetUser(GetUserRequest) returns (User);
     rpc GetUserInternal(GetUserRequest) returns (User) {
-        option (redact.v3.method_skip) = true;
+        option (redact.method_skip) = true;
     }
     rpc ListUsers (google.protobuf.Empty) returns (ListUsersResponse) {
-        option (redact.v3.internal_method) = true;
+        option (redact.internal_method) = true;
     }
 }
 ```
@@ -112,7 +112,7 @@ service Chat {
 ## Installation
 
 ```bash
-go install github.com/menta2k/protoc-gen-redact/v3@latest
+go install github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact@latest
 ```
 
 ---
@@ -124,11 +124,11 @@ go install github.com/menta2k/protoc-gen-redact/v3@latest
 Annotate individual fields with custom redaction values:
 
 ```protobuf
-string password = 1 [(redact.v3.value).string = "REDACTED"];
-int32  age      = 2 [(redact.v3.value).int32 = 0];
-bool   active   = 3 [(redact.v3.value).bool = false];
-bytes  sign     = 4 [(redact.v3.value).bytes = ""];
-double score    = 5 [(redact.v3.value).double = 0.0];
+string password = 1 [(redact.value).string = "REDACTED"];
+int32  age      = 2 [(redact.value).int32 = 0];
+bool   active   = 3 [(redact.value).bool = false];
+bytes  sign     = 4 [(redact.value).bytes = ""];
+double score    = 5 [(redact.value).double = 0.0];
 ```
 
 All proto scalar types are supported: `float`, `double`, `int32`, `int64`, `uint32`, `uint64`, `sint32`, `sint64`, `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `bool`, `string`, `bytes`, and `enum`.
@@ -139,30 +139,30 @@ Control redaction of nested messages:
 
 ```protobuf
 // Recursively apply redaction rules
-Profile profile = 1 [(redact.v3.value).message.apply = true];
+Profile profile = 1 [(redact.value).message.apply = true];
 
 // Set the entire message to nil
-Settings settings = 2 [(redact.v3.value).message.nil = true];
+Settings settings = 2 [(redact.value).message.nil = true];
 
 // Replace with an empty instance
-Metadata metadata = 3 [(redact.v3.value).message.empty = true];
+Metadata metadata = 3 [(redact.value).message.empty = true];
 
 // Skip redaction entirely
-AuditLog log = 4 [(redact.v3.value).message.skip = true];
+AuditLog log = 4 [(redact.value).message.skip = true];
 ```
 
 ### Repeated / Map Fields
 
 ```protobuf
 // Clear the collection
-map<string, string> attributes = 1 [(redact.v3.value).element.empty = true];
+map<string, string> attributes = 1 [(redact.value).element.empty = true];
 
 // Apply default redaction to each element
-repeated Address addresses = 2 [(redact.v3.value).element.nested = true];
+repeated Address addresses = 2 [(redact.value).element.nested = true];
 
 // Apply custom rules to each item
-repeated int32 scores = 3 [(redact.v3.value).element.item.int32 = 0];
-repeated string phones = 4 [(redact.v3.value).element.item.mask = { keep_first: 3 keep_last: 4 }];
+repeated int32 scores = 3 [(redact.value).element.item.int32 = 0];
+repeated string phones = 4 [(redact.value).element.item.mask = { keep_first: 3 keep_last: 4 }];
 ```
 
 ### Proto3 Optional Fields
@@ -171,8 +171,8 @@ Proto3 `optional` fields use pointer semantics in Go. The generator handles this
 
 ```protobuf
 message User {
-    optional string email = 1 [(redact.v3.value).string = "r*d@ct*d"];
-    optional int32 age    = 2 [(redact.v3.value).int32 = 0];
+    optional string email = 1 [(redact.value).string = "r*d@ct*d"];
+    optional int32 age    = 2 [(redact.value).int32 = 0];
 }
 ```
 
@@ -189,8 +189,8 @@ The generator supports `oneof` groups with type-safe switch statements:
 ```protobuf
 message OneofMessage {
     oneof contact {
-        string email = 1 [(redact.v3.value).string = "r*d@ct*d"];
-        string phone = 2 [(redact.v3.value).mask = { keep_first: 3 keep_last: 4 }];
+        string email = 1 [(redact.value).string = "r*d@ct*d"];
+        string phone = 2 [(redact.value).mask = { keep_first: 3 keep_last: 4 }];
     }
 }
 ```
@@ -210,7 +210,7 @@ case *OneofMessage_Phone:
 Use regular expressions for partial masking. Capture groups can be referenced via `${1}`, `${2}`:
 
 ```protobuf
-string phone = 1 [(redact.v3.value).regex = {
+string phone = 1 [(redact.value).regex = {
     pattern: "^(\\d{3})\\d{4}(\\d{4})$"
     replacement: "${1}****${2}"
 }];
@@ -222,10 +222,10 @@ string phone = 1 [(redact.v3.value).regex = {
 Keep the first N and last M characters, mask the rest:
 
 ```protobuf
-string phone   = 1 [(redact.v3.value).mask = { keep_first: 3 keep_last: 4 }];
+string phone   = 1 [(redact.value).mask = { keep_first: 3 keep_last: 4 }];
 // 13812345678 → 138****5678
 
-string id_card = 2 [(redact.v3.value).mask = { keep_first: 6 keep_last: 4 mask_char: "X" }];
+string id_card = 2 [(redact.value).mask = { keep_first: 6 keep_last: 4 mask_char: "X" }];
 // 110101199001011234 → 110101XXXXXXXX1234
 ```
 
@@ -240,10 +240,10 @@ string id_card = 2 [(redact.v3.value).mask = { keep_first: 6 keep_last: 4 mask_c
 Split on `@`, mask the local part and/or domain separately:
 
 ```protobuf
-string email  = 1 [(redact.v3.value).email = { keep_local_first: 2 }];
+string email  = 1 [(redact.value).email = { keep_local_first: 2 }];
 // alice@example.com → al***@example.com
 
-string email2 = 2 [(redact.v3.value).email = { keep_local_first: 1 mask_domain: true }];
+string email2 = 2 [(redact.value).email = { keep_local_first: 1 mask_domain: true }];
 // bob@test.com → ***@********
 ```
 
@@ -258,7 +258,7 @@ string email2 = 2 [(redact.v3.value).email = { keep_local_first: 1 mask_domain: 
 Keep only the first N characters, optionally append a suffix:
 
 ```protobuf
-string name = 1 [(redact.v3.value).truncate = { length: 1 suffix: "**" }];
+string name = 1 [(redact.value).truncate = { length: 1 suffix: "**" }];
 // Alexander → A**
 ```
 
@@ -272,9 +272,9 @@ string name = 1 [(redact.v3.value).truncate = { length: 1 suffix: "**" }];
 Replace the field value with its hex-encoded hash digest:
 
 ```protobuf
-string token = 1 [(redact.v3.value).hash = { algo: SHA256 }];
+string token = 1 [(redact.value).hash = { algo: SHA256 }];
 
-repeated string tokens = 2 [(redact.v3.value).element.item.hash = { algo: MD5 }];
+repeated string tokens = 2 [(redact.value).element.item.hash = { algo: MD5 }];
 ```
 
 | Algorithm | Output Length |
@@ -288,7 +288,7 @@ repeated string tokens = 2 [(redact.v3.value).element.item.hash = { algo: MD5 }]
 Replace the field value with a deterministic UUID v5 (SHA-1 based). Same input always produces the same UUID:
 
 ```protobuf
-string user_id = 1 [(redact.v3.value).uuid = {}];
+string user_id = 1 [(redact.value).uuid = {}];
 // alice@example.com → a2b4c6d8-e9f0-5a1b-8c2d-3e4f5a6b7c8d
 ```
 
@@ -297,7 +297,7 @@ string user_id = 1 [(redact.v3.value).uuid = {}];
 Mask an IP address (IPv4 or IPv6), preserving the first N octets/hextets:
 
 ```protobuf
-string client_ip = 1 [(redact.v3.value).ip = { keep_octets: 2 }];
+string client_ip = 1 [(redact.value).ip = { keep_octets: 2 }];
 // 192.168.1.100 → 192.168.x.x
 ```
 
@@ -311,7 +311,7 @@ string client_ip = 1 [(redact.v3.value).ip = { keep_octets: 2 }];
 Mask URL query parameter values:
 
 ```protobuf
-string callback = 1 [(redact.v3.value).url = { mask_query: true }];
+string callback = 1 [(redact.value).url = { mask_query: true }];
 // https://api.example.com/cb?token=secret → ...?token=******
 ```
 
@@ -320,7 +320,7 @@ string callback = 1 [(redact.v3.value).url = { mask_query: true }];
 Replace the entire value with a mask of the same length:
 
 ```protobuf
-string bank_account = 1 [(redact.v3.value).fixed_length = { char: "X" }];
+string bank_account = 1 [(redact.value).fixed_length = { char: "X" }];
 // 6225880123456789 → XXXXXXXXXXXXXXXX
 ```
 
@@ -339,7 +339,7 @@ func init() {
 ```
 
 ```protobuf
-string ssn = 1 [(redact.v3.value).custom = { name: "myRedactor" }];
+string ssn = 1 [(redact.value).custom = { name: "myRedactor" }];
 // 123456789 → ***6789
 ```
 
@@ -348,7 +348,7 @@ string ssn = 1 [(redact.v3.value).custom = { name: "myRedactor" }];
 Apply inner rules only when an environment variable matches:
 
 ```protobuf
-string phone = 1 [(redact.v3.value).condition = {
+string phone = 1 [(redact.value).condition = {
     env_var: "APP_ENV"
     env_val: "production"
     rules: { mask: { keep_first: 3 keep_last: 4 } }
@@ -363,7 +363,7 @@ string phone = 1 [(redact.v3.value).condition = {
 Automatically apply redaction rules to fields matching name patterns:
 
 ```protobuf
-option (redact.v3.auto_detect) = {
+option (redact.auto_detect) = {
     patterns: ["password", "token", "secret", "api_key"]
     default_action: { mask: { keep_first: 2 keep_last: 2 } }
 };
@@ -383,17 +383,17 @@ Matching is case-insensitive substring matching. Fields with explicit rules are 
 
 ```protobuf
 message PublicData {
-    option (redact.v3.ignored) = true;
+    option (redact.ignored) = true;
     string data = 1;
 }
 
 message SensitiveData {
-    option (redact.v3.nil) = true;
+    option (redact.nil) = true;
     string secret = 1;
 }
 
 message EmptyData {
-    option (redact.v3.empty) = true;
+    option (redact.empty) = true;
     string field1 = 1;
 }
 ```
@@ -407,11 +407,11 @@ service MyService {
     rpc GetUser(GetUserRequest) returns (User);
 
     rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse) {
-        option (redact.v3.method_skip) = true;
+        option (redact.method_skip) = true;
     }
 
     rpc AdminOperation(AdminRequest) returns (AdminResponse) {
-        option (redact.v3.internal_method) = true;
+        option (redact.internal_method) = true;
     }
 }
 ```

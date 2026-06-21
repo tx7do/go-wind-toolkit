@@ -50,7 +50,7 @@ linters-settings:
     simplify: true
 
   goimports:
-    local-prefixes: github.com/menta2k/protoc-gen-redact
+    local-prefixes: github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact
 
   misspell:
     locale: US

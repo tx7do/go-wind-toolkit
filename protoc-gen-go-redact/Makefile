@@ -25,7 +25,7 @@ STATICCHECK := staticcheck
 
 # Proto files
 PROTO_FILES := $(shell find . -name "*.proto" -not -path "./vendor/*" -not -path "./testdata/*")
-REDACT_PROTO := redact/v3/redact.proto
+REDACT_PROTO := redact/redact.proto
 EXAMPLE_PROTOS := examples/user/pb/user.proto examples/tests/message.proto
 
 # Go files
@@ -150,7 +150,7 @@ lint-fix: ## Run linters and auto-fix issues
 .PHONY: buf-lint
 buf-lint: ## Lint proto files with buf
 	@echo "Linting proto files..."
-	$(BUF) lint --path redact/v3 || (echo "⚠ Buf linting found issues (examples/testdata excluded)" && exit 0)
+	$(BUF) lint --path redact || (echo "⚠ Buf linting found issues (examples/testdata excluded)" && exit 0)
 	@echo "✓ Proto files linted"
 
 .PHONY: buf-format

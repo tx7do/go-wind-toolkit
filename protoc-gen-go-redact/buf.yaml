@@ -1,8 +1,21 @@
-version: v1
-name: buf.build/menta2k-org/redact
+version: v2
+
+modules:
+  - path: .
+    lint:
+      use:
+        - STANDARD
+    breaking:
+      use:
+        - FILE
+
+deps:
+  - "buf.build/go-wind/redact"
+
 breaking:
   use:
     - FILE
+
 lint:
   use:
-    - STANDARD
+    - DEFAULT

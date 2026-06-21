@@ -15,3 +15,9 @@ plugins:
     out: .
     opt:
       - paths=source_relative
+
+  # Generate redaction code
+  - plugin: go-redact
+    out: .
+    opt:
+      - paths=source_relative

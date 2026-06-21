@@ -220,7 +220,7 @@ This will:
 
 ### Working with Proto Files
 
-The main proto file is `redact/v3/redact.proto`. When modifying proto definitions:
+The main proto file is `redact/redact.proto`. When modifying proto definitions:
 
 1. Make your changes to the `.proto` file
 2. Lint your changes: `make buf-lint`

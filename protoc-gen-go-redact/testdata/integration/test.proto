@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package testdata;
 
-import "redact/v3/redact.proto";
+import "redact/v1/redact.proto";
 
-option go_package = "github.com/menta2k/protoc-gen-redact/v3/testdata/integration;testdata";
+option go_package = "github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/testdata/integration;testdata";
 
 // TestMessage contains various field types and options for comprehensive testing
 message TestMessage {
@@ -13,85 +13,85 @@ message TestMessage {
   string name = 2;
 
   // Redacted string field with default redaction
-  string password = 3 [(redact.v3.value).string = "REDACTED"];
+  string password = 3 [(redact.value).string = "REDACTED"];
 
   // Optional fields (proto3 explicit optional)
-  optional string email = 4 [(redact.v3.value).string = "r*d@ct*d"];
-  optional int32 age = 5 [(redact.v3.value).int32 = 0];
-  optional bool is_active = 6 [(redact.v3.value).bool = false];
+  optional string email = 4 [(redact.value).string = "r*d@ct*d"];
+  optional int32 age = 5 [(redact.value).int32 = 0];
+  optional bool is_active = 6 [(redact.value).bool = false];
 
   // Optional bytes field
-  optional bytes signature = 7 [(redact.v3.value).bytes = ""];
+  optional bytes signature = 7 [(redact.value).bytes = ""];
 
   // Optional message field with nested redaction
   optional Profile profile = 8;
 
   // Optional message field set to nil
-  optional Settings settings = 9 [(redact.v3.value).message.nil = true];
+  optional Settings settings = 9 [(redact.value).message.nil = true];
 
   // Optional message field set to empty
-  optional Metadata metadata = 10 [(redact.v3.value).message.empty = true];
+  optional Metadata metadata = 10 [(redact.value).message.empty = true];
 
   // Repeated fields
-  repeated string tags = 11 [(redact.v3.value).element.nested = true];
-  repeated int32 scores = 12 [(redact.v3.value).element.item.int32 = 0];
+  repeated string tags = 11 [(redact.value).element.nested = true];
+  repeated int32 scores = 12 [(redact.value).element.item.int32 = 0];
 
   // Repeated message field
-  repeated Address addresses = 13 [(redact.v3.value).element.nested = true];
+  repeated Address addresses = 13 [(redact.value).element.nested = true];
 
   // Map fields
-  map<string, string> attributes = 14 [(redact.v3.value).element.empty = true];
-  map<string, Profile> profiles_map = 15 [(redact.v3.value).element.nested = true];
+  map<string, string> attributes = 14 [(redact.value).element.empty = true];
+  map<string, Profile> profiles_map = 15 [(redact.value).element.nested = true];
 
   // Non-redacted fields
   string public_info = 16;
   repeated string public_tags = 17;
 
   // Regex-based masking fields
-  string phone = 18 [(redact.v3.value).regex = { pattern: "^(\\d{3})\\d{4}(\\d{4})$" replacement: "${1}****${2}" }];
-  optional string ssn = 19 [(redact.v3.value).regex = { pattern: "\\d" replacement: "*" }];
-  repeated string id_cards = 20 [(redact.v3.value).element.item.regex = { pattern: "(\\d{4})\\d{10}(\\d{4})" replacement: "${1}**********${2}" }];
+  string phone = 18 [(redact.value).regex = { pattern: "^(\\d{3})\\d{4}(\\d{4})$" replacement: "${1}****${2}" }];
+  optional string ssn = 19 [(redact.value).regex = { pattern: "\\d" replacement: "*" }];
+  repeated string id_cards = 20 [(redact.value).element.item.regex = { pattern: "(\\d{4})\\d{10}(\\d{4})" replacement: "${1}**********${2}" }];
 
   // Mask-based redaction
-  string mask_phone = 21 [(redact.v3.value).mask = { keep_first: 3 keep_last: 4 }];
-  optional string mask_ssn = 22 [(redact.v3.value).mask = { keep_first: 0 keep_last: 4 mask_char: "X" }];
-  repeated string mask_emails = 23 [(redact.v3.value).element.item.mask = { keep_first: 2 keep_last: 0 }];
+  string mask_phone = 21 [(redact.value).mask = { keep_first: 3 keep_last: 4 }];
+  optional string mask_ssn = 22 [(redact.value).mask = { keep_first: 0 keep_last: 4 mask_char: "X" }];
+  repeated string mask_emails = 23 [(redact.value).element.item.mask = { keep_first: 2 keep_last: 0 }];
 
   // Email-based redaction
-  string email_addr = 24 [(redact.v3.value).email = { keep_local_first: 2 mask_domain: false }];
-  optional string email_addr2 = 25 [(redact.v3.value).email = { keep_local_first: 1 mask_domain: true }];
+  string email_addr = 24 [(redact.value).email = { keep_local_first: 2 mask_domain: false }];
+  optional string email_addr2 = 25 [(redact.value).email = { keep_local_first: 1 mask_domain: true }];
 
   // Truncate-based redaction
-  string truncate_name = 26 [(redact.v3.value).truncate = { length: 1 suffix: "**" }];
+  string truncate_name = 26 [(redact.value).truncate = { length: 1 suffix: "**" }];
 
   // Hash-based redaction
-  string hash_token = 27 [(redact.v3.value).hash = { algo: SHA256 }];
-  repeated string hash_tokens = 28 [(redact.v3.value).element.item.hash = { algo: MD5 }];
+  string hash_token = 27 [(redact.value).hash = { algo: SHA256 }];
+  repeated string hash_tokens = 28 [(redact.value).element.item.hash = { algo: MD5 }];
 
   // UUID-based redaction
-  string uuid_user_id = 29 [(redact.v3.value).uuid = {}];
+  string uuid_user_id = 29 [(redact.value).uuid = {}];
 
   // IP-based redaction
-  string ip_address = 30 [(redact.v3.value).ip = { keep_octets: 2 }];
+  string ip_address = 30 [(redact.value).ip = { keep_octets: 2 }];
 
   // URL-based redaction
-  string callback_url = 31 [(redact.v3.value).url = { mask_query: true }];
+  string callback_url = 31 [(redact.value).url = { mask_query: true }];
 
   // FixedLength-based redaction
-  string bank_account = 32 [(redact.v3.value).fixed_length = { char: "X" }];
+  string bank_account = 32 [(redact.value).fixed_length = { char: "X" }];
 
   // Custom-based redaction
-  string custom_ssn = 33 [(redact.v3.value).custom = { name: "myRedactor" }];
+  string custom_ssn = 33 [(redact.value).custom = { name: "myRedactor" }];
 
   // Condition-based redaction
-  string cond_phone = 34 [(redact.v3.value).condition = { env_var: "APP_ENV" env_val: "production" rules: { mask: { keep_first: 3 keep_last: 4 } } }];
+  string cond_phone = 34 [(redact.value).condition = { env_var: "APP_ENV" env_val: "production" rules: { mask: { keep_first: 3 keep_last: 4 } } }];
 }
 
 // Profile message with its own redaction rules
 message Profile {
   string username = 1;
-  string bio = 2 [(redact.v3.value).string = "[REDACTED BIO]"];
-  optional string phone = 3 [(redact.v3.value).string = "XXX-XXX-XXXX"];
+  string bio = 2 [(redact.value).string = "[REDACTED BIO]"];
+  optional string phone = 3 [(redact.value).string = "XXX-XXX-XXXX"];
   optional int64 created_at = 4;
 }
 
@@ -111,10 +111,10 @@ message Metadata {
 
 // Address message for repeated fields
 message Address {
-  string street = 1 [(redact.v3.value).string = "REDACTED"];
+  string street = 1 [(redact.value).string = "REDACTED"];
   string city = 2;
   string country = 3;
-  optional string postal_code = 4 [(redact.v3.value).string = "XXXXX"];
+  optional string postal_code = 4 [(redact.value).string = "XXXXX"];
 }
 
 // TestService demonstrates service-level redaction
@@ -124,12 +124,12 @@ service TestService {
 
   // Internal method that returns error
   rpc AdminOperation(GetUserRequest) returns (TestMessage) {
-    option (redact.v3.internal_method) = true;
+    option (redact.internal_method) = true;
   }
 
   // Skipped method (no redaction)
   rpc HealthCheck(GetUserRequest) returns (TestMessage) {
-    option (redact.v3.method_skip) = true;
+    option (redact.method_skip) = true;
   }
 
   // Server streaming
@@ -138,12 +138,12 @@ service TestService {
 
 message GetUserRequest {
   string user_id = 1;
-  optional string token = 2 [(redact.v3.value).string = "[TOKEN]"];
+  optional string token = 2 [(redact.value).string = "[TOKEN]"];
 }
 
 // Message with all options ignored
 message PublicData {
-  option (redact.v3.ignored) = true;
+  option (redact.ignored) = true;
 
   string data = 1;
   string more_data = 2;
@@ -151,7 +151,7 @@ message PublicData {
 
 // Message that should be nil
 message SensitiveData {
-  option (redact.v3.nil) = true;
+  option (redact.nil) = true;
 
   string secret = 1;
   bytes key = 2;
@@ -159,7 +159,7 @@ message SensitiveData {
 
 // Message that should be empty
 message EmptyData {
-  option (redact.v3.empty) = true;
+  option (redact.empty) = true;
 
   string field1 = 1;
   string field2 = 2;
@@ -168,11 +168,11 @@ message EmptyData {
 // Complex nested structure
 message ComplexMessage {
   optional TestMessage user = 1;
-  repeated TestMessage users = 2 [(redact.v3.value).element.nested = true];
-  map<string, TestMessage> user_map = 3 [(redact.v3.value).element.nested = true];
+  repeated TestMessage users = 2 [(redact.value).element.nested = true];
+  map<string, TestMessage> user_map = 3 [(redact.value).element.nested = true];
 
-  optional Profile optional_profile = 4 [(redact.v3.value).message.nil = true];
-  optional Settings optional_settings = 5 [(redact.v3.value).message.empty = true];
+  optional Profile optional_profile = 4 [(redact.value).message.nil = true];
+  optional Settings optional_settings = 5 [(redact.value).message.empty = true];
 }
 
 // OneofMessage demonstrates oneof field redaction
@@ -181,40 +181,40 @@ message OneofMessage {
 
   // Oneof with scalar fields that need redaction
   oneof contact {
-    string email = 2 [(redact.v3.value).string = "r*d@ct*d"];
-    string phone = 3 [(redact.v3.value).string = "XXX-XXX-XXXX"];
-    int32 phone_code = 4 [(redact.v3.value).int32 = 0];
+    string email = 2 [(redact.value).string = "r*d@ct*d"];
+    string phone = 3 [(redact.value).string = "XXX-XXX-XXXX"];
+    int32 phone_code = 4 [(redact.value).int32 = 0];
   }
 
   // Oneof with a message field
   oneof payload {
-    Profile user_profile = 5 [(redact.v3.value).message.apply = true];
-    Settings user_settings = 6 [(redact.v3.value).message.nil = true];
-    string raw_data = 7 [(redact.v3.value).string = "REDACTED"];
+    Profile user_profile = 5 [(redact.value).message.apply = true];
+    Settings user_settings = 6 [(redact.value).message.nil = true];
+    string raw_data = 7 [(redact.value).string = "REDACTED"];
   }
 
   // Oneof with mixed redacted and non-redacted fields
   oneof identifier {
-    string username = 8 [(redact.v3.value).string = "REDACTED"];
+    string username = 8 [(redact.value).string = "REDACTED"];
     string public_id = 9;
-    int64 internal_id = 10 [(redact.v3.value).int64 = 0];
+    int64 internal_id = 10 [(redact.value).int64 = 0];
   }
 
   // Oneof with regex masking
   oneof secret {
-    string api_key = 11 [(redact.v3.value).regex = { pattern: "(.{4}).*(.{4})" replacement: "${1}****${2}" }];
+    string api_key = 11 [(redact.value).regex = { pattern: "(.{4}).*(.{4})" replacement: "${1}****${2}" }];
   }
 
   // Oneof with mask/email/truncate/hash
   oneof pii {
-    string mask_ssn_val = 12 [(redact.v3.value).mask = { keep_first: 0 keep_last: 4 }];
-    string mask_email_val = 13 [(redact.v3.value).email = { keep_local_first: 1 }];
-    string trunc_name_val = 14 [(redact.v3.value).truncate = { length: 2 }];
-    string hash_secret_val = 15 [(redact.v3.value).hash = { algo: SHA1 }];
-    string uuid_pii = 16 [(redact.v3.value).uuid = {}];
-    string ip_pii = 17 [(redact.v3.value).ip = { keep_octets: 1 }];
-    string url_pii = 18 [(redact.v3.value).url = { mask_query: true }];
-    string fixed_pii = 19 [(redact.v3.value).fixed_length = { char: "#" }];
-    string custom_pii = 20 [(redact.v3.value).custom = { name: "myRedactor" }];
+    string mask_ssn_val = 12 [(redact.value).mask = { keep_first: 0 keep_last: 4 }];
+    string mask_email_val = 13 [(redact.value).email = { keep_local_first: 1 }];
+    string trunc_name_val = 14 [(redact.value).truncate = { length: 2 }];
+    string hash_secret_val = 15 [(redact.value).hash = { algo: SHA1 }];
+    string uuid_pii = 16 [(redact.value).uuid = {}];
+    string ip_pii = 17 [(redact.value).ip = { keep_octets: 1 }];
+    string url_pii = 18 [(redact.value).url = { mask_query: true }];
+    string fixed_pii = 19 [(redact.value).fixed_length = { char: "#" }];
+    string custom_pii = 20 [(redact.value).custom = { name: "myRedactor" }];
   }
 }

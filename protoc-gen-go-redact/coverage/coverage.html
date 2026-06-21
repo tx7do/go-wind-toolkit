@@ -3,7 +3,7 @@
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-		<title>v3: Go Coverage Report</title>
+		<title>Go Coverage Report</title>
 		<style>
 			body {
 				background: black;
@@ -55,27 +55,27 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/menta2k/protoc-gen-redact/v3/errors.go (24.5%)</option>
+				<option value="file0">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/errors.go (24.5%)</option>
 				
-				<option value="file1">github.com/menta2k/protoc-gen-redact/v3/examples/tests/message.pb.go (0.0%)</option>
+				<option value="file1">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/examples/tests/message.pb.go (0.0%)</option>
 				
-				<option value="file2">github.com/menta2k/protoc-gen-redact/v3/examples/tests/message.pb.redact.go (0.0%)</option>
+				<option value="file2">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/examples/tests/message.pb.redact.go (0.0%)</option>
 				
-				<option value="file3">github.com/menta2k/protoc-gen-redact/v3/fields.go (21.5%)</option>
+				<option value="file3">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/fields.go (21.5%)</option>
 				
-				<option value="file4">github.com/menta2k/protoc-gen-redact/v3/imports.go (0.0%)</option>
+				<option value="file4">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/imports.go (0.0%)</option>
 				
-				<option value="file5">github.com/menta2k/protoc-gen-redact/v3/main.go (0.0%)</option>
+				<option value="file5">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/main.go (0.0%)</option>
 				
-				<option value="file6">github.com/menta2k/protoc-gen-redact/v3/module.go (16.7%)</option>
+				<option value="file6">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/module.go (16.7%)</option>
 				
-				<option value="file7">github.com/menta2k/protoc-gen-redact/v3/process.go (0.0%)</option>
+				<option value="file7">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/process.go (0.0%)</option>
 				
 				<option value="file8">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/interface.go (0.0%)</option>
 				
 				<option value="file9">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/redact.pb.go (0.0%)</option>
 				
-				<option value="file10">github.com/menta2k/protoc-gen-redact/v3/utils.go (96.7%)</option>
+				<option value="file10">github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/utils.go (96.7%)</option>
 				
 				</select>
 			</div>
@@ -3232,7 +3232,7 @@ var Falsy = Wrapper(func(_ context.Context) bool <span class="cov0" title="0">{
 // versions:
 //         protoc-gen-go v1.33.0
 //         protoc        v5.26.1
-// source: redact/v3/redact.proto
+// source: redact/redact.proto
 
 // Package redact provides interfaces and methods to help implement redaction.
 
@@ -3288,7 +3288,7 @@ type FieldRules struct {
 func (x *FieldRules) Reset() <span class="cov0" title="0">{
         *x = FieldRules{}
         if protoimpl.UnsafeEnabled </span><span class="cov0" title="0">{
-                mi := &amp;file_redact_v3_redact_proto_msgTypes[0]
+                mi := &amp;file_redact_redact_proto_msgTypes[0]
                 ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
                 ms.StoreMessageInfo(mi)
         }</span>
@@ -3301,7 +3301,7 @@ func (x *FieldRules) String() string <span class="cov0" title="0">{
 func (*FieldRules) ProtoMessage() {<span class="cov0" title="0">}</span>
 
 func (x *FieldRules) ProtoReflect() protoreflect.Message <span class="cov0" title="0">{
-        mi := &amp;file_redact_v3_redact_proto_msgTypes[0]
+        mi := &amp;file_redact_redact_proto_msgTypes[0]
         if protoimpl.UnsafeEnabled &amp;&amp; x != nil </span><span class="cov0" title="0">{
                 ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
                 if ms.LoadMessageInfo() == nil </span><span class="cov0" title="0">{
@@ -3314,7 +3314,7 @@ func (x *FieldRules) ProtoReflect() protoreflect.Message <span class="cov0" titl
 
 // Deprecated: Use FieldRules.ProtoReflect.Descriptor instead.
 func (*FieldRules) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
-        return file_redact_v3_redact_proto_rawDescGZIP(), []int{0}
+        return file_redact_redact_proto_rawDescGZIP(), []int{0}
 }</span>
 
 func (m *FieldRules) GetValues() isFieldRules_Values <span class="cov0" title="0">{
@@ -3585,7 +3585,7 @@ type MessageRules struct {
 func (x *MessageRules) Reset() <span class="cov0" title="0">{
         *x = MessageRules{}
         if protoimpl.UnsafeEnabled </span><span class="cov0" title="0">{
-                mi := &amp;file_redact_v3_redact_proto_msgTypes[1]
+                mi := &amp;file_redact_redact_proto_msgTypes[1]
                 ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
                 ms.StoreMessageInfo(mi)
         }</span>
@@ -3598,7 +3598,7 @@ func (x *MessageRules) String() string <span class="cov0" title="0">{
 func (*MessageRules) ProtoMessage() {<span class="cov0" title="0">}</span>
 
 func (x *MessageRules) ProtoReflect() protoreflect.Message <span class="cov0" title="0">{
-        mi := &amp;file_redact_v3_redact_proto_msgTypes[1]
+        mi := &amp;file_redact_redact_proto_msgTypes[1]
         if protoimpl.UnsafeEnabled &amp;&amp; x != nil </span><span class="cov0" title="0">{
                 ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
                 if ms.LoadMessageInfo() == nil </span><span class="cov0" title="0">{
@@ -3611,7 +3611,7 @@ func (x *MessageRules) ProtoReflect() protoreflect.Message <span class="cov0" ti
 
 // Deprecated: Use MessageRules.ProtoReflect.Descriptor instead.
 func (*MessageRules) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
-        return file_redact_v3_redact_proto_rawDescGZIP(), []int{1}
+        return file_redact_redact_proto_rawDescGZIP(), []int{1}
 }</span>
 
 func (x *MessageRules) GetSkip() bool <span class="cov0" title="0">{
@@ -3661,7 +3661,7 @@ type ElementRules struct {
 func (x *ElementRules) Reset() <span class="cov0" title="0">{
         *x = ElementRules{}
         if protoimpl.UnsafeEnabled </span><span class="cov0" title="0">{
-                mi := &amp;file_redact_v3_redact_proto_msgTypes[2]
+                mi := &amp;file_redact_redact_proto_msgTypes[2]
                 ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
                 ms.StoreMessageInfo(mi)
         }</span>
@@ -3674,7 +3674,7 @@ func (x *ElementRules) String() string <span class="cov0" title="0">{
 func (*ElementRules) ProtoMessage() {<span class="cov0" title="0">}</span>
 
 func (x *ElementRules) ProtoReflect() protoreflect.Message <span class="cov0" title="0">{
-        mi := &amp;file_redact_v3_redact_proto_msgTypes[2]
+        mi := &amp;file_redact_redact_proto_msgTypes[2]
         if protoimpl.UnsafeEnabled &amp;&amp; x != nil </span><span class="cov0" title="0">{
                 ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
                 if ms.LoadMessageInfo() == nil </span><span class="cov0" title="0">{
@@ -3687,7 +3687,7 @@ func (x *ElementRules) ProtoReflect() protoreflect.Message <span class="cov0" ti
 
 // Deprecated: Use ElementRules.ProtoReflect.Descriptor instead.
 func (*ElementRules) Descriptor() ([]byte, []int) <span class="cov0" title="0">{
-        return file_redact_v3_redact_proto_rawDescGZIP(), []int{2}
+        return file_redact_redact_proto_rawDescGZIP(), []int{2}
 }</span>
 
 func (x *ElementRules) GetEmpty() bool <span class="cov0" title="0">{
@@ -3711,110 +3711,110 @@ func (x *ElementRules) GetItem() *FieldRules <span class="cov0" title="0">{
         <span class="cov0" title="0">return nil</span>
 }
 
-var file_redact_v3_redact_proto_extTypes = []protoimpl.ExtensionInfo{
+var file_redact_redact_proto_extTypes = []protoimpl.ExtensionInfo{
         {
                 ExtendedType:  (*descriptorpb.FileOptions)(nil),
                 ExtensionType: (*bool)(nil),
                 Field:         90102,
-                Name:          "redact.v3.file_skip",
+                Name:          "redact.file_skip",
                 Tag:           "varint,90102,opt,name=file_skip",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.ServiceOptions)(nil),
                 ExtensionType: (*bool)(nil),
                 Field:         54123,
-                Name:          "redact.v3.service_skip",
+                Name:          "redact.service_skip",
                 Tag:           "varint,54123,opt,name=service_skip",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.ServiceOptions)(nil),
                 ExtensionType: (*bool)(nil),
                 Field:         54124,
-                Name:          "redact.v3.internal_service",
+                Name:          "redact.internal_service",
                 Tag:           "varint,54124,opt,name=internal_service",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.ServiceOptions)(nil),
                 ExtensionType: (*uint32)(nil),
                 Field:         54125,
-                Name:          "redact.v3.internal_service_code",
+                Name:          "redact.internal_service_code",
                 Tag:           "varint,54125,opt,name=internal_service_code",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.ServiceOptions)(nil),
                 ExtensionType: (*string)(nil),
                 Field:         54126,
-                Name:          "redact.v3.internal_service_err_message",
+                Name:          "redact.internal_service_err_message",
                 Tag:           "bytes,54126,opt,name=internal_service_err_message",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.MethodOptions)(nil),
                 ExtensionType: (*bool)(nil),
                 Field:         54123,
-                Name:          "redact.v3.method_skip",
+                Name:          "redact.method_skip",
                 Tag:           "varint,54123,opt,name=method_skip",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.MethodOptions)(nil),
                 ExtensionType: (*bool)(nil),
                 Field:         54124,
-                Name:          "redact.v3.internal_method",
+                Name:          "redact.internal_method",
                 Tag:           "varint,54124,opt,name=internal_method",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.MethodOptions)(nil),
                 ExtensionType: (*uint32)(nil),
                 Field:         54125,
-                Name:          "redact.v3.internal_method_code",
+                Name:          "redact.internal_method_code",
                 Tag:           "varint,54125,opt,name=internal_method_code",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.MethodOptions)(nil),
                 ExtensionType: (*string)(nil),
                 Field:         54126,
-                Name:          "redact.v3.internal_method_err_message",
+                Name:          "redact.internal_method_err_message",
                 Tag:           "bytes,54126,opt,name=internal_method_err_message",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.MessageOptions)(nil),
                 ExtensionType: (*bool)(nil),
                 Field:         54123,
-                Name:          "redact.v3.nil",
+                Name:          "redact.nil",
                 Tag:           "varint,54123,opt,name=nil",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.MessageOptions)(nil),
                 ExtensionType: (*bool)(nil),
                 Field:         54124,
-                Name:          "redact.v3.empty",
+                Name:          "redact.empty",
                 Tag:           "varint,54124,opt,name=empty",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.MessageOptions)(nil),
                 ExtensionType: (*bool)(nil),
                 Field:         54125,
-                Name:          "redact.v3.ignored",
+                Name:          "redact.ignored",
                 Tag:           "varint,54125,opt,name=ignored",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
         {
                 ExtendedType:  (*descriptorpb.FieldOptions)(nil),
                 ExtensionType: (*FieldRules)(nil),
                 Field:         54123,
-                Name:          "redact.v3.value",
+                Name:          "redact.value",
                 Tag:           "bytes,54123,opt,name=value",
-                Filename:      "redact/v3/redact.proto",
+                Filename:      "redact/redact.proto",
         },
 }
 
@@ -3823,7 +3823,7 @@ var (
         // FileSkip is used to skip generation of any redaction for proto file
         //
         // optional bool file_skip = 90102;
-        E_FileSkip = &amp;file_redact_v3_redact_proto_extTypes[0]
+        E_FileSkip = &amp;file_redact_redact_proto_extTypes[0]
 )
 
 // Extension fields to descriptorpb.ServiceOptions.
@@ -3831,7 +3831,7 @@ var (
         // ServiceSkip is used to skip the redaction in grpc service in the server
         //
         // optional bool service_skip = 54123;
-        E_ServiceSkip = &amp;file_redact_v3_redact_proto_extTypes[1]
+        E_ServiceSkip = &amp;file_redact_redact_proto_extTypes[1]
         // InternalService will make this service private and client will not be
         // able to receive any response for any of it's method, (unless skipped
         // explicitly) and will get PermissionDenied(7) error by default, to set
@@ -3841,11 +3841,11 @@ var (
         // corresponding service name or method name, respectively.
         //
         // optional bool internal_service = 54124;
-        E_InternalService = &amp;file_redact_v3_redact_proto_extTypes[2]
+        E_InternalService = &amp;file_redact_redact_proto_extTypes[2]
         // optional uint32 internal_service_code = 54125;
-        E_InternalServiceCode = &amp;file_redact_v3_redact_proto_extTypes[3]
+        E_InternalServiceCode = &amp;file_redact_redact_proto_extTypes[3]
         // optional string internal_service_err_message = 54126;
-        E_InternalServiceErrMessage = &amp;file_redact_v3_redact_proto_extTypes[4]
+        E_InternalServiceErrMessage = &amp;file_redact_redact_proto_extTypes[4]
 )
 
 // Extension fields to descriptorpb.MethodOptions.
@@ -3853,7 +3853,7 @@ var (
         // MethodSkip is used to skip the redactions for this method in the grpc server
         //
         // optional bool method_skip = 54123;
-        E_MethodSkip = &amp;file_redact_v3_redact_proto_extTypes[5]
+        E_MethodSkip = &amp;file_redact_redact_proto_extTypes[5]
         // InternalMethod, InternalMethodCode and InternalMethodErrMessage works same
         // as that of service level options: InternalService, InternalServiceCode and
         // InternalServiceErrMessage, but at Method level. All the validations and
@@ -3861,11 +3861,11 @@ var (
         // whenever both are specified.
         //
         // optional bool internal_method = 54124;
-        E_InternalMethod = &amp;file_redact_v3_redact_proto_extTypes[6]
+        E_InternalMethod = &amp;file_redact_redact_proto_extTypes[6]
         // optional uint32 internal_method_code = 54125;
-        E_InternalMethodCode = &amp;file_redact_v3_redact_proto_extTypes[7]
+        E_InternalMethodCode = &amp;file_redact_redact_proto_extTypes[7]
         // optional string internal_method_err_message = 54126;
-        E_InternalMethodErrMessage = &amp;file_redact_v3_redact_proto_extTypes[8]
+        E_InternalMethodErrMessage = &amp;file_redact_redact_proto_extTypes[8]
 )
 
 // Extension fields to descriptorpb.MessageOptions.
@@ -3873,15 +3873,15 @@ var (
         // Nil will redact message to nil (can be override by field level, `empty` option)
         //
         // optional bool nil = 54123;
-        E_Nil = &amp;file_redact_v3_redact_proto_extTypes[9]
+        E_Nil = &amp;file_redact_redact_proto_extTypes[9]
         // Empty will redact message to it's empty object
         //
         // optional bool empty = 54124;
-        E_Empty = &amp;file_redact_v3_redact_proto_extTypes[10]
+        E_Empty = &amp;file_redact_redact_proto_extTypes[10]
         // Ignored skips generation of any redaction for this message.
         //
         // optional bool ignored = 54125;
-        E_Ignored = &amp;file_redact_v3_redact_proto_extTypes[11]
+        E_Ignored = &amp;file_redact_redact_proto_extTypes[11]
 )
 
 // Extension fields to descriptorpb.FieldOptions.
@@ -3900,13 +3900,13 @@ var (
         // default, if Custom value is not defined Redact should be true to apply redaction.
         // And if Custom value is to be assigned, one can skip the Redact field.
         //
-        // optional redact.v3.FieldRules value = 54123;
-        E_Value = &amp;file_redact_v3_redact_proto_extTypes[12]
+        // optional redact.FieldRules value = 54123;
+        E_Value = &amp;file_redact_redact_proto_extTypes[12]
 )
 
-var File_redact_v3_redact_proto protoreflect.FileDescriptor
+var File_redact_redact_proto protoreflect.FileDescriptor
 
-var file_redact_v3_redact_proto_rawDesc = []byte{
+var file_redact_redact_proto_rawDesc = []byte{
         0x0a, 0x16, 0x72, 0x65, 0x64, 0x61, 0x63, 0x74, 0x2f, 0x76, 0x33, 0x2f, 0x72, 0x65, 0x64, 0x61,
         0x63, 0x74, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x09, 0x72, 0x65, 0x64, 0x61, 0x63, 0x74,
         0x2e, 0x76, 0x33, 0x1a, 0x20, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74,
@@ -4027,46 +4027,46 @@ var file_redact_v3_redact_proto_rawDesc = []byte{
 }
 
 var (
-        file_redact_v3_redact_proto_rawDescOnce sync.Once
-        file_redact_v3_redact_proto_rawDescData = file_redact_v3_redact_proto_rawDesc
+        file_redact_redact_proto_rawDescOnce sync.Once
+        file_redact_redact_proto_rawDescData = file_redact_redact_proto_rawDesc
 )
 
-func file_redact_v3_redact_proto_rawDescGZIP() []byte <span class="cov0" title="0">{
-        file_redact_v3_redact_proto_rawDescOnce.Do(func() </span><span class="cov0" title="0">{
-                file_redact_v3_redact_proto_rawDescData = protoimpl.X.CompressGZIP(file_redact_v3_redact_proto_rawDescData)
+func file_redact_redact_proto_rawDescGZIP() []byte <span class="cov0" title="0">{
+        file_redact_redact_proto_rawDescOnce.Do(func() </span><span class="cov0" title="0">{
+                file_redact_redact_proto_rawDescData = protoimpl.X.CompressGZIP(file_redact_redact_proto_rawDescData)
         }</span>)
-        <span class="cov0" title="0">return file_redact_v3_redact_proto_rawDescData</span>
+        <span class="cov0" title="0">return file_redact_redact_proto_rawDescData</span>
 }
 
-var file_redact_v3_redact_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_redact_v3_redact_proto_goTypes = []interface{}{
-        (*FieldRules)(nil),                  // 0: redact.v3.FieldRules
-        (*MessageRules)(nil),                // 1: redact.v3.MessageRules
-        (*ElementRules)(nil),                // 2: redact.v3.ElementRules
+var file_redact_redact_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_redact_redact_proto_goTypes = []interface{}{
+        (*FieldRules)(nil),                  // 0: redact.FieldRules
+        (*MessageRules)(nil),                // 1: redact.MessageRules
+        (*ElementRules)(nil),                // 2: redact.ElementRules
         (*descriptorpb.FileOptions)(nil),    // 3: google.protobuf.FileOptions
         (*descriptorpb.ServiceOptions)(nil), // 4: google.protobuf.ServiceOptions
         (*descriptorpb.MethodOptions)(nil),  // 5: google.protobuf.MethodOptions
         (*descriptorpb.MessageOptions)(nil), // 6: google.protobuf.MessageOptions
         (*descriptorpb.FieldOptions)(nil),   // 7: google.protobuf.FieldOptions
 }
-var file_redact_v3_redact_proto_depIdxs = []int32{
-        1,  // 0: redact.v3.FieldRules.message:type_name -&gt; redact.v3.MessageRules
-        2,  // 1: redact.v3.FieldRules.element:type_name -&gt; redact.v3.ElementRules
-        0,  // 2: redact.v3.ElementRules.item:type_name -&gt; redact.v3.FieldRules
-        3,  // 3: redact.v3.file_skip:extendee -&gt; google.protobuf.FileOptions
-        4,  // 4: redact.v3.service_skip:extendee -&gt; google.protobuf.ServiceOptions
-        4,  // 5: redact.v3.internal_service:extendee -&gt; google.protobuf.ServiceOptions
-        4,  // 6: redact.v3.internal_service_code:extendee -&gt; google.protobuf.ServiceOptions
-        4,  // 7: redact.v3.internal_service_err_message:extendee -&gt; google.protobuf.ServiceOptions
-        5,  // 8: redact.v3.method_skip:extendee -&gt; google.protobuf.MethodOptions
-        5,  // 9: redact.v3.internal_method:extendee -&gt; google.protobuf.MethodOptions
-        5,  // 10: redact.v3.internal_method_code:extendee -&gt; google.protobuf.MethodOptions
-        5,  // 11: redact.v3.internal_method_err_message:extendee -&gt; google.protobuf.MethodOptions
-        6,  // 12: redact.v3.nil:extendee -&gt; google.protobuf.MessageOptions
-        6,  // 13: redact.v3.empty:extendee -&gt; google.protobuf.MessageOptions
-        6,  // 14: redact.v3.ignored:extendee -&gt; google.protobuf.MessageOptions
-        7,  // 15: redact.v3.value:extendee -&gt; google.protobuf.FieldOptions
-        0,  // 16: redact.v3.value:type_name -&gt; redact.v3.FieldRules
+var file_redact_redact_proto_depIdxs = []int32{
+        1,  // 0: redact.FieldRules.message:type_name -&gt; redact.MessageRules
+        2,  // 1: redact.FieldRules.element:type_name -&gt; redact.ElementRules
+        0,  // 2: redact.ElementRules.item:type_name -&gt; redact.FieldRules
+        3,  // 3: redact.file_skip:extendee -&gt; google.protobuf.FileOptions
+        4,  // 4: redact.service_skip:extendee -&gt; google.protobuf.ServiceOptions
+        4,  // 5: redact.internal_service:extendee -&gt; google.protobuf.ServiceOptions
+        4,  // 6: redact.internal_service_code:extendee -&gt; google.protobuf.ServiceOptions
+        4,  // 7: redact.internal_service_err_message:extendee -&gt; google.protobuf.ServiceOptions
+        5,  // 8: redact.method_skip:extendee -&gt; google.protobuf.MethodOptions
+        5,  // 9: redact.internal_method:extendee -&gt; google.protobuf.MethodOptions
+        5,  // 10: redact.internal_method_code:extendee -&gt; google.protobuf.MethodOptions
+        5,  // 11: redact.internal_method_err_message:extendee -&gt; google.protobuf.MethodOptions
+        6,  // 12: redact.nil:extendee -&gt; google.protobuf.MessageOptions
+        6,  // 13: redact.empty:extendee -&gt; google.protobuf.MessageOptions
+        6,  // 14: redact.ignored:extendee -&gt; google.protobuf.MessageOptions
+        7,  // 15: redact.value:extendee -&gt; google.protobuf.FieldOptions
+        0,  // 16: redact.value:type_name -&gt; redact.FieldRules
         17, // [17:17] is the sub-list for method output_type
         17, // [17:17] is the sub-list for method input_type
         16, // [16:17] is the sub-list for extension type_name
@@ -4074,13 +4074,13 @@ var file_redact_v3_redact_proto_depIdxs = []int32{
         0,  // [0:3] is the sub-list for field type_name
 }
 
-func init() <span class="cov0" title="0">{ file_redact_v3_redact_proto_init() }</span>
-func file_redact_v3_redact_proto_init() <span class="cov0" title="0">{
-        if File_redact_v3_redact_proto != nil </span><span class="cov0" title="0">{
+func init() <span class="cov0" title="0">{ file_redact_redact_proto_init() }</span>
+func file_redact_redact_proto_init() <span class="cov0" title="0">{
+        if File_redact_redact_proto != nil </span><span class="cov0" title="0">{
                 return
         }</span>
         <span class="cov0" title="0">if !protoimpl.UnsafeEnabled </span><span class="cov0" title="0">{
-                file_redact_v3_redact_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} </span><span class="cov0" title="0">{
+                file_redact_redact_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} </span><span class="cov0" title="0">{
                         switch v := v.(*FieldRules); i </span>{
                         case 0:<span class="cov0" title="0">
                                 return &amp;v.state</span>
@@ -4092,7 +4092,7 @@ func file_redact_v3_redact_proto_init() <span class="cov0" title="0">{
                                 return nil</span>
                         }
                 }
-                <span class="cov0" title="0">file_redact_v3_redact_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} </span><span class="cov0" title="0">{
+                <span class="cov0" title="0">file_redact_redact_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} </span><span class="cov0" title="0">{
                         switch v := v.(*MessageRules); i </span>{
                         case 0:<span class="cov0" title="0">
                                 return &amp;v.state</span>
@@ -4104,7 +4104,7 @@ func file_redact_v3_redact_proto_init() <span class="cov0" title="0">{
                                 return nil</span>
                         }
                 }
-                <span class="cov0" title="0">file_redact_v3_redact_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} </span><span class="cov0" title="0">{
+                <span class="cov0" title="0">file_redact_redact_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} </span><span class="cov0" title="0">{
                         switch v := v.(*ElementRules); i </span>{
                         case 0:<span class="cov0" title="0">
                                 return &amp;v.state</span>
@@ -4117,7 +4117,7 @@ func file_redact_v3_redact_proto_init() <span class="cov0" title="0">{
                         }
                 }
         }
-        <span class="cov0" title="0">file_redact_v3_redact_proto_msgTypes[0].OneofWrappers = []interface{}{
+        <span class="cov0" title="0">file_redact_redact_proto_msgTypes[0].OneofWrappers = []interface{}{
                 (*FieldRules_Float)(nil),
                 (*FieldRules_Double)(nil),
                 (*FieldRules_Int32)(nil),
@@ -4141,21 +4141,21 @@ func file_redact_v3_redact_proto_init() <span class="cov0" title="0">{
         out := protoimpl.TypeBuilder{
                 File: protoimpl.DescBuilder{
                         GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-                        RawDescriptor: file_redact_v3_redact_proto_rawDesc,
+                        RawDescriptor: file_redact_redact_proto_rawDesc,
                         NumEnums:      0,
                         NumMessages:   3,
                         NumExtensions: 13,
                         NumServices:   0,
                 },
-                GoTypes:           file_redact_v3_redact_proto_goTypes,
-                DependencyIndexes: file_redact_v3_redact_proto_depIdxs,
-                MessageInfos:      file_redact_v3_redact_proto_msgTypes,
-                ExtensionInfos:    file_redact_v3_redact_proto_extTypes,
+                GoTypes:           file_redact_redact_proto_goTypes,
+                DependencyIndexes: file_redact_redact_proto_depIdxs,
+                MessageInfos:      file_redact_redact_proto_msgTypes,
+                ExtensionInfos:    file_redact_redact_proto_extTypes,
         }.Build()
-        File_redact_v3_redact_proto = out.File
-        file_redact_v3_redact_proto_rawDesc = nil
-        file_redact_v3_redact_proto_goTypes = nil
-        file_redact_v3_redact_proto_depIdxs = nil</span>
+        File_redact_redact_proto = out.File
+        file_redact_redact_proto_rawDesc = nil
+        file_redact_redact_proto_goTypes = nil
+        file_redact_redact_proto_depIdxs = nil</span>
 }
 </pre>
 		

@@ -12,7 +12,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/menta2k/protoc-gen-redact/v3/examples/user/pb"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/examples/user/pb"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/redact/v1"
 )
 
 func RunServer() (*grpc.Server, <-chan struct{}) {
