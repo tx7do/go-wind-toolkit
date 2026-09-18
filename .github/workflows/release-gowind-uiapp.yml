@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.14.0
 
       - name: Extract version
         id: version
@@ -90,7 +90,7 @@ jobs:
         run: npm ci
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.14.0
 
       - name: Build Linux
         working-directory: gowind-uiapp
@@ -131,7 +131,7 @@ jobs:
         run: npm ci
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.14.0
 
       - name: Build macOS
         working-directory: gowind-uiapp
@@ -143,8 +143,9 @@ jobs:
         working-directory: gowind-uiapp/build/bin
         run: |
           ls -la
-          if [ -d "gowind-toolkit.app" ]; then
-            zip -r gowind-toolkit-darwin-arm64.zip gowind-toolkit.app
+          APP_NAME=$(ls -d *.app 2>/dev/null | head -1)
+          if [ -n "$APP_NAME" ]; then
+            zip -r gowind-toolkit-darwin-arm64.zip "$APP_NAME"
           else
             zip gowind-toolkit-darwin-arm64.zip gowind-toolkit
           fi
