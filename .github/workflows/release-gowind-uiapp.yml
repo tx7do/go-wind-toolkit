@@ -144,11 +144,11 @@ jobs:
         run: |
           ls -la
           APP_NAME=$(ls -d *.app 2>/dev/null | head -1)
-          if [ -n "$APP_NAME" ]; then
-            zip -r gowind-toolkit-darwin-arm64.zip "$APP_NAME"
-          else
-            zip gowind-toolkit-darwin-arm64.zip gowind-toolkit
+          if [ -z "$APP_NAME" ]; then
+            echo "No .app bundle found in $(pwd)" >&2
+            exit 1
           fi
+          zip -r gowind-toolkit-darwin-arm64.zip "$APP_NAME"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
