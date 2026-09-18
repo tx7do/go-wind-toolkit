@@ -40,20 +40,23 @@ func stripScheme(path string) string {
 // ParseType 把 SQL 类型文本解析为 atlas schema 类型,依次尝试
 // MySQL/PostgreSQL/SQLite 方言解析器,全部失败时返回 UnsupportedType。
 func ParseType(raw string) (schema.Type, error) {
-	mysqlType, err := mysql.ParseType(raw)
-	if err == nil {
-		return mysqlType, nil
+	for _, parse := range []func(string) (schema.Type, error){
+		mysql.ParseType,
+		postgres.ParseType,
+		sqlite.ParseType,
+	} {
+		typ, err := parse(raw)
+		if err != nil {
+			continue
+		}
+		// 各方言对未知类型的表示不同且都不报错:mysql 返回 UnsupportedType,
+		// postgres/sqlite 返回 UserDefinedType(int8/timestamptz 等 Postgres
+		// 类型名会在 mysql 处短路),均须让位给下一方言
+		switch typ.(type) {
+		case *schema.UnsupportedType, *postgres.UserDefinedType, *sqlite.UserDefinedType:
+			continue
+		}
+		return typ, nil
 	}
-
-	postgresType, err := postgres.ParseType(raw)
-	if err == nil {
-		return postgresType, nil
-	}
-
-	sqliteType, err := sqlite.ParseType(raw)
-	if err == nil {
-		return sqliteType, nil
-	}
-
 	return &schema.UnsupportedType{T: raw}, nil
 }

@@ -29,7 +29,7 @@ func TestMySQL(t *testing.T) {
 	var (
 		r   = require.New(t)
 		ctx = context.Background()
-		dsn = "root:pass@tcp(localhost:3306)/test?parseTime=True&multiStatements=true"
+		dsn = testEnvOr("TEST_MYSQL_DSN", "root:pass@tcp(localhost:3306)/test?parseTime=True&multiStatements=true")
 	)
 	var tests = []struct {
 		name           string
@@ -528,7 +528,9 @@ create table user_groups
 	db, err := sql.Open(dialect.MySQL, dsn)
 	r.NoError(err)
 	defer db.Close()
-	r.NoError(db.Ping())
+	if pingErr := db.Ping(); pingErr != nil {
+		t.Skipf("MySQL 不可达(%v),跳过集成测试;可用 TEST_MYSQL_DSN 指定实例", pingErr)
+	}
 	drv, err := schemasource.Default.Open("mysql://" + dsn)
 	r.NoError(err)
 	defer drv.Close()
@@ -576,7 +578,7 @@ func TestPostgres(t *testing.T) {
 	var (
 		r   = require.New(t)
 		ctx = context.Background()
-		dsn = "postgres://postgres:pass@localhost:5432/test?sslmode=disable"
+		dsn = testEnvOr("TEST_POSTGRES_DSN", "postgres://postgres:pass@localhost:5432/test?sslmode=disable")
 	)
 	tests := []struct {
 		name           string
@@ -1109,7 +1111,9 @@ create table user_groups
 	db, err := sql.Open(dialect.Postgres, dsn)
 	r.NoError(err)
 	defer db.Close()
-	r.NoError(db.Ping())
+	if pingErr := db.Ping(); pingErr != nil {
+		t.Skipf("Postgres 不可达(%v),跳过集成测试;可用 TEST_POSTGRES_DSN 指定实例", pingErr)
+	}
 	drv, err := schemasource.Default.Open(dsn)
 	r.NoError(err)
 	defer drv.Close()
@@ -1152,6 +1156,14 @@ create table user_groups
 			}
 		})
 	}
+}
+
+// testEnvOr 读取环境变量作为集成测试的连接 DSN,未设置时用默认值。
+func testEnvOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func createTempDir(t *testing.T) string {

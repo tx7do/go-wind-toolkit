@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -96,10 +97,12 @@ func (t *Text) InspectSchema(ctx context.Context, sqlContent string, opts *schem
 	}
 
 	// 解析 SQL 文本
-	tables, err := ddlparser.ParseCreateTables(sqlContent)
+	tables, err := ddlparser.ParseCreateTables(normalizeTableConstraints(sqlContent))
 	if err != nil {
 		return nil, fmt.Errorf("解析失败: %v", err)
 	}
+
+	columnComments, tableComments := extractCommentOn(sqlContent)
 
 	// 按 InspectOptions.Tables 过滤（nil/空 = 全部表），
 	// 与数据库直连路径的 atlas Inspector 行为一致
@@ -112,18 +115,23 @@ func (t *Text) InspectSchema(ctx context.Context, sqlContent string, opts *schem
 	}
 
 	for _, tbl := range tables {
-		if includeTables != nil && !includeTables[tbl.Name] {
+		name := cleanTableName(tbl.Name)
+		if includeTables != nil && !includeTables[name] {
 			continue
 		}
 
 		table := &schema.Table{
-			Name:   tbl.Name,
+			Name:   name,
 			Schema: s,
 		}
 
-		if tbl.Comment != "" {
+		tableComment := tbl.Comment
+		if tableComment == "" {
+			tableComment = tableComments[name]
+		}
+		if tableComment != "" {
 			table.Attrs = append(table.Attrs, &schema.Comment{
-				Text: tbl.Comment,
+				Text: tableComment,
 			})
 		}
 		if tbl.Collation != "" {
@@ -150,8 +158,12 @@ func (t *Text) InspectSchema(ctx context.Context, sqlContent string, opts *schem
 				Name: col.Name,
 				Type: colType,
 			}
-			if col.Comment != "" {
-				column.SetComment(col.Comment)
+			colComment := col.Comment
+			if colComment == "" {
+				colComment = columnComments[name+"."+col.Name]
+			}
+			if colComment != "" {
+				column.SetComment(colComment)
 			}
 			if col.Default != "" {
 				column.SetDefault(&schema.NamedDefault{Expr: &schema.Literal{V: col.Default}})
@@ -325,13 +337,13 @@ func (t *Text) convertInteger(typ *schema.IntegerType, name string) (f ent.Field
 	switch typ.T {
 	case mTinyInt:
 		f = field.Int8(name)
-	case mSmallInt:
+	case mSmallInt, pInt2:
 		f = field.Int16(name)
 	case mMediumInt:
 		f = field.Int32(name)
-	case mInt, pInteger:
+	case mInt, pInteger, pInt4:
 		f = field.Int32(name)
-	case mBigInt:
+	case mBigInt, pInt8:
 		f = field.Int64(name)
 	default:
 		f = field.Int(name).
@@ -355,4 +367,62 @@ func (t *Text) convertSerial(typ *postgres.SerialType, name string) ent.Field {
 		SchemaType(map[string]string{
 			dialect.Postgres: typ.T, // Override Postgres.
 		})
+}
+
+// constraintPKRe 匹配表级 `CONSTRAINT <名> PRIMARY KEY`。ddl_parser 只识别
+// 以 PRIMARY KEY 开头的分片,CONSTRAINT 名字头会被当作约束整体跳过,
+// 导致 Postgres 风格 DDL 丢失主键,解析前先归一化为 `PRIMARY KEY`。
+var constraintPKRe = regexp.MustCompile(`(?is)constraint\s+(?:"[^"]*"|` + "`[^`]*`" + `|\[[^\]]*\]|\S+)\s+primary\s+key`)
+
+func normalizeTableConstraints(sqlContent string) string {
+	return constraintPKRe.ReplaceAllString(sqlContent, "PRIMARY KEY")
+}
+
+// cleanTableName 去掉表名的引号与 schema/catalog 限定,只保留末端表名。
+// ddl_parser 对 "public"."addresses" 这类带引号限定名会解析出
+// `public"."addresses` 这样的残缺名。
+func cleanTableName(name string) string {
+	name = unquoteIdentifier(name)
+	if idx := strings.LastIndex(name, "."); idx != -1 {
+		name = name[idx+1:]
+	}
+	return strings.TrimSpace(name)
+}
+
+// unquoteIdentifier 去掉标识符的引号包裹,保留限定分隔符。
+func unquoteIdentifier(s string) string {
+	return strings.NewReplacer("\"", "", "`", "", "[", "", "]", "").Replace(s)
+}
+
+var (
+	// commentOnColumnRe 匹配 `COMMENT ON COLUMN <表路径>.<列> IS '<文本>'`,
+	// Postgres 的列注释是独立语句,不在 CREATE TABLE 内。
+	commentOnColumnRe = regexp.MustCompile(`(?is)comment\s+on\s+column\s+(.+?)\s+is\s+'((?:[^']|'')*)'`)
+	// commentOnTableRe 匹配 `COMMENT ON TABLE <表路径> IS '<文本>'`。
+	commentOnTableRe = regexp.MustCompile(`(?is)comment\s+on\s+table\s+(.+?)\s+is\s+'((?:[^']|'')*)'`)
+)
+
+// extractCommentOn 提取 COMMENT ON COLUMN/TABLE 独立语句的注释,
+// 返回 列注释(key: "表.列")与表注释(key: 表名),表/列名均已去限定去引号。
+func extractCommentOn(sqlContent string) (columnComments, tableComments map[string]string) {
+	columnComments = make(map[string]string)
+	tableComments = make(map[string]string)
+	for _, m := range commentOnColumnRe.FindAllStringSubmatch(sqlContent, -1) {
+		parts := strings.Split(unquoteIdentifier(m[1]), ".")
+		if len(parts) < 2 {
+			continue
+		}
+		table := parts[len(parts)-2]
+		column := parts[len(parts)-1]
+		columnComments[table+"."+column] = unescapeSQLString(m[2])
+	}
+	for _, m := range commentOnTableRe.FindAllStringSubmatch(sqlContent, -1) {
+		tableComments[cleanTableName(m[1])] = unescapeSQLString(m[2])
+	}
+	return columnComments, tableComments
+}
+
+// unescapeSQLString 还原 SQL 字符串字面量中的 '' 转义。
+func unescapeSQLString(s string) string {
+	return strings.ReplaceAll(s, "''", "'")
 }

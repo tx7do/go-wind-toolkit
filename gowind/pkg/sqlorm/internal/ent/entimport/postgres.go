@@ -22,6 +22,11 @@ const (
 	pSmallInt = "smallint" // smallint - 2 bytes small-range integer -32768 to +32767.
 	pInteger  = "integer"  // integer - 4 bytes typical choice for integer	-2147483648 to +2147483647.
 	pBigInt   = "bigint"   // bigint - 8 bytes large-range integer	-9223372036854775808 to 9223372036854775807.
+
+	// Atlas 内省与 DDL 文本中常见的整型别名。
+	pInt2 = "int2"
+	pInt4 = "int4"
+	pInt8 = "int8"
 )
 
 // Postgres implements SchemaImporter for PostgreSQL databases.
