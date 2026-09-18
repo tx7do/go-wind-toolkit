@@ -2,11 +2,13 @@ package entimport
 
 import (
 	"context"
-	"log"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"ariga.io/atlas/sql/schema"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestText(t *testing.T) {
@@ -37,8 +39,10 @@ CREATE TABLE users1 (
 	assert.Nil(t, err)
 
 	schemaPath := t.TempDir()
+	// WriteSchema 要求 schema 目录位于某个 Go module 内(与真实生成目标一致)
+	require.NoError(t, os.WriteFile(filepath.Join(schemaPath, "go.mod"), []byte("module example.com/scratch\n\ngo 1.21\n"), 0o644))
 	if err = WriteSchema(mutations, WithSchemaPath(schemaPath)); err != nil {
-		log.Fatalf("entimport: schema writing failed - %v", err)
+		t.Fatalf("entimport: schema writing failed - %v", err)
 	}
 }
 

@@ -67,7 +67,7 @@ func WriteSchema(mutations []schemast.Mutator, opts ...ImportOption) error {
 	if err := os.MkdirAll(i.schemaPath, 0o755); err != nil {
 		return err
 	}
-	ctx, err := schemast.Load(i.schemaPath)
+	ctx, err := loadSchemaContext(i.schemaPath)
 	if err != nil {
 		return err
 	}
@@ -78,6 +78,41 @@ func WriteSchema(mutations []schemast.Mutator, opts ...ImportOption) error {
 		return err
 	}
 	return formatSchemaFiles(i.schemaPath)
+}
+
+// loadSchemaContext 在 schema 目录内加载 schemast 上下文。
+// schemast.Load 内部的 go/packages 不设置 Dir,以进程 CWD 运行 go list:
+// GUI 进程(macOS 从 Dock/Finder 启动时 CWD 为 /)不在任何 Go module 内,
+// go list 以 exit 1 + 空 stdout 失败,go/packages 驱动对这种失败无兜底分支,
+// 返回 0 个包,schemast.Load 便报 "missing package information"(issue #13)。
+// 因此临时把 CWD 切到 schema 目录——它必位于用户项目的 module 内——再加载,
+// 结束后恢复原 CWD。
+func loadSchemaContext(schemaPath string) (*schemast.Context, error) {
+	absPath, err := filepath.Abs(schemaPath)
+	if err != nil {
+		return nil, err
+	}
+	origWd, err := os.Getwd()
+	if err != nil {
+		origWd = ""
+	}
+	if err = os.Chdir(absPath); err != nil {
+		return nil, fmt.Errorf("entimport: chdir to schema dir failed: %w", err)
+	}
+	defer func() {
+		if origWd != "" {
+			_ = os.Chdir(origWd)
+		}
+	}()
+
+	ctx, err := schemast.Load(absPath)
+	if err != nil {
+		if strings.Contains(err.Error(), "missing package information") {
+			return nil, fmt.Errorf("entimport: %w (schema dir is not inside a Go module; run `go mod init` in the target project first)", err)
+		}
+		return nil, err
+	}
+	return ctx, nil
 }
 
 // entEdge creates an edge based on the given params and direction.

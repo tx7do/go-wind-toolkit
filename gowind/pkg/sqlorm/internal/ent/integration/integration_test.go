@@ -1158,6 +1158,8 @@ func createTempDir(t *testing.T) string {
 	r := require.New(t)
 	tmpDir, err := ioutil.TempDir("", "entimport-*")
 	r.NoError(err)
+	// WriteSchema 要求 schema 目录位于某个 Go module 内(与真实生成目标一致)
+	r.NoError(os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/scratch\n\ngo 1.21\n"), 0o644))
 	t.Cleanup(func() {
 		err = os.RemoveAll(tmpDir)
 		r.NoError(err)
@@ -1169,6 +1171,10 @@ func readDir(t *testing.T, path string) map[string]string {
 	files := make(map[string]string)
 	err := filepath.Walk(path, func(path string, info os.FileInfo, _ error) error {
 		if info.IsDir() {
+			return nil
+		}
+		// 只收集生成的 schema 源文件,忽略夹具里的 go.mod 等辅助文件
+		if filepath.Ext(path) != ".go" {
 			return nil
 		}
 		buf, err := os.ReadFile(path)
