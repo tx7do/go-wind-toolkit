@@ -60,13 +60,15 @@ async function handleOpenProject() {
     if (!path) return
 
     projectLoading.value = true
-    const pi = await OpenProject(path)
-    if (!pi || !pi.ModPath) {
+    const res = await OpenProject(path)
+    // choose：由全局模块选择器处理，保持当前状态。
+    if (!res || res.Status === 'choose') return
+    if (res.Status !== 'opened' || !res.Project?.ModPath) {
       message.error(t('ai.project.noProject'))
       projectInfo.value = undefined
       return
     }
-    projectInfo.value = pi
+    projectInfo.value = res.Project
     message.success(t('ai.project.ready'))
   } catch (err) {
     message.error(t('ai.project.openFailed'))

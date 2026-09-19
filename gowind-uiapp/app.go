@@ -88,8 +88,21 @@ func (l *wailsLogger) Errorf(format string, args ...any) {
 	runtime.LogErrorf(l.app.ctx, format, args...)
 }
 
-// OpenProject 打开指定路径的项目，并返回项目的信息。
-func (a *App) OpenProject(projectPath string) *detect.ProjectInfo {
+// OpenProjectResult 描述一次 OpenProject 调用的结果。
+// Status 取值：
+//   - "opened"  已直接打开，Project 为项目信息；
+//   - "choose"  所选目录无自身 go.mod 但发现多个子模块，需用户从 Candidates 中选择
+//     （前端全局选择器据 project-modules-found 事件弹框，调用方此时不应报错也不清空当前项目）；
+//   - "invalid" 既非模块根、也无子模块、且不属于任何上级模块。
+type OpenProjectResult struct {
+	Status     string                   `json:"Status"`
+	Project    *detect.ProjectInfo      `json:"Project,omitempty"`
+	Candidates []detect.ModuleCandidate `json:"Candidates,omitempty"`
+}
+
+// OpenProject 打开指定路径的项目。目录自身是模块根则直接打开；
+// 否则向下发现候选子模块交给前端选择；再否则回退向上探测所属父模块。
+func (a *App) OpenProject(projectPath string) *OpenProjectResult {
 	// 清理路径：去除前后空格、换行符、控制字符等
 	projectPath = strings.TrimSpace(projectPath)
 	projectPath = strings.ReplaceAll(projectPath, "\r\n", "")
@@ -99,19 +112,25 @@ func (a *App) OpenProject(projectPath string) *detect.ProjectInfo {
 		return r < 32 && r != '\t' // 保留制表符
 	})
 
-	var err error
-	var pi *detect.ProjectInfo
-	pi, err = a.projectDetector.Detect(projectPath)
-	if err != nil {
-		runtime.LogErrorf(a.ctx, "项目检测失败：%v (路径：%q)", err, projectPath)
-		return nil
+	if !detect.HasGoMod(projectPath) {
+		if candidates, err := detect.FindModulesUnder(projectPath, detect.DefaultModuleSearchDepth); err == nil && len(candidates) > 0 {
+			runtime.EventsEmit(a.ctx, "project-modules-found", candidates)
+			return &OpenProjectResult{Status: "choose", Candidates: candidates}
+		}
+	}
+
+	pi, err := a.projectDetector.Detect(projectPath)
+	if err != nil || pi == nil || pi.ModPath == "" {
+		if err != nil {
+			runtime.LogErrorf(a.ctx, "项目检测失败：%v (路径：%q)", err, projectPath)
+		}
+		return &OpenProjectResult{Status: "invalid"}
 	}
 	a.setProjectInfo(pi)
-
 	runtime.EventsEmit(a.ctx, "project-opened", pi)
-
-	return pi
+	return &OpenProjectResult{Status: "opened", Project: pi}
 }
+
 
 // GetProjectInfo 返回当前打开的项目的信息。
 func (a *App) GetProjectInfo() *detect.ProjectInfo {

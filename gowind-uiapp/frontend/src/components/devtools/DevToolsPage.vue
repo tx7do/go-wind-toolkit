@@ -55,11 +55,14 @@ async function handleOpenProject() {
   try {
     const path = await SelectFolder()
     if (!path) return
-    const pi = await OpenProject(path)
-    if (!pi || !pi.ModPath) {
+    const res = await OpenProject(path)
+    // choose：由全局模块选择器处理，保持当前状态。
+    if (!res || res.Status === 'choose') return
+    if (res.Status !== 'opened' || !res.Project?.ModPath) {
       message.error(t('backend.project.noProject'))
       return
     }
+    const pi = res.Project
     projectInfo.value = pi
     selectedRowKeys.value = []
     await loadServices()

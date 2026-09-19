@@ -1,6 +1,10 @@
 export default {
   app: {
     title: 'GoWind Toolkit',
+    selectModuleTitle: '选择要打开的 Go 模块',
+    selectModuleHint: '该目录下未发现 go.mod，但找到以下子模块，请选择一个打开：',
+    confirm: '打开',
+    cancel: '取消',
   },
   // Tab 标签
   tabs: {

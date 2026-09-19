@@ -366,6 +366,22 @@ export namespace detect {
 	        this.Version = source["Version"];
 	    }
 	}
+	export class ModuleCandidate {
+	    Dir: string;
+	    ModPath: string;
+	    RelPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModuleCandidate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Dir = source["Dir"];
+	        this.ModPath = source["ModPath"];
+	        this.RelPath = source["RelPath"];
+	    }
+	}
 	export class ProjectInfo {
 	    Root: string;
 	    GoVersion: string;
@@ -768,6 +784,40 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.results = this.convertValues(source["results"], frontendgen.WriteResult);
 	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OpenProjectResult {
+	    Status: string;
+	    Project?: detect.ProjectInfo;
+	    Candidates?: detect.ModuleCandidate[];
+	
+	    static createFrom(source: any = {}) {
+	        return new OpenProjectResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Status = source["Status"];
+	        this.Project = this.convertValues(source["Project"], detect.ProjectInfo);
+	        this.Candidates = this.convertValues(source["Candidates"], detect.ModuleCandidate);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

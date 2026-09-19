@@ -61,13 +61,17 @@ async function handleOpenProject() {
     projectError.value = ''
 
     try {
-      const pi = await OpenProject(path);
-      if (!pi || !pi.ModPath) {
+      const res = await OpenProject(path);
+      // choose：交给全局模块选择器弹框，保持当前项目状态不变，不报错。
+      if (!res || res.Status === 'choose') {
+        return
+      }
+      if (res.Status !== 'opened' || !res.Project?.ModPath) {
         projectError.value = t('backend.project.noProject')
         projectInfo.value = undefined
         return
       }
-      projectInfo.value = pi;
+      projectInfo.value = res.Project;
       await refreshServiceOptions();
       await refreshTableData();
     } catch (err) {

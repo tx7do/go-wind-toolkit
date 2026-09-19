@@ -112,6 +112,15 @@ func (g *GoCmd) CombinedOutput(args ...string) ([]byte, error) {
 // RunUpwardUntilSucceeds 从 startDir 开始向上遍历父目录，尝试执行 go 命令，
 // 直到某一目录执行成功或到达根目录。返回最后一次成功的输出（combined）。
 func (g *GoCmd) RunUpwardUntilSucceeds(startDir string, args ...string) ([]byte, error) {
+	return g.RunUpwardUntilValid(startDir, nil, args...)
+}
+
+// RunUpwardUntilValid 从 startDir 向上遍历父目录执行 go 命令。
+// valid 为 nil 时，以进程退出码为准（等同 RunUpwardUntilSucceeds）；
+// 否则仅当退出码为 0 且 valid(out) 为真才算命中——用于甄别 `go list -m -json`
+// 在无 go.mod 目录仍返回 exit 0 的伪主模块（Path=command-line-arguments）。
+// 全部目录都不命中时返回描述性错误，而非伪结果。
+func (g *GoCmd) RunUpwardUntilValid(startDir string, valid func(out []byte) bool, args ...string) ([]byte, error) {
 	dir := startDir
 	if dir == "" {
 		wd, err := os.Getwd()
@@ -120,19 +129,25 @@ func (g *GoCmd) RunUpwardUntilSucceeds(startDir string, args ...string) ([]byte,
 		}
 		dir = wd
 	}
+	var lastOut []byte
+	var lastErr error
 	for {
 		g.Dir = dir
 		out, err := g.CombinedOutput(args...)
-		if err == nil {
+		if err == nil && (valid == nil || valid(out)) {
 			return out, nil
 		}
+		lastOut, lastErr = out, err
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// 到根仍失败，返回最后一个错误和输出
-			return out, err
+			break
 		}
 		dir = parent
 	}
+	if lastErr != nil {
+		return lastOut, lastErr
+	}
+	return lastOut, fmt.Errorf("未在 %s 及其上级目录找到有效的 Go 模块（缺少 go.mod）", startDir)
 }
 
 // Helper: join args for logging

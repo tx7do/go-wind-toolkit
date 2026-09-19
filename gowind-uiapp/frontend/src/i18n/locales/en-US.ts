@@ -1,6 +1,10 @@
 export default {
   app: {
     title: 'GoWind Toolkit',
+    selectModuleTitle: 'Select a Go module to open',
+    selectModuleHint: 'No go.mod found here, but these child modules were detected. Choose one to open:',
+    confirm: 'Open',
+    cancel: 'Cancel',
   },
   tabs: {
     backend: 'Backend Code Gen',

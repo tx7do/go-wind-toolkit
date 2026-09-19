@@ -74,7 +74,7 @@ export function ImportDatabaseTables(arg1:database.DBConfig):Promise<string>;
 
 export function ImportSqlTables(arg1:string):Promise<string>;
 
-export function OpenProject(arg1:string):Promise<detect.ProjectInfo>;
+export function OpenProject(arg1:string):Promise<main.OpenProjectResult>;
 
 export function ParseFrontendServices(arg1:string):Promise<main.FrontendServicesResult>;
 
