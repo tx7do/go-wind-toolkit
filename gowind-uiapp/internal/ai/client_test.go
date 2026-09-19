@@ -82,8 +82,12 @@ func TestChatNonStreamStillWorks(t *testing.T) {
 
 func TestConfigPersistRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("AppData", dir)   // windows
-	t.Setenv("XDG_CONFIG_HOME", dir) // linux/darwin
+	// os.UserConfigDir 各平台取值不同:Windows=%AppData%,Linux=$XDG_CONFIG_HOME
+	// (未设时回落 $HOME/.config),macOS=$HOME/Library/Application Support 且忽略 XDG。
+	// 三者指向同一临时目录,才能在所有平台把配置隔离到测试沙箱。
+	t.Setenv("AppData", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
 
 	saved := &Config{Provider: "deepseek", BaseURL: "https://api.deepseek.com/v1", APIKey: "sk-x", AzureAPIVersion: "2024-02-01", Model: "deepseek-chat", Temperature: 0.3, MaxTokens: 2048}
 	if err := SaveConfig(saved); err != nil {
@@ -104,8 +108,11 @@ func TestConfigPersistRoundTrip(t *testing.T) {
 
 func TestLoadConfigFallsBackToDefault(t *testing.T) {
 	dir := t.TempDir()
+	// 见 TestConfigPersistRoundTrip:三个平台的 UserConfigDir 取值都要隔离,
+	// macOS 走 $HOME 而非 XDG_CONFIG_HOME。
 	t.Setenv("AppData", dir)
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
 
 	cfg := LoadConfig()
 	def := DefaultConfig()
