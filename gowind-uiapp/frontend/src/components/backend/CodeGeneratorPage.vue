@@ -18,6 +18,7 @@ import {
   TableOutlined,
   RocketOutlined,
   RightOutlined,
+  CodeOutlined,
 } from '@ant-design/icons-vue'
 
 import {
@@ -28,7 +29,10 @@ import {
   GenerateRestCode,
   ImportSqlTables,
   ImportDatabaseTables,
+  ImportGoSchemaTables,
+  GetDBConfig,
   TestDatabaseConnection,
+  SelectFolder,
   SetDBConfig,
 } from "../../../wailsjs/go/main/App";
 import {generator} from "../../../wailsjs/go/models";
@@ -52,8 +56,12 @@ const {
 } = useProject()
 
 // ==================== Schema 导入方式 ====================
-type ImportSource = 'database' | 'file' | 'remote' | 'editor'
+type ImportSource = 'database' | 'file' | 'remote' | 'editor' | 'go-schema'
 const importSource = ref<ImportSource>('database')
+
+// ent:// 与 gorm:// 数据源只在 ORM 匹配时才成立，故导入成功后锁定步骤 2 的 ORM。
+// 真值在后端 dbConfig.dsn 里（refreshTableData 时反查），避免五个导入入口各自维护副本。
+const schemaOrmLock = ref<'' | 'ent' | 'gorm'>('')
 
 const openDatabaseImporter = ref(false)
 const openSqlImporter = ref(false)
@@ -131,6 +139,40 @@ async function handleDatabaseImport() {
   }
 }
 
+// Go 源码 schema（ent:// / gorm://）：不连库，直接解析源码目录下的模型定义。
+const goSchemaForm = reactive({
+  scheme: 'ent',
+  dir: '',
+})
+const goSchemaLoading = ref(false)
+
+async function handleSelectSchemaDir() {
+  const dir = await SelectFolder()
+  if (dir) goSchemaForm.dir = dir
+}
+
+async function handleGoSchemaImport() {
+  if (!goSchemaForm.dir) {
+    message.error(t('backend.import.goSchemaDirRequired'))
+    return
+  }
+  goSchemaLoading.value = true
+  try {
+    const res = await ImportGoSchemaTables(`${goSchemaForm.scheme}://${goSchemaForm.dir}`, goSchemaForm.scheme)
+    if (res !== '') {
+      message.error(t('backend.import.goSchemaImportFailed', {msg: res}))
+      return
+    }
+    await refreshTableData()
+    message.success(t('backend.import.goSchemaImportSuccess'))
+  } catch (e) {
+    console.error('Go 源码 schema 导入失败:', e)
+    message.error(t('backend.import.goSchemaImportFailed', {msg: String(e)}))
+  } finally {
+    goSchemaLoading.value = false
+  }
+}
+
 // 本地文件
 const selectedFileName = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -182,6 +224,22 @@ async function refreshServiceOptions() {
 async function refreshTableData() {
   const opts = await GetGeneratorOptions();
   tableData.value = opts || [];
+  await refreshSchemaOrmLock();
+}
+
+// 数据源一旦是 Go 源码 scheme，就把 ORM 锁定为对应值并同步回表单：
+// 生成阶段 sqlkratos 会强制校验配对，UI 提前锁住才不会让用户在第三步点生成才失败。
+async function refreshSchemaOrmLock() {
+  let lock: '' | 'ent' | 'gorm' = ''
+  try {
+    const cfg = await GetDBConfig()
+    const dsn = cfg?.dsn ?? ''
+    if (dsn.startsWith('ent://')) lock = 'ent'
+    else if (dsn.startsWith('gorm://')) lock = 'gorm'
+  } catch (e) {
+    console.error('读取数据源配置失败:', e)
+  }
+  schemaOrmLock.value = lock
 }
 
 // ==================== 导入操作 ====================
@@ -356,6 +414,11 @@ const ormTypes = [
   {value: 'gorm', label: 'GORM'},
 ]
 
+// 导入 Go 源码 schema 后 ORM 只能跟随数据源，否则生成阶段必然报错。
+watch(schemaOrmLock, (v) => {
+  if (v) generateConfig.ormType = v
+})
+
 const excludedCount = ref(0)
 const excludeAll = ref(false)
 const protoPackageAll = ref('')
@@ -467,6 +530,7 @@ watch(projectInfo, async (pi, prev) => {
   if (!pi || pi.ModPath !== prev?.ModPath) {
     currentStep.value = 0;
     dbFormData.dsn = '';
+    goSchemaForm.dir = '';
     sqlContent.value = '';
     selectedFileName.value = '';
   }
@@ -543,6 +607,7 @@ onUnmounted(() => {
           <a-radio-button value="file"><FileTextOutlined style="margin-right: 4px"/> {{ t('backend.import.file') }}</a-radio-button>
           <a-radio-button value="remote"><CloudDownloadOutlined style="margin-right: 4px"/> {{ t('backend.import.remote') }}</a-radio-button>
           <a-radio-button value="editor"><EditOutlined style="margin-right: 4px"/> {{ t('backend.import.editor') }}</a-radio-button>
+          <a-radio-button value="go-schema"><CodeOutlined style="margin-right: 4px"/> {{ t('backend.import.goSchema') }}</a-radio-button>
         </a-radio-group>
 
         <!-- 数据库导入 -->
@@ -642,6 +707,41 @@ onUnmounted(() => {
             <a-button type="default" @click="handleOpenSqlEditor">
               <EditOutlined style="margin-right: 4px"/> {{ t('backend.import.openAdvancedEditor') }}
             </a-button>
+          </div>
+        </div>
+
+        <!-- Go 源码 schema：不连库，直接解析 ent schema / gorm model 目录 -->
+        <div v-if="importSource === 'go-schema'">
+          <a-alert :message="t('backend.import.goSchemaHint')" type="info" show-icon style="margin-bottom: 12px"/>
+          <div style="display: flex; gap: 16px; margin-bottom: 12px">
+            <div>
+              <div style="color: #666; font-size: 12px; margin-bottom: 4px">{{ t('backend.import.goScheme') }}</div>
+              <a-select v-model:value="goSchemaForm.scheme" style="width: 110px">
+                <a-select-option value="ent">ent://</a-select-option>
+                <a-select-option value="gorm">gorm://</a-select-option>
+              </a-select>
+            </div>
+            <div style="flex: 1">
+              <div style="color: #666; font-size: 12px; margin-bottom: 4px">{{ t('backend.import.schemaDir') }}</div>
+              <a-input-group compact>
+                <a-input
+                  v-model:value="goSchemaForm.dir"
+                  :placeholder="goSchemaForm.scheme === 'ent' ? t('backend.import.entDirPlaceholder') : t('backend.import.gormDirPlaceholder')"
+                  style="width: calc(100% - 96px)"
+                />
+                <a-button style="width: 96px" @click="handleSelectSchemaDir">
+                  <FolderOpenOutlined style="margin-right: 4px"/> {{ t('backend.import.selectDir') }}
+                </a-button>
+              </a-input-group>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <a-button type="primary" :loading="goSchemaLoading" :disabled="!goSchemaForm.dir" @click="handleGoSchemaImport">
+              <ImportOutlined style="margin-right: 4px"/> {{ t('backend.import.importTables') }}
+            </a-button>
+            <span v-if="goSchemaForm.dir" style="color: #999; font-size: 12px; word-break: break-all">
+              {{ goSchemaForm.scheme }}://{{ goSchemaForm.dir }}
+            </span>
           </div>
         </div>
 
@@ -797,11 +897,14 @@ onUnmounted(() => {
             <div v-if="generateConfig.generateGrpc" class="target-body">
               <a-form layout="inline">
                 <a-form-item :label="t('backend.generate.ormType')">
-                  <a-select v-model:value="generateConfig.ormType" style="width: 120px">
-                    <a-select-option v-for="item in ormTypes" :key="item.value" :value="item.value">
-                      {{ item.label }}
-                    </a-select-option>
-                  </a-select>
+                  <a-tooltip :title="schemaOrmLock ? t('backend.generate.ormLockedTip', {scheme: `${schemaOrmLock}://`}) : ''">
+                    <a-select v-model:value="generateConfig.ormType" style="width: 120px" :disabled="!!schemaOrmLock">
+                      <a-select-option v-for="item in ormTypes" :key="item.value" :value="item.value">
+                        {{ item.label }}
+                      </a-select-option>
+                    </a-select>
+                  </a-tooltip>
+                  <a-tag v-if="schemaOrmLock" color="purple" style="margin-left: 8px">{{ schemaOrmLock }}://</a-tag>
                 </a-form-item>
                 <a-form-item :label="t('backend.generate.servers')">
                   <a-checkbox-group v-model:value="generateConfig.grpcServers">

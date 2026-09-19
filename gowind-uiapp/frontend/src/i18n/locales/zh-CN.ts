@@ -66,6 +66,17 @@ export default {
       file: '本地文件',
       remote: '远程地址',
       editor: 'SQL 编辑器',
+      // Go 源码 schema（ent:// / gorm://）
+      goSchema: 'Go 源码 Schema',
+      goSchemaHint: '无需连接数据库，直接解析 Go 源码中的模型定义：ent:// 指向 ent 的 schema 目录，gorm:// 指向包含 GORM model 结构体的目录。',
+      goScheme: '数据源',
+      schemaDir: '模型目录',
+      entDirPlaceholder: '如 /path/to/project/ent/schema',
+      gormDirPlaceholder: '如 /path/to/project/internal/data',
+      selectDir: '选择目录',
+      goSchemaDirRequired: '请先选择模型目录',
+      goSchemaImportSuccess: 'Go 源码模型导入成功',
+      goSchemaImportFailed: 'Go 源码导入失败：{msg}',
       // 数据库
       dbType: '数据库类型',
       dsn: '数据源名称 (DSN)',
@@ -142,6 +153,7 @@ export default {
       bffServiceName: 'BFF 服务名',
       bffServiceNamePlaceholder: '如 admin',
       servers: '传输层',
+      ormLockedTip: '数据源为 {scheme} Go 源码，ORM 已锁定为与之配对的类型。',
       atLeastOne: '请至少选择一种生成目标',
       atLeastOneTransport: 'gRPC 服务请至少选择一种传输层',
       // 概览

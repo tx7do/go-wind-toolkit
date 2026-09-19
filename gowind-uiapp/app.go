@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -17,6 +18,7 @@ import (
 
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlkratos"
 )
 
 // App struct
@@ -263,6 +265,85 @@ func (a *App) ImportDatabaseTables(cfg database.DBConfig) string {
 	runtime.EventsEmit(a.ctx, "table-imported")
 
 	return ""
+}
+
+// ImportGoSchemaTables 从 Go 源码数据源导入表清单：ent://<ent schema 目录> 或
+// gorm://<gorm model 目录>。与 ImportDatabaseTables 的区别是不连库——表结构由
+// go/ast 解析源码得到；scheme 与 ORM 必须配对，否则 sqlkratos 会拖到生成阶段才报错。
+func (a *App) ImportGoSchemaTables(source string, ormType string) string {
+	source = strings.TrimSpace(source)
+	ormType = strings.TrimSpace(ormType)
+
+	var scheme string
+	switch {
+	case strings.HasPrefix(source, "ent://"):
+		scheme = "ent"
+	case strings.HasPrefix(source, "gorm://"):
+		scheme = "gorm"
+	default:
+		return "Go 源码数据源需写成 ent://<schema 目录> 或 gorm://<model 目录>"
+	}
+	if scheme != ormType {
+		return fmt.Sprintf("%s:// 数据源只能搭配 %s ORM（当前为 %q）", scheme, scheme, ormType)
+	}
+
+	dir := strings.TrimPrefix(source, scheme+"://")
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return fmt.Sprintf("目录不存在：%s", dir)
+	}
+
+	names, err := planGoSchemaTables(a.ctx, source, ormType)
+	if err != nil {
+		return fmt.Sprintf("解析 Go 源码失败：%v", err)
+	}
+	if len(names) == 0 {
+		return "该目录下没有解析到任何模型"
+	}
+
+	// Driver 留空无妨：source 自带 scheme，ensureDSNScheme 会原样透传给 sqlkratos。
+	a.setDBConfig(&database.DBConfig{UseDSN: true, DSN: source})
+
+	a.generator.CleanOptions()
+	for _, name := range names {
+		a.generator.AddOption(&generator.Option{TableName: name})
+	}
+
+	runtime.EventsEmit(a.ctx, "table-imported")
+
+	return ""
+}
+
+// planGoSchemaTables 只读解析 Go 源码数据源将被处理的表名。
+// Servers 必须非空（generateProtobufCode 只在 grpc/rest 分支执行转换），且转换会把
+// proto 写到 OutputPath 下，故指向临时目录保证零副作用。
+func planGoSchemaTables(ctx context.Context, source string, ormType string) ([]string, error) {
+	tmp, err := os.MkdirTemp("", "gowind-schema-preview")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmp)
+
+	tables, err := sqlkratos.PlanTables(ctx, sqlkratos.GeneratorOptions{
+		Source:               source,
+		OrmType:              ormType,
+		OutputPath:           tmp,
+		ModuleName:           "preview",
+		SourceModuleName:     "preview",
+		ModuleVersion:        "v1",
+		ProjectName:          "preview",
+		ServiceName:          "preview",
+		Servers:              []string{"grpc"},
+		ProtoPackageStrategy: "per-table",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(tables))
+	for _, t := range tables {
+		names = append(names, t.Name)
+	}
+	return names, nil
 }
 
 // SetDBConfig 设置数据库连接配置

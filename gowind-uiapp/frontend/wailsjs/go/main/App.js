@@ -130,6 +130,10 @@ export function ImportDatabaseTables(arg1) {
   return window['go']['main']['App']['ImportDatabaseTables'](arg1);
 }
 
+export function ImportGoSchemaTables(arg1, arg2) {
+  return window['go']['main']['App']['ImportGoSchemaTables'](arg1, arg2);
+}
+
 export function ImportSqlTables(arg1) {
   return window['go']['main']['App']['ImportSqlTables'](arg1);
 }
