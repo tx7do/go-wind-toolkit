@@ -288,6 +288,16 @@ func (g *GoGenerator) GenerateRestServer(ctx context.Context, opts code_generato
 	return g.Generate(ctx, opts, "rest_server.tpl")
 }
 
+// GenerateWebsocketServer 渲染 WebSocket 传输层骨架(internal/server/websocket_server.go)。
+// WebSocket 以消息类型驱动,不登记 proto 服务,故无需 Services/Packages 变量。
+func (g *GoGenerator) GenerateWebsocketServer(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {
+	if g.CodeGenerator == nil {
+		return "", os.ErrInvalid
+	}
+
+	return g.Generate(ctx, opts, "websocket_server.tpl")
+}
+
 func (g *GoGenerator) GenerateService(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {
 	if g.CodeGenerator == nil {
 		return "", os.ErrInvalid

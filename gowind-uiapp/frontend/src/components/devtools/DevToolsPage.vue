@@ -81,6 +81,7 @@ const addForm = reactive({
 const serverOptions = [
   {label: 'gRPC', value: 'grpc'},
   {label: 'REST/BFF', value: 'rest'},
+  {label: 'WebSocket', value: 'websocket'},
 ]
 const dbClientOptions = [
   {label: 'Ent', value: 'ent'},

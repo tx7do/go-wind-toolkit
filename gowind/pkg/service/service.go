@@ -203,6 +203,17 @@ func (g *Generator) generateServerPackageCode(
 			if _, err := g.goGenerator.GenerateRestServer(context.Background(), o); err != nil {
 				return err
 			}
+		case "websocket":
+			o := code_generator.Options{
+				OutDir: outputPath,
+				Module: projectModule,
+				Vars: map[string]any{
+					"Service": serviceName,
+				},
+			}
+			if _, err := g.goGenerator.GenerateWebsocketServer(context.Background(), o); err != nil {
+				return err
+			}
 		}
 	}
 
