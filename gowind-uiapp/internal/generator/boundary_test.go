@@ -258,6 +258,7 @@ func TestGenerator_GenerateWithEmptyDBConfig(t *testing.T) {
 		"per-table",
 		"/tmp",
 		"test",
+		[]string{"grpc"},
 	)
 	// 预期会失败（因为没有有效的数据源）
 	assert.Error(t, err)

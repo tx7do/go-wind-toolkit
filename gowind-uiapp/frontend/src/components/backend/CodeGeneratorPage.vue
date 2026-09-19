@@ -376,7 +376,14 @@ const generateConfig = reactive({
   generateBff: true,
   ormType: 'ent',
   bffServiceName: 'admin',
+  grpcServers: ['grpc'] as string[],
 })
+
+const transportOptions = [
+  {value: 'grpc', label: 'gRPC'},
+  {value: 'rest', label: 'REST'},
+  {value: 'websocket', label: 'WebSocket'},
+]
 
 const ormTypes = [
   {value: 'ent', label: 'Ent'},
@@ -427,11 +434,15 @@ async function handleGenerate() {
     message.warning(t('backend.generate.atLeastOne'))
     return
   }
+  if (generateConfig.generateGrpc && generateConfig.grpcServers.length === 0) {
+    message.warning(t('backend.generate.atLeastOneTransport'))
+    return
+  }
 
   confirmLoading.value = true
   try {
     if (generateConfig.generateGrpc) {
-      const res = await GenerateGrpcCode(generateConfig.ormType, protoPackageStrategy.value);
+      const res = await GenerateGrpcCode(generateConfig.ormType, protoPackageStrategy.value, generateConfig.grpcServers);
       if (res !== '') {
         message.error(t('backend.generate.grpcFailed', {msg: res}));
         return;
@@ -835,6 +846,11 @@ onUnmounted(() => {
                       {{ item.label }}
                     </a-select-option>
                   </a-select>
+                </a-form-item>
+                <a-form-item :label="t('backend.generate.servers')">
+                  <a-checkbox-group v-model:value="generateConfig.grpcServers">
+                    <a-checkbox v-for="opt in transportOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</a-checkbox>
+                  </a-checkbox-group>
                 </a-form-item>
               </a-form>
             </div>

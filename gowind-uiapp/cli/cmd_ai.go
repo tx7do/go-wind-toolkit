@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -8,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/ai"
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
 )
 
 var aiCmd = &cobra.Command{
@@ -179,6 +183,171 @@ func shortPath(path string) string {
 	return path
 }
 
+// maskKey 遮蔽密钥,仅保留末 4 位。
+func maskKey(s string) string {
+	if len(s) <= 4 {
+		return "****"
+	}
+	return "****" + s[len(s)-4:]
+}
+
+// applyAIFlagsToConfig 仅将命令行显式提供的旗标覆盖到 cfg(不回退环境变量)。
+func applyAIFlagsToConfig(cmd *cobra.Command, cfg *ai.Config) {
+	set := func(name string, dst *string) {
+		if cmd.Flags().Changed(name) {
+			if v, err := cmd.Flags().GetString(name); err == nil {
+				*dst = v
+			}
+		}
+	}
+	set("provider", &cfg.Provider)
+	set("base-url", &cfg.BaseURL)
+	set("api-key", &cfg.APIKey)
+	set("azure-api-version", &cfg.AzureAPIVersion)
+	set("model", &cfg.Model)
+	if cmd.Flags().Changed("temperature") {
+		if t, err := cmd.Flags().GetFloat64("temperature"); err == nil && t >= 0 && t <= 2 {
+			cfg.Temperature = t
+		}
+	}
+	if cmd.Flags().Changed("max-tokens") {
+		if m, err := cmd.Flags().GetInt("max-tokens"); err == nil && m > 0 {
+			cfg.MaxTokens = m
+		}
+	}
+}
+
+var aiConfigCmd = &cobra.Command{
+	Use:   "config",
+	Short: "查看 / 持久化 AI 配置(与 GUI 设置同源)",
+}
+
+var aiConfigShowCmd = &cobra.Command{
+	Use:   "show",
+	Short: "查看已持久化的 AI 配置",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := ai.LoadConfig()
+		if !boolFlag(cmd, "show-secrets") && cfg.APIKey != "" {
+			cfg.APIKey = maskKey(cfg.APIKey)
+		}
+		emit(cfg)
+		return nil
+	},
+}
+
+var aiConfigSetCmd = &cobra.Command{
+	Use:   "set",
+	Short: "写入 AI 配置到持久化文件(仅覆盖显式提供的旗标)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := ai.LoadConfig()
+		applyAIFlagsToConfig(cmd, cfg)
+		if err := ai.SaveConfig(cfg); err != nil {
+			return err
+		}
+		out := *cfg
+		if !boolFlag(cmd, "show-secrets") && out.APIKey != "" {
+			out.APIKey = maskKey(out.APIKey)
+		}
+		emit(out)
+		return nil
+	},
+}
+
+var aiFindOpenapiCmd = &cobra.Command{
+	Use:   "find-openapi",
+	Short: "在项目内查找 OpenAPI 规范文件",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root := flagString(cmd, "path", ".")
+		files, err := ai.FindOpenAPIFiles(root)
+		if err != nil {
+			return err
+		}
+		msg := ""
+		if len(files) == 0 {
+			msg = "未找到 OpenAPI 文件"
+		}
+		emit(ai.OpenAPIResult{Success: true, Files: files, Message: msg})
+		return nil
+	},
+}
+
+// parsePartitions 兼容两种输入:划分结果对象 {success,partitions:[...]} 与裸数组 [...]。
+func parsePartitions(raw string) ([]ai.MicroservicePartition, error) {
+	trimmed := strings.TrimSpace(raw)
+	if strings.HasPrefix(trimmed, "[") {
+		var arr []ai.MicroservicePartition
+		if err := json.Unmarshal([]byte(trimmed), &arr); err != nil {
+			return nil, fmt.Errorf("--partitions 不是合法的划分数组: %w", err)
+		}
+		return arr, nil
+	}
+	var res ai.PartitionResult
+	if err := json.Unmarshal([]byte(trimmed), &res); err != nil {
+		return nil, fmt.Errorf("--partitions 不是合法的划分结果 JSON: %w", err)
+	}
+	return res.Partitions, nil
+}
+
+var aiBackendCmd = &cobra.Command{
+	Use:   "backend",
+	Short: "按 AI 微服务划分结果,从 DDL 生成 gRPC 后端代码(等价 GUI 的 AI 后端生成)",
+	Long: `读取 DDL 文件与微服务划分 JSON(--partitions,支持 ai partition 的输出对象或其 partitions 数组),
+按 {serviceName, tables} 映射生成 gRPC 全栈代码,与 GUI 的 AIGenerateBackendCode 同源。`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ddlFile := flagString(cmd, "ddl", "")
+		partFile := flagString(cmd, "partitions", "")
+		if ddlFile == "" || partFile == "" {
+			checkErr(fmt.Errorf("必须指定 --ddl 与 --partitions"))
+		}
+		ddl, err := readFileContent(ddlFile)
+		if err != nil {
+			return err
+		}
+		partitions, err := parsePartitions(readJSONArg(partFile, "--partitions"))
+		if err != nil {
+			checkErr(err)
+		}
+		if len(partitions) == 0 {
+			checkErr(fmt.Errorf("划分结果为空,无可生成的服务"))
+		}
+
+		var opts generator.GeneratorOptions
+		var id uint32
+		for _, p := range partitions {
+			for _, tableName := range p.Tables {
+				id++
+				opts = append(opts, &generator.Option{ID: id, TableName: tableName, Service: p.ServiceName})
+			}
+		}
+
+		dbConfig := database.DBConfig{Type: database.DbTypeMySQL, SQLContent: ddl}
+		rootPath, projectName := resolveProjectRoot(cmd)
+		ormType := flagString(cmd, "orm", "ent")
+		servers := stringSliceFlag(cmd, "servers")
+
+		g := generator.NewGenerator()
+		g.SetLogger(cliLogger{})
+		g.SetOptions(opts)
+		g.SetSkipPostProcess(boolFlag(cmd, "skip-postprocess"))
+
+		logf("项目根目录: %s (module: %s)", rootPath, projectName)
+		logf("开始按 %d 个划分服务生成 gRPC 代码 (orm=%s)...", len(partitions), ormType)
+
+		if err := g.GenerateGrpcCode(context.Background(), dbConfig, ormType, "per-table", rootPath, projectName, servers); err != nil {
+			return err
+		}
+
+		emit(map[string]any{
+			"success":     true,
+			"root":        rootPath,
+			"orm":         ormType,
+			"postprocess": !boolFlag(cmd, "skip-postprocess"),
+			"services":    serviceNames(opts),
+		})
+		return nil
+	},
+}
+
 func init() {
 	addAIFlags(aiTestCmd)
 	addAIFlags(aiDdlCmd)
@@ -190,5 +359,15 @@ func init() {
 	aiReviewCmd.Flags().StringSlice("files", nil, "要审查的文件路径（逗号分隔，必填）")
 	aiReviewCmd.Flags().Bool("stream", false, "流式审查（增量内容实时输出到 stderr，完整结果仍输出 stdout JSON）")
 
-	aiCmd.AddCommand(aiPresetsCmd, aiTestCmd, aiDdlCmd, aiPartitionCmd, aiReviewCmd)
+	addAIFlags(aiConfigSetCmd)
+	aiConfigShowCmd.Flags().Bool("show-secrets", false, "显示完整 API Key(默认末 4 位脱敏)")
+	aiConfigSetCmd.Flags().Bool("show-secrets", false, "输出中显示完整 API Key(默认脱敏)")
+
+	aiFindOpenapiCmd.Flags().String("path", ".", "项目根目录（默认当前目录）")
+
+	addBackendFlags(aiBackendCmd)
+	aiBackendCmd.Flags().String("partitions", "", "微服务划分 JSON 文件（ai partition 输出,支持 @file,必填）")
+
+	aiConfigCmd.AddCommand(aiConfigShowCmd, aiConfigSetCmd)
+	aiCmd.AddCommand(aiPresetsCmd, aiTestCmd, aiDdlCmd, aiPartitionCmd, aiReviewCmd, aiConfigCmd, aiFindOpenapiCmd, aiBackendCmd)
 }

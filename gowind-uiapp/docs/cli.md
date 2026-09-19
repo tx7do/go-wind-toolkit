@@ -26,9 +26,9 @@ cd gowind-uiapp && go build -o gowind-uiapp .
 |------|------|
 | `gowind-uiapp project inspect` | 探测项目信息（模块路径、服务列表） |
 | `gowind-uiapp db test/tables/columns` | 数据库连接测试与元数据 |
-| `gowind-uiapp backend grpc/rest` | 后端 Kratos 微服务代码生成 |
-| `gowind-uiapp frontend gen` | 前端 CRUD 代码生成（三框架） |
-| `gowind-uiapp ai presets/test/ddl/partition/review` | AI 助手 |
+| `gowind-uiapp backend grpc/rest` | 后端 Kratos 微服务代码生成（`--servers` 选传输层） |
+| `gowind-uiapp frontend gen/parse` | 前端 CRUD 代码生成（三框架）/ OpenAPI 服务解析预览 |
+| `gowind-uiapp ai presets/test/ddl/partition/review/backend/find-openapi/config` | AI 助手（含按划分生成后端、配置查看/持久化） |
 | `gowind-uiapp config types/services/export` | 远程配置中心导出 |
 
 ## 交给 gow 的能力
@@ -97,9 +97,15 @@ gowind-uiapp backend grpc --ddl schema.sql --mapping tables.json --skip-postproc
 # REST 网关（不生成 ORM/data，无后处理）
 gowind-uiapp backend rest --ddl schema.sql --mapping tables.json \
   --service-name admin-portal --out /path/to/project
+
+# 选择传输层（对应 gow generate -s）：默认 grpc，可多选
+gowind-uiapp backend grpc --ddl schema.sql --mapping tables.json \
+  --servers grpc,websocket --skip-postprocess --out /path/to/project
 ```
 
 产物位于 `<out>/app/<服务名>/service/`，与 GUI 的 gRPC/REST 生成完全同源。
+
+`--servers` 可选 `grpc` / `rest` / `websocket`（逗号分隔，缺省 `grpc`）。`websocket` 是消息驱动传输，只生成 `websocket_server.go`（不承载逐表 proto 服务），并在 `initApp` 装配里注入 `wsServer`/`wsMiddlewares`；它是**惰性**的——需在配置里补 `server.websocket` 段后才真正生效。GUI 后端向导的「传输层」多选框与此同源。
 
 ## frontend — 前端 CRUD 代码生成
 
@@ -119,6 +125,9 @@ gowind-uiapp frontend gen \
 
 # 生成全部内容 JSON 到 stdout（供 AI 直接消费）
 gowind-uiapp frontend gen --openapi openapi.yaml --framework react --stdout
+
+# 仅解析 OpenAPI -> 服务清单（不生成，供 GUI/AI 预览有哪些 tag/操作）
+gowind-uiapp frontend parse --openapi openapi.yaml
 ```
 
 | 参数 | 说明 |
@@ -145,6 +154,17 @@ gowind-uiapp ai test                             # 连通性测试
 gowind-uiapp ai ddl --requirements req.md        # 需求文档 -> MySQL DDL
 gowind-uiapp ai partition --ddl schema.sql       # DDL -> 微服务划分建议
 gowind-uiapp ai review --files internal/user/service.go,internal/role/service.go
+
+# 查找目录下 OpenAPI 文件
+gowind-uiapp ai find-openapi --path /path/to/project
+
+# AI 配置查看/持久化（默认脱敏，--show-secrets 显示完整 Key）
+gowind-uiapp ai config show
+gowind-uiapp ai config set --provider openai --base-url https://api.openai.com/v1 \
+  --api-key sk-xxx --model gpt-4o
+
+# 依据微服务划分 JSON 直接生成后端（partitions.json 来自 ai partition）
+gowind-uiapp ai backend --ddl schema.sql --partitions @partitions.json --orm ent
 ```
 
 典型的 AI 全链路组合：
@@ -152,8 +172,8 @@ gowind-uiapp ai review --files internal/user/service.go,internal/role/service.go
 ```bash
 gowind-uiapp ai ddl --requirements req.md --json | jq -r .content > schema.sql
 gowind-uiapp ai partition --ddl schema.sql --json > partitions.json
-# 依据 partitions.json 构建 mapping.json 后:
-gowind-uiapp backend grpc --ddl schema.sql --mapping mapping.json
+# ai backend 直接读取 partitions.json 构建映射并生成，无需手工拼 mapping.json：
+gowind-uiapp ai backend --ddl schema.sql --partitions @partitions.json --orm ent
 ```
 
 ## config — 远程配置导出

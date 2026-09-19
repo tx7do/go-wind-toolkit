@@ -193,7 +193,11 @@ gow new project <project-name> [flags]
 
 Flags:
   -m, --module string   Go module 名称（默认：项目名）
+      --no-ci           跳过 GitHub Actions CI workflow 的生成
 ```
+
+> 创建项目时默认会在仓库根生成 `.github/workflows/ci.yml`（setup-go 按 `go.mod` 取版本，串起
+> download → vet → build → test）。若项目已有同名文件则不覆盖；用 `--no-ci` 可完全跳过。
 
 ### `gow add` — 新增组件
 
@@ -225,7 +229,7 @@ Flags:
       --driver string           Database driver: mysql, postgres (default "mysql")
       --service string          Service name (module name)
       --orm string              ORM type: ent, gorm (default "ent")
-  -s, --servers strings         Server types: grpc, rest (default [grpc])
+  -s, --servers strings         Server types: grpc, rest, websocket (default [grpc])
   -t, --tables strings          Tables to include (default: all)
       --exclude-tables strings  Tables to exclude
       --module-version string   API module version (default "v1")
@@ -236,6 +240,10 @@ Flags:
       --source-module string    Source module name for REST service
   -n, --dry-run                 Validate the data source, resolve tables and preview the plan without writing anything
 ```
+
+> `-s websocket` 与 `gow add service` 语义一致：websocket 为消息驱动传输，只生成
+> `internal/server/websocket_server.go`（不逐表注册 proto 服务）并在 `initApp` 装配里注入
+> `wsServer`/`wsMiddlewares`；需在服务 `configs/*.yaml` 补 `server.websocket` 段后才真正启用。
 
 ### `gow extract` — 微服务模块提取
 

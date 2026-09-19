@@ -34,6 +34,7 @@ func addBackendFlags(cmd *cobra.Command) {
 	cmd.Flags().String("mapping", "", "表映射 JSON 文件: [{\"table\":\"user\",\"service\":\"identity\"}]")
 	cmd.Flags().StringSlice("tables", nil, "表映射简写: --tables user:identity,role:permission")
 	cmd.Flags().String("orm", "ent", "ORM 类型: ent | gorm")
+	cmd.Flags().StringSlice("servers", []string{"grpc"}, "生成的传输层，逗号分隔: grpc,rest,websocket（对应 gow generate -s）")
 	cmd.Flags().String("strategy", "per-table", "proto 包策略: per-table | by-service | custom")
 	cmd.Flags().String("out", ".", "项目根目录（生成到 app/<服务名>/service，默认当前目录）")
 	cmd.Flags().Bool("skip-postprocess", false, "跳过生成后的 tidy/buf/ent/wire 后处理链")
@@ -136,6 +137,7 @@ var backendGrpcCmd = &cobra.Command{
 
 		strategy := flagString(cmd, "strategy", "per-table")
 		ormType := flagString(cmd, "orm", "ent")
+		servers := stringSliceFlag(cmd, "servers")
 
 		g := generator.NewGenerator()
 		g.SetLogger(cliLogger{})
@@ -145,7 +147,7 @@ var backendGrpcCmd = &cobra.Command{
 		logf("项目根目录: %s (module: %s)", rootPath, projectName)
 		logf("开始生成 gRPC 代码 (orm=%s, strategy=%s)...", ormType, strategy)
 
-		if err := g.GenerateGrpcCode(context.Background(), dbConfig, ormType, strategy, rootPath, projectName); err != nil {
+		if err := g.GenerateGrpcCode(context.Background(), dbConfig, ormType, strategy, rootPath, projectName, servers); err != nil {
 			return err
 		}
 

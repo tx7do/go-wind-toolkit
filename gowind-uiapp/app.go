@@ -15,8 +15,8 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
 )
 
 // App struct
@@ -26,7 +26,7 @@ type App struct {
 	// stateMu 保护 projectInfo/dbConfig:Wails 绑定调用各自在独立
 	// goroutine 中执行,并发读写存在数据竞争。指针只在锁内整体替换,
 	// 指向的结构体发布后不再修改。
-	stateMu    sync.Mutex
+	stateMu     sync.Mutex
 	projectInfo *detect.ProjectInfo
 	dbConfig    *database.DBConfig
 
@@ -259,7 +259,7 @@ func (a *App) CleanConfig() {
 }
 
 // GenerateGrpcCode 生成代码
-func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) string {
+func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string, servers []string) string {
 	if ormType == "" {
 		runtime.LogErrorf(a.ctx, "ORM 类型不能为空")
 		return "ORM 类型不能为空"
@@ -281,7 +281,7 @@ func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) stri
 		protoPackageStrategy = "per-table"
 	}
 
-	runtime.LogDebugf(a.ctx, "生成代码，ORM 类型: %v，Proto 包策略: %v", ormType, protoPackageStrategy)
+	runtime.LogDebugf(a.ctx, "生成代码，ORM 类型: %v，Proto 包策略: %v，传输层: %v", ormType, protoPackageStrategy, servers)
 
 	if err := a.generator.GenerateGrpcCode(
 		a.ctx,
@@ -290,6 +290,7 @@ func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) stri
 		protoPackageStrategy,
 		pi.Root,
 		pi.ModPath,
+		servers,
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "生成代码失败: %v", err)
 		return fmt.Sprintf("生成代码失败: %v", err)
@@ -567,6 +568,7 @@ func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.
 		"per-table", // AI 辅助生成默认使用每表独立包
 		pi.Root,
 		pi.ModPath,
+		[]string{"grpc"},
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "AI 辅助生成后端代码失败: %v", err)
 		return fmt.Sprintf("生成后端代码失败: %v", err)

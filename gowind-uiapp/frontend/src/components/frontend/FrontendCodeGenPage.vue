@@ -372,10 +372,6 @@ function getFileTypeColor(type: string) {
   return map[type] || 'default'
 }
 
-function getFrameworkLabel(value: string) {
-  return frameworkOptions.find(f => f.value === value)?.label || value
-}
-
 // 根据文件路径推断 Monaco 语言
 function detectLanguage(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() || ''
@@ -526,13 +522,6 @@ const previewLanguage = computed(() => {
             </a-checkbox-group>
           </a-form-item>
         </a-form>
-        <a-alert
-          v-if="targetFramework !== 'vue-element' && targetFramework !== 'react' && targetFramework !== 'vue-vben'"
-          :message="t('frontend.config.notImplemented', {framework: getFrameworkLabel(targetFramework)})"
-          type="warning"
-          show-icon
-          style="margin-top: 12px"
-        />
       </a-card>
 
       <!-- 服务列表 -->

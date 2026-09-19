@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -19,12 +20,12 @@ import (
 
 // CmdProject represents the project command.
 var CmdProject = &cobra.Command{
-	Use:     "project [name]",
-	Aliases: []string{"proj"},
-	Short:   "create a new project scaffold",
-	Long:    "Create a project using the repository template. Example: gow new project helloworld",
-	Args:    cobra.ExactArgs(1),
-	RunE:    Run,
+	Use:          "project [name]",
+	Aliases:      []string{"proj"},
+	Short:        "create a new project scaffold",
+	Long:         "Create a project using the repository template. Example: gow new project helloworld",
+	Args:         cobra.ExactArgs(1),
+	RunE:         Run,
 	SilenceUsage: true,
 }
 
@@ -34,6 +35,7 @@ var (
 	timeout    string
 	moduleName string
 	nomod      bool
+	skipCI     bool
 )
 
 const (
@@ -58,6 +60,7 @@ func init() {
 	CmdProject.Flags().StringVarP(&timeout, "timeout", "t", timeout, "time out")
 	CmdProject.Flags().StringVarP(&moduleName, "module", "m", moduleName, "set go module name, if not set, use project name")
 	CmdProject.Flags().BoolVarP(&nomod, "nomod", "", nomod, "retain go mod")
+	CmdProject.Flags().BoolVar(&skipCI, "no-ci", false, "skip emitting the GitHub Actions CI workflow (.github/workflows/ci.yml)")
 }
 
 func Run(cmd *cobra.Command, args []string) error {
@@ -130,7 +133,19 @@ func Run(cmd *cobra.Command, args []string) error {
 	done := make(chan error, 1)
 	go func() {
 		if !nomod {
-			done <- p.New(ctx, workingDir, repoURL, branch)
+			if err := p.New(ctx, workingDir, repoURL, branch); err != nil {
+				done <- err
+				return
+			}
+			if !skipCI {
+				if written, err := writeCIWorkflow(filepath.Join(workingDir, projectName)); err != nil {
+					done <- err
+					return
+				} else if written {
+					log.Printf("🧭 CI workflow emitted at .github/workflows/ci.yml\n")
+				}
+			}
+			done <- nil
 			return
 		}
 		projectRoot := getGoModProjectRoot(workingDir)
@@ -139,11 +154,11 @@ func Run(cmd *cobra.Command, args []string) error {
 			return
 		}
 
-			packagePath, e := filepath.Rel(projectRoot, filepath.Join(workingDir, projectName))
-			if e != nil {
-				done <- fmt.Errorf("🚫 failed to get relative path: %v", e)
-				return
-			}
+		packagePath, e := filepath.Rel(projectRoot, filepath.Join(workingDir, projectName))
+		if e != nil {
+			done <- fmt.Errorf("🚫 failed to get relative path: %v", e)
+			return
+		}
 		packagePath = strings.ReplaceAll(packagePath, "\\", "/")
 
 		mod, e := pkg.ModulePath(filepath.Join(projectRoot, "go.mod"))

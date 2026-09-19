@@ -187,7 +187,12 @@ gow new project <project-name> [flags]
 
 Flags:
   -m, --module string   Go module name (default: project name)
+      --no-ci           Skip emitting the GitHub Actions CI workflow
 ```
+
+> By default `gow new` emits `.github/workflows/ci.yml` at the repo root (setup-go reads the
+> version from `go.mod`, chaining download → vet → build → test). An existing file is never
+> overwritten; pass `--no-ci` to skip it entirely.
 
 ### `gow add` — Add Components
 
@@ -220,7 +225,7 @@ Flags:
       --driver string           Database driver: mysql, postgres (default "mysql")
       --service string          Service name (module name)
       --orm string              ORM type: ent, gorm (default "ent")
-  -s, --servers strings         Server types: grpc, rest (default [grpc])
+  -s, --servers strings         Server types: grpc, rest, websocket (default [grpc])
   -t, --tables strings          Tables to include (default: all)
       --exclude-tables strings  Tables to exclude
       --module-version string   API module version (default "v1")
@@ -231,6 +236,11 @@ Flags:
       --source-module string    Source module name for REST service
   -n, --dry-run                 Validate the data source, resolve tables and preview the plan without writing anything
 ```
+
+> `-s websocket` matches `gow add service`: websocket is a message-driven transport that only
+> generates `internal/server/websocket_server.go` (no per-table proto registration) and injects
+> `wsServer`/`wsMiddlewares` into `initApp`. It activates once a `server.websocket` section is added
+> to the service's `configs/*.yaml`.
 
 ### `gow extract` — Microservice Module Extraction
 

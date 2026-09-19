@@ -89,6 +89,23 @@ vue-vben 的国际化产物是合并式片段: 目标 locales/langs/{lang}/page.
 	},
 }
 
+var frontendParseCmd = &cobra.Command{
+	Use:   "parse",
+	Short: "解析 OpenAPI 规范,列出可生成的服务(tag)——等价 GUI 的服务预览",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		openapiRef := flagString(cmd, "openapi", "")
+		if openapiRef == "" {
+			checkErr(fmt.Errorf("必须指定 --openapi（OpenAPI YAML 文件路径或 http(s) URL）"))
+		}
+		spec, err := loadOpenAPISpec(openapiRef)
+		if err != nil {
+			return err
+		}
+		emit(frontendgen.ExtractServices(spec))
+		return nil
+	},
+}
+
 // loadOpenAPISpec 加载 OpenAPI 规格（本地文件或 URL）
 func loadOpenAPISpec(ref string) (*frontendgen.Spec, error) {
 	var data []byte
@@ -171,5 +188,7 @@ func init() {
 	frontendGenCmd.Flags().Bool("dry-run", false, "只输出文件清单，不写盘")
 	frontendGenCmd.Flags().Bool("stdout", false, "不写盘，输出全部文件内容 JSON")
 
-	frontendCmd.AddCommand(frontendGenCmd)
+	frontendParseCmd.Flags().String("openapi", "", "OpenAPI 3.0 YAML 文件路径或 http(s) URL（必填）")
+
+	frontendCmd.AddCommand(frontendGenCmd, frontendParseCmd)
 }

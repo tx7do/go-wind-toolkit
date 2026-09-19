@@ -134,7 +134,9 @@ export default {
       ormType: 'ORM 类型',
       bffServiceName: 'BFF 服务名',
       bffServiceNamePlaceholder: '如 admin',
+      servers: '传输层',
       atLeastOne: '请至少选择一种生成目标',
+      atLeastOneTransport: 'gRPC 服务请至少选择一种传输层',
       // 概览
       summary: '生成概览',
       project: '项目',
