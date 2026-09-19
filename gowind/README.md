@@ -107,6 +107,27 @@ gow generate --dsn "mysql://..." --service user-admin \
 gow gen --dsn "..." --service user
 ```
 
+#### 从 Go 源码 schema 直接生成（无需数据库）
+
+已有 ent schema 或 gorm model 目录时，可跳过数据库直接把 DSN 写成源码源，生成同一套下游 CRUD 代码：
+
+```shell
+# ent schema 目录（服务约定路径 internal/data/ent/schema）
+gow generate --dsn "ent://internal/data/ent/schema" --service user --orm ent
+
+# gorm model 目录：解析模型后在 daoPath 下经临时包回转生成 DAO（自动清理）
+# 目标 models 目录只补缺失文件，与手写模型类型冲突时跳过，绝不覆盖
+gow generate --dsn "gorm://internal/data/models" --service payment --orm gorm
+
+# 先用 dry-run 校验源与表解析结果
+gow generate --dsn "ent://..." --service user -n
+```
+
+约束与说明：
+- `ent://` 要求 `--orm ent`，`gorm://` 要求 `--orm gorm`（CLI 与生成器两侧都会校验）。
+- ent 源的 Mixin / GoType / SchemaType 覆写无法静态还原，会打印 `[WARN]` 提示缺失字段。
+- 解析产物中的 m2m 中间表与数据库流程一致，按 join table 规则从 proto 中剔除。
+
 ### 5. 微服务演进（提取拆分）
 
 从一个已有服务中提取业务模块到另一个服务，实现渐进式微服务拆分：
@@ -180,14 +201,19 @@ Flags:
 gow add service <service-name> [flags]
 
 Flags:
-  -s, --server strings   服务类型：grpc / rest（可多选）
+  -s, --server strings   服务类型：grpc / rest / websocket（可多选）
   -d, --dao strings      数据访问层：gorm / ent / redis（可多选）
   -o, --orm string       ORM 类型：gorm / ent（默认：ent）
 ```
 
+> `websocket` 传输以消息类型驱动（`srv.RegisterMessageHandler`），不注册 proto 服务。
+> 生成的 `internal/server/websocket_server.go` 仅在该服务 `configs/*.yaml` 含 `server.websocket`
+> 段（`network`/`addr`/`path`/`codec`）时才启用，消息处理器在 `register:route` 锚点后手动登记。
+
 ### `gow generate` — 数据库驱动代码生成
 
 从数据库 schema 生成完整的 Kratos 微服务代码（proto、ORM、service、server、装配、config）。
+数据源除数据库 DSN / SQL 文件外，还支持 Go 源码 schema：`ent://<ent schema 目录>` 与 `gorm://<gorm model 目录>`（见上文「从 Go 源码 schema 直接生成」）。
 
 ```shell
 gow generate [flags]
@@ -195,7 +221,7 @@ gow generate [flags]
 gow gen [flags]
 
 Flags:
-      --dsn string              Database source name, e.g. mysql://user:pass@tcp(localhost:3306)/dbname
+      --dsn string              Data source: e.g. mysql://user:pass@tcp(localhost:3306)/dbname, or ent://<dir> / gorm://<dir>
       --driver string           Database driver: mysql, postgres (default "mysql")
       --service string          Service name (module name)
       --orm string              ORM type: ent, gorm (default "ent")
@@ -208,6 +234,7 @@ Flags:
       --skip-config             Skip config file generation
       --skip-makefile           Skip Makefile generation
       --source-module string    Source module name for REST service
+  -n, --dry-run                 Validate the data source, resolve tables and preview the plan without writing anything
 ```
 
 ### `gow extract` — 微服务模块提取

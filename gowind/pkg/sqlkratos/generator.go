@@ -376,6 +376,10 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 }
 
 // generateOrmCode generates the ORM code based on the specified ORM type.
+//
+// Go 源码数据源(ent://<dir>、gorm://<dir>)有特殊语义:
+//   - ent:// 的 schema 本身就是输入,跳过导入(运行时代码由 gow ent 生成);
+//   - gorm:// 经 sqlorm 路由到 DAO 回转生成,只补缺失模型、不覆盖用户模型。
 func (g *Generator) generateOrmCode(
 	ctx context.Context,
 	opts GeneratorOptions,
@@ -396,6 +400,20 @@ func (g *Generator) generateOrmCode(
 	case "gorm":
 		schemaPath = path.Join(serviceRootPath, "/data/gorm/models")
 		daoPath = path.Join(serviceRootPath, "/data/gorm/dao")
+	}
+
+	switch {
+	case strings.HasPrefix(source, "ent://"):
+		if opts.OrmType != "ent" {
+			return fmt.Errorf("sqlkratos: ent:// source requires --orm ent, got %q", opts.OrmType)
+		}
+		log.Println("Source is an ent schema dir; schema import skipped. Run `gow ent <service>` to (re)generate ent runtime code.")
+		return nil
+
+	case strings.HasPrefix(source, "gorm://"):
+		if opts.OrmType != "gorm" {
+			return fmt.Errorf("sqlkratos: gorm:// source requires --orm gorm, got %q", opts.OrmType)
+		}
 	}
 
 	if err = sqlorm.Importer(

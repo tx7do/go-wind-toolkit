@@ -2,6 +2,7 @@ package generate
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -16,7 +17,7 @@ var CmdGenerate = &cobra.Command{
 	Use:     "generate",
 	Aliases: []string{"gen"},
 	Short:   "generate CRUD code from database schema",
-	Long:    "Generate complete Kratos microservice code (proto, ORM, service, server, wiring, config) from an existing database or SQL file. Module registration follows the target service form: anchor injection into hand-written wiring.go, or wire provider sets for legacy services. Example: gow generate",
+	Long:    "Generate complete Kratos microservice code (proto, ORM, service, server, wiring, config) from an existing database, SQL file, or Go schema source (ent schema dir via ent://, gorm model dir via gorm://). Module registration follows the target service form: anchor injection into hand-written wiring.go, or wire provider sets for legacy services. Example: gow generate",
 	RunE:         Run,
 	SilenceUsage: true,
 }
@@ -39,7 +40,7 @@ var (
 )
 
 func init() {
-	CmdGenerate.Flags().StringVarP(&genDSN, "dsn", "", "", "Database source name (DSN), e.g. mysql://user:pass@tcp(localhost:3306)/dbname")
+	CmdGenerate.Flags().StringVarP(&genDSN, "dsn", "", "", "Database source name (DSN), e.g. mysql://user:pass@tcp(localhost:3306)/dbname; Go schema sources: ent://<schema dir>, gorm://<model dir>")
 	CmdGenerate.Flags().StringVarP(&genDriver, "driver", "", "mysql", "Database driver: mysql, postgres")
 	CmdGenerate.Flags().StringVarP(&genServiceName, "service", "", "", "Service name (module name)")
 	CmdGenerate.Flags().StringVarP(&genOrmType, "orm", "", "ent", "ORM type: ent, gorm")
@@ -60,7 +61,7 @@ func Run(cmd *cobra.Command, args []string) error {
 	if genDSN == "" {
 		prompt := &survey.Input{
 			Message: "Database DSN?",
-			Help:    "Database connection string, e.g. mysql://user:pass@tcp(localhost:3306)/dbname",
+			Help:    "Database connection string (e.g. mysql://user:pass@tcp(localhost:3306)/dbname), or a Go schema source: ent://<schema dir> / gorm://<model dir>",
 		}
 		if err := survey.AskOne(prompt, &genDSN); err != nil || genDSN == "" {
 			return nil
@@ -93,6 +94,21 @@ func Run(cmd *cobra.Command, args []string) error {
 
 	// 构建 DSN 前缀（如果用户没有提供 scheme）
 	dsn := genDSN
+
+	// 裸目录路径多半是想用 Go 源码 schema 源,给出明确指引。
+	if !strings.Contains(dsn, "://") {
+		if fi, statErr := os.Stat(dsn); statErr == nil && fi.IsDir() {
+			return fmt.Errorf("source %q is a directory; use ent://<dir> (ent schema dir) or gorm://<dir> (gorm model dir)", dsn)
+		}
+	}
+
+	// Go 源码 schema 源与 ORM 选择必须一致(dry-run 也要能发现)。
+	switch {
+	case strings.HasPrefix(dsn, "ent://") && genOrmType != "ent":
+		return fmt.Errorf("source ent:// requires --orm ent (got %q)", genOrmType)
+	case strings.HasPrefix(dsn, "gorm://") && genOrmType != "gorm":
+		return fmt.Errorf("source gorm:// requires --orm gorm (got %q)", genOrmType)
+	}
 
 	// 逗号分隔写法(-s grpc,rest)与重复 flag 写法(-s grpc -s rest)等价。
 	genServers = pkg.SplitFlagList(genServers)

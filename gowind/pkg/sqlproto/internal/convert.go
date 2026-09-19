@@ -43,6 +43,12 @@ func NewConvert(opts ...ConvertOption) (SchemaConverter, error) {
 			return nil, err
 		}
 
+	case schemasource.DialectEntSchema, schemasource.DialectGormSchema:
+		si, err = NewGoSchema(i)
+		if err != nil {
+			return nil, err
+		}
+
 	default:
 		return nil, fmt.Errorf("sqlproto: unsupported dialect %q", i.driver.Dialect)
 	}
