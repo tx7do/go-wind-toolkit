@@ -5,6 +5,10 @@ export default {
     selectModuleHint: '该目录下未发现 go.mod，但找到以下子模块，请选择一个打开：',
     confirm: '打开',
     cancel: '取消',
+    noProject: '未打开项目',
+    openProject: '打开已有项目',
+    projectInvalid: '所选目录不是一个有效的 Go 项目，未找到 go.mod 文件',
+    projectOpenFailed: '无法打开项目，请确认目录正确',
   },
   // Tab 标签
   tabs: {
@@ -45,7 +49,6 @@ export default {
       clickToOpen: '点击打开项目目录',
       selectGoProject: '选择 Go 微服务项目的根目录',
       identifying: '正在识别项目...',
-      ready: '项目已就绪',
       switchProject: '切换项目',
       failed: '项目识别失败',
       hintGoMod: '请确保目录下包含 go.mod 文件',
@@ -359,7 +362,10 @@ export default {
     },
     create: {
       btn: '新建后端项目',
+      btnSwitch: '新建并切换项目',
       title: '创建新后端项目',
+      switchTitle: '新建项目将离开当前项目',
+      switchContent: '新建完成后会切换到新项目，当前项目已导入但未生成的表配置与数据库连接会被清空。',
       name: '项目名称',
       namePlaceholder: '例如: my-project',
       nameRequired: '请输入项目名称',

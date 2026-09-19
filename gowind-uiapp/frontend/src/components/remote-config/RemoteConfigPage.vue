@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, reactive} from 'vue'
+import {ref, reactive, watch} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
@@ -9,44 +9,17 @@ import {
   SendOutlined,
 } from '@ant-design/icons-vue'
 import {
-  OpenProject,
-  SelectFolder,
-  GetProjectInfo,
   GetRemoteConfigTypes,
   GetConfigServices,
   ExportConfigToRemote,
   ExportOneServiceConfig,
 } from '../../../wailsjs/go/main/App'
+import {useProject} from '../../stores/project'
 
 const {t} = useI18n()
 
-// ==================== 项目信息 ====================
-const projectInfo = ref<any>()
-const projectLoading = ref(false)
-
-async function handleOpenProject() {
-  try {
-    const path = await SelectFolder()
-    if (!path) return
-
-    projectLoading.value = true
-    const res = await OpenProject(path)
-    // choose：由全局模块选择器处理，保持当前状态。
-    if (!res || res.Status === 'choose') return
-    if (res.Status !== 'opened' || !res.Project?.ModPath) {
-      message.error(t('remoteConfig.project.noProject'))
-      projectInfo.value = undefined
-      return
-    }
-    projectInfo.value = res.Project
-    message.success(t('common.success'))
-    await loadServices()
-  } catch (err) {
-    message.error(t('remoteConfig.project.noProject'))
-  } finally {
-    projectLoading.value = false
-  }
-}
+// ==================== 项目信息（全局唯一真值） ====================
+const {projectInfo, hasProject, projectLoading, projectError, selectAndOpenProject} = useProject()
 
 // ==================== 配置中心类型 ====================
 const configTypes = ref<any[]>([])
@@ -176,21 +149,25 @@ function getFileName(path: string): string {
   return parts[parts.length - 1] || path
 }
 
+// 项目为全局状态：本页首次挂载时 immediate 拉一次服务列表，之后切换项目自动刷新。
+watch(projectInfo, () => {
+  services.value = []
+  selectedServiceNames.value = []
+  if (hasProject.value) loadServices()
+}, {immediate: true})
+
 // 初始化
 loadConfigTypes()
 </script>
 
 <template>
   <div class="remote-config-page">
-    <!-- 项目选择 -->
-    <div class="project-bar">
-      <a-button type="primary" :loading="projectLoading" @click="handleOpenProject">
-        <FolderOpenOutlined style="margin-right: 4px"/> {{ projectInfo ? t('remoteConfig.project.switchProject') : t('remoteConfig.project.selectProject') }}
+    <!-- 未打开项目时给出入口；已打开项目由顶栏全局展示，本页不重复 -->
+    <div v-if="!hasProject" class="project-bar">
+      <a-button type="primary" :loading="projectLoading" @click="selectAndOpenProject">
+        <FolderOpenOutlined style="margin-right: 4px"/> {{ t('remoteConfig.project.selectProject') }}
       </a-button>
-      <span v-if="projectInfo" class="project-info">
-        {{ projectInfo.ModPath }}
-      </span>
-      <span v-else class="project-info project-info--empty">{{ t('remoteConfig.project.noProject') }}</span>
+      <span class="project-info project-info--empty">{{ projectError || t('app.noProject') }}</span>
     </div>
 
     <div class="main-content">

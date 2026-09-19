@@ -126,6 +126,12 @@ func (a *App) OpenProject(projectPath string) *OpenProjectResult {
 		}
 		return &OpenProjectResult{Status: "invalid"}
 	}
+	// 切换模块时丢弃上一个项目的表配置与 DSN，否则生成器会把 A 项目的表写进 B 项目。
+	// 前端不靠事件感知（避免先清空再赋值的闪烁），而是比较 projectInfo.ModPath 自行复位。
+	if prev := a.getProjectInfo(); prev == nil || prev.ModPath != pi.ModPath {
+		a.setDBConfig(nil)
+		a.generator.CleanOptions()
+	}
 	a.setProjectInfo(pi)
 	runtime.EventsEmit(a.ctx, "project-opened", pi)
 	return &OpenProjectResult{Status: "opened", Project: pi}

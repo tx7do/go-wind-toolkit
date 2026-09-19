@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, reactive, computed, onMounted, onUnmounted} from 'vue'
+import {ref, reactive, computed, watch} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
@@ -13,17 +13,18 @@ import {
   ClearOutlined,
 } from '@ant-design/icons-vue'
 import {
-  SelectFolder, OpenProject, GetProjectInfo, GetDevServices,
+  GetDevServices,
   AddService,
   DevRunService,
   DevBufGenerate, DevEntGenerate,
   DevWireGenerate, DevGoModTidy,
 } from '../../../wailsjs/go/main/App'
-import {EventsOn, EventsOff} from '../../../wailsjs/runtime'
+import {useProject} from '../../stores/project'
 
 const {t} = useI18n()
 
-const projectInfo = ref<any>(null)
+const {projectInfo, hasProject, selectAndOpenProject} = useProject()
+
 const services = ref<any[]>([])
 const selectedRowKeys = ref<string[]>([])
 const loading = ref(false)
@@ -48,27 +49,6 @@ async function loadServices() {
     services.value = list || []
   } catch (e) {
     services.value = []
-  }
-}
-
-async function handleOpenProject() {
-  try {
-    const path = await SelectFolder()
-    if (!path) return
-    const res = await OpenProject(path)
-    // choose：由全局模块选择器处理，保持当前状态。
-    if (!res || res.Status === 'choose') return
-    if (res.Status !== 'opened' || !res.Project?.ModPath) {
-      message.error(t('backend.project.noProject'))
-      return
-    }
-    const pi = res.Project
-    projectInfo.value = pi
-    selectedRowKeys.value = []
-    await loadServices()
-    message.success(t('backend.project.ready'))
-  } catch (err) {
-    message.error(t('backend.project.openFailed'))
   }
 }
 
@@ -203,50 +183,33 @@ const rowSelection = computed(() => ({
 // ==================== 工具 ====================
 function clearOutput() { outputText.value = '' }
 
-function onProjectOpened() {
-  GetProjectInfo().then(pi => {
-    if (pi && pi.ModPath) {
-      projectInfo.value = pi
-      selectedRowKeys.value = []
-      loadServices()
-    }
-  }).catch(() => {})
-}
-
-onMounted(async () => {
-  EventsOn('project-opened', onProjectOpened)
-  try {
-    const pi = await GetProjectInfo()
-    if (pi && pi.ModPath) {
-      projectInfo.value = pi
-      await loadServices()
-    }
-  } catch (e) { /* ignore */ }
-})
-
-onUnmounted(() => {
-  EventsOff('project-opened')
-})
+// 项目为全局状态：本页首次挂载时 immediate 拉一次服务列表，之后切换项目自动刷新。
+watch(projectInfo, () => {
+  selectedRowKeys.value = []
+  services.value = []
+  if (hasProject.value) loadServices()
+}, {immediate: true})
 </script>
 
 <template>
   <div class="devtools-page">
-    <!-- 顶部：项目操作 + 管理按钮 -->
+    <!-- 顶部：未打开项目时给出入口；已打开项目由顶栏全局展示，本页不重复 -->
     <div class="top-bar">
-      <a-button type="primary" @click="handleOpenProject">
-        <FolderOpenOutlined style="margin-right: 4px"/> {{ projectInfo ? t('backend.project.switchProject') : t('backend.project.clickToOpen') }}
-      </a-button>
-      <span v-if="projectInfo" class="project-path">{{ projectInfo.ModPath }}</span>
-      <span v-else class="project-path project-path--empty">{{ t('devTools.service.noServices') }}</span>
+      <template v-if="!hasProject">
+        <a-button type="primary" @click="selectAndOpenProject">
+          <FolderOpenOutlined style="margin-right: 4px"/> {{ t('backend.project.clickToOpen') }}
+        </a-button>
+        <span class="project-path project-path--empty">{{ t('app.noProject') }}</span>
+      </template>
 
       <div class="spacer"/>
 
-      <a-button size="small" type="primary" ghost :disabled="!projectInfo" @click="openAddModal"><PlusOutlined style="margin-right: 4px"/> {{ t('devTools.addService.btn') }}</a-button>
-      <a-button size="small" @click="loadServices" :disabled="!projectInfo"><ReloadOutlined style="margin-right: 4px"/> {{ t('common.refresh') }}</a-button>
+      <a-button size="small" type="primary" ghost :disabled="!hasProject" @click="openAddModal"><PlusOutlined style="margin-right: 4px"/> {{ t('devTools.addService.btn') }}</a-button>
+      <a-button size="small" @click="loadServices" :disabled="!hasProject"><ReloadOutlined style="margin-right: 4px"/> {{ t('common.refresh') }}</a-button>
     </div>
 
     <!-- 群控 + 批量按钮栏 -->
-    <div class="global-actions" v-if="projectInfo">
+    <div class="global-actions" v-if="hasProject">
       <span class="action-group-label">{{ t('devTools.commands.globalActions') }}</span>
       <a-button size="small" type="primary" ghost :loading="loading" @click="handleBufGenerate"><ThunderboltOutlined style="margin-right: 4px"/> {{ t('devTools.commands.bufGenerate') }}</a-button>
       <a-button size="small" ghost :loading="loading" @click="handleEntGenerateAll">{{ t('devTools.commands.entGenerateAll') }}</a-button>
@@ -265,7 +228,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 服务表格 -->
-    <div class="table-section" v-if="projectInfo">
+    <div class="table-section" v-if="hasProject">
       <a-table
           :data-source="services"
           :row-selection="rowSelection"
@@ -318,7 +281,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 输出面板 -->
-    <div class="output-panel" v-if="projectInfo">
+    <div class="output-panel" v-if="hasProject">
       <div class="output-header">
         <span class="panel-title">{{ t('devTools.output.title') }}</span>
         <a-button size="small" type="link" @click="clearOutput" :disabled="!outputText"><ClearOutlined style="margin-right: 4px"/> {{ t('devTools.output.clear') }}</a-button>

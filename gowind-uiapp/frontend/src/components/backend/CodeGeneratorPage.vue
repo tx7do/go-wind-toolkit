@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import {ref, reactive, onUnmounted} from 'vue'
+import {ref, reactive, watch, onUnmounted} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
   FolderOpenOutlined,
   CloseCircleOutlined,
-  CodeOutlined,
   AppstoreOutlined,
-  ApiOutlined,
   InboxOutlined,
   DatabaseOutlined,
   CloudDownloadOutlined,
@@ -25,10 +23,7 @@ import {
 import {
   EditGeneratorOption,
   GetGeneratorOptions,
-  GetProjectInfo,
   SetGeneratorOption,
-  OpenProject,
-  SelectFolder,
   GenerateGrpcCode,
   GenerateRestCode,
   ImportSqlTables,
@@ -36,8 +31,9 @@ import {
   TestDatabaseConnection,
   SetDBConfig,
 } from "../../../wailsjs/go/main/App";
-import {generator, detect} from "../../../wailsjs/go/models";
+import {generator} from "../../../wailsjs/go/models";
 import {EventsOn, EventsOff} from "../../../wailsjs/runtime";
+import {useProject} from "../../stores/project";
 
 import DatabaseImporterModal from "./DatabaseImporterModal.vue";
 import SqlImporterModal from "./SqlImporterModal.vue";
@@ -47,44 +43,13 @@ const {t} = useI18n()
 // ==================== 步骤控制 ====================
 const currentStep = ref(0)
 
-// ==================== 项目信息 ====================
-const projectInfo = ref<detect.ProjectInfo>()
-const projectError = ref('')
-const projectLoading = ref(false)
-
-async function handleOpenProject() {
-  try {
-    const path = await SelectFolder();
-    if (!path) return
-
-    projectLoading.value = true
-    projectError.value = ''
-
-    try {
-      const res = await OpenProject(path);
-      // choose：交给全局模块选择器弹框，保持当前项目状态不变，不报错。
-      if (!res || res.Status === 'choose') {
-        return
-      }
-      if (res.Status !== 'opened' || !res.Project?.ModPath) {
-        projectError.value = t('backend.project.noProject')
-        projectInfo.value = undefined
-        return
-      }
-      projectInfo.value = res.Project;
-      await refreshServiceOptions();
-      await refreshTableData();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      projectError.value = msg || t('backend.project.openFailed')
-      projectInfo.value = undefined
-    }
-  } catch (err) {
-    console.error('选择文件夹出错：', err);
-  } finally {
-    projectLoading.value = false
-  }
-}
+// ==================== 项目信息（全局唯一真值，见 stores/project.ts） ====================
+const {
+  projectInfo,
+  projectError,
+  projectLoading,
+  selectAndOpenProject,
+} = useProject()
 
 // ==================== Schema 导入方式 ====================
 type ImportSource = 'database' | 'file' | 'remote' | 'editor'
@@ -208,13 +173,10 @@ async function handleExcludeChange(row: generator.Option) {
 }
 
 async function refreshServiceOptions() {
-  const pi = await GetProjectInfo();
-  if (pi && pi.Services) {
-    serviceOptions.length = 0;
-    pi.Services.forEach(service => {
-      serviceOptions.push({label: service, value: service});
-    });
-  }
+  serviceOptions.length = 0;
+  (projectInfo.value?.Services ?? []).forEach(service => {
+    serviceOptions.push({label: service, value: service});
+  });
 }
 
 async function refreshTableData() {
@@ -494,12 +456,21 @@ function handleNextFromTableConfig() {
 }
 
 // ==================== 事件监听 ====================
-EventsOn('project-opened', () => {
+// 项目由全局 store 持有：顶栏、模块选择器、其它页面切换项目都只走这一个 watch。
+// immediate 覆盖「项目已在本页挂载前打开」的情况（tab 面板是懒挂载的）。
+watch(projectInfo, async (pi, prev) => {
   refreshServiceOptions();
-  GetProjectInfo().then(pi => {
-    if (pi) projectInfo.value = pi;
-  });
-})
+  await refreshTableData();
+  updateTableStats();
+  // 换项目必须回到第一步并清掉上一个项目的 DSN/SQL：后端此时已 CleanOptions，
+  // 留着旧表单只会让用户拿 A 项目的配置去生成 B 项目。
+  if (!pi || pi.ModPath !== prev?.ModPath) {
+    currentStep.value = 0;
+    dbFormData.dsn = '';
+    sqlContent.value = '';
+    selectedFileName.value = '';
+  }
+}, {immediate: true});
 
 EventsOn('table-imported', () => {
   refreshTableData().then(() => {
@@ -511,7 +482,6 @@ EventsOn('table-imported', () => {
 })
 
 onUnmounted(() => {
-  EventsOff('project-opened')
   EventsOff('table-imported')
 })
 </script>
@@ -528,7 +498,7 @@ onUnmounted(() => {
     <!-- ====== 步骤 0: 导入 Schema ====== -->
     <div v-if="currentStep === 0" class="step-content">
       <!-- 打开项目 - 空状态 -->
-      <div v-if="!projectInfo && !projectError" class="project-empty-card" @click="handleOpenProject">
+      <div v-if="!projectInfo && !projectError" class="project-empty-card" @click="selectAndOpenProject">
         <div class="project-empty-icon">
           <FolderOpenOutlined style="font-size: 40px; color: #1890ff"/>
         </div>
@@ -553,35 +523,17 @@ onUnmounted(() => {
           <div class="project-error-msg">{{ projectError }}</div>
           <div class="project-error-hint">{{ t('backend.project.hintGoMod') }}</div>
         </div>
-        <a-button size="small" type="primary" @click="handleOpenProject">{{ t('backend.project.retry') }}</a-button>
+        <a-button size="small" type="primary" @click="selectAndOpenProject">{{ t('backend.project.retry') }}</a-button>
       </div>
 
-      <!-- 项目已打开 -->
-      <div v-if="projectInfo" class="project-opened-card">
-        <div class="project-opened-left">
-          <div class="project-opened-indicator">
-            <span class="project-opened-dot"></span>
-            <span class="project-opened-label">{{ t('backend.project.ready') }}</span>
-          </div>
-          <div class="project-opened-name">{{ projectInfo.ModPath }}</div>
-          <div class="project-opened-meta">
-            <span class="meta-item">
-              <CodeOutlined style="font-size: 14px"/>
-              Go {{ projectInfo.GoVersion }}
-            </span>
-            <span class="meta-divider">|</span>
-            <span class="meta-item">
-              <AppstoreOutlined style="font-size: 14px"/>
-              {{ t('backend.project.services', {count: projectInfo.Services?.length ?? 0}) }}
-            </span>
-            <span class="meta-divider">|</span>
-            <span class="meta-item">
-              <ApiOutlined style="font-size: 14px"/>
-              {{ projectInfo.HasApi ? t('backend.project.apiDefined') : t('backend.project.apiNotDefined') }}
-            </span>
-          </div>
-        </div>
-        <span class="switch-project-link" @click="handleOpenProject">{{ t('backend.project.switchProject') }}</span>
+      <!-- 项目已打开：精简为一条内联提示，详细信息见顶栏 -->
+      <div v-if="projectInfo" class="project-inline">
+        <span class="project-opened-dot"></span>
+        <span class="project-inline-name">{{ projectInfo.ModPath }}</span>
+        <span class="project-inline-meta">
+          Go {{ projectInfo.GoVersion }} · {{ t('backend.project.services', {count: projectInfo.Services?.length ?? 0}) }}
+        </span>
+        <span class="switch-project-link" @click="selectAndOpenProject">{{ t('backend.project.switchProject') }}</span>
       </div>
 
       <!-- 导入方式 -->
@@ -961,31 +913,37 @@ onUnmounted(() => {
   color: #8c8c8c;
 }
 
-/* 项目已打开 - 成功卡片 */
-.project-opened-card {
+/* 项目已打开 - 内联提示条 */
+.project-inline {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #f6ffed 0%, #e8f5e9 100%);
+  gap: 10px;
+  background: #f6ffed;
   border: 1px solid #b7eb8f;
-  border-radius: 10px;
-  padding: 16px 20px;
+  border-radius: 8px;
+  padding: 8px 14px;
   margin-bottom: 16px;
 }
 
-.project-opened-left {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.project-inline-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-family: 'Consolas', 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.project-opened-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.project-inline-meta {
+  color: #595959;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-left: auto;
 }
 
 .project-opened-dot {
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -997,37 +955,6 @@ onUnmounted(() => {
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.2); }
   50% { box-shadow: 0 0 0 6px rgba(82, 196, 26, 0.1); }
-}
-
-.project-opened-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #389e0d;
-}
-
-.project-opened-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a1a1a;
-  font-family: 'Consolas', 'Courier New', monospace;
-}
-
-.project-opened-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #595959;
-  font-size: 12px;
-}
-
-.meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.meta-divider {
-  color: #d9d9d9;
 }
 
 .switch-project-link {

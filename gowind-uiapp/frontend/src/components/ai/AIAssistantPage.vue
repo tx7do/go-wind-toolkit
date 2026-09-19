@@ -24,12 +24,10 @@ import {
   AIGenerateBackendCode,
   AIFindOpenAPIFiles,
   AIReviewCodeStream,
-  OpenProject,
-  SelectFolder,
-  GetProjectInfo,
 } from '../../../wailsjs/go/main/App'
 import {EventsOn, EventsOff} from '../../../wailsjs/runtime'
 import type {ai} from '../../../wailsjs/go/models'
+import {useProject} from '../../stores/project'
 
 import MonacoEditor from '../backend/MonacoEditor.vue'
 
@@ -50,32 +48,8 @@ const steps = computed(() => [
   {title: t('ai.steps.review')},
 ])
 
-// ==================== 项目信息 ====================
-const projectInfo = ref<any>()
-const projectLoading = ref(false)
-
-async function handleOpenProject() {
-  try {
-    const path = await SelectFolder()
-    if (!path) return
-
-    projectLoading.value = true
-    const res = await OpenProject(path)
-    // choose：由全局模块选择器处理，保持当前状态。
-    if (!res || res.Status === 'choose') return
-    if (res.Status !== 'opened' || !res.Project?.ModPath) {
-      message.error(t('ai.project.noProject'))
-      projectInfo.value = undefined
-      return
-    }
-    projectInfo.value = res.Project
-    message.success(t('ai.project.ready'))
-  } catch (err) {
-    message.error(t('ai.project.openFailed'))
-  } finally {
-    projectLoading.value = false
-  }
-}
+// ==================== 项目信息（全局唯一真值，见 stores/project.ts） ====================
+const {projectInfo, hasProject, projectLoading, projectError, selectAndOpenProject} = useProject()
 
 // ==================== Step 1: AI 配置 ====================
 interface AIConfigData {
@@ -357,15 +331,12 @@ loadAIConfig()
 
 <template>
   <div class="ai-assistant-page">
-    <!-- 项目选择 -->
-    <div class="project-bar">
-      <a-button type="primary" :loading="projectLoading" @click="handleOpenProject">
-        <FolderOpenOutlined style="margin-right: 4px"/> {{ projectInfo ? t('ai.project.switchProject') : t('ai.project.selectProject') }}
+    <!-- 未打开项目时给出入口；已打开项目由顶栏全局展示，本页不重复 -->
+    <div v-if="!hasProject" class="project-bar">
+      <a-button type="primary" :loading="projectLoading" @click="selectAndOpenProject">
+        <FolderOpenOutlined style="margin-right: 4px"/> {{ t('ai.project.selectProject') }}
       </a-button>
-      <span v-if="projectInfo" class="project-info">
-        {{ projectInfo.ModPath }} ({{ projectInfo.Services?.length || 0 }} {{ t('ai.project.services') }})
-      </span>
-      <span v-else class="project-info project-info--empty">{{ t('ai.project.noProjectOpen') }}</span>
+      <span class="project-info project-info--empty">{{ projectError || t('ai.project.noProjectOpen') }}</span>
     </div>
 
     <!-- 步骤条 -->

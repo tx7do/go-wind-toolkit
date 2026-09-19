@@ -2,15 +2,13 @@
 import {ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {EventsOn, EventsOff} from '../../wailsjs/runtime'
-import {OpenProject} from '../../wailsjs/go/main/App'
+import {detect} from '../../wailsjs/go/models'
+import {useProject} from '../stores/project'
 
-interface ModuleCandidate {
-  Dir: string
-  ModPath: string
-  RelPath: string
-}
+type ModuleCandidate = detect.ModuleCandidate
 
 const {t} = useI18n()
+const {openProject} = useProject()
 
 const visible = ref(false)
 const candidates = ref<ModuleCandidate[]>([])
@@ -30,7 +28,7 @@ window.addEventListener('beforeunload', () => EventsOff('project-modules-found')
 async function handleConfirm() {
   const dir = selected.value
   visible.value = false
-  if (dir) await OpenProject(dir)
+  if (dir) await openProject(dir)
 }
 </script>
 
