@@ -64,11 +64,27 @@ func (g *Generator) GetOptions() GeneratorOptions {
 	return out
 }
 
-// SetOptions 设置选项
+// SetOptions 设置选项（深拷贝）
 func (g *Generator) SetOptions(options GeneratorOptions) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	g.options = options
+	// 深拷贝：创建新切片并为每个 Option 创建新实例
+	if len(options) == 0 {
+		g.options = GeneratorOptions{}
+		return
+	}
+	g.options = make(GeneratorOptions, len(options))
+	for i, opt := range options {
+		// 为每个 Option 创建新实例，避免共享指针
+		newOpt := &Option{
+			ID:           opt.ID,
+			TableName:    opt.TableName,
+			Service:      opt.Service,
+			Exclude:      opt.Exclude,
+			ProtoPackage: opt.ProtoPackage,
+		}
+		g.options[i] = newOpt
+	}
 }
 
 // EditOption 编辑已有的选项

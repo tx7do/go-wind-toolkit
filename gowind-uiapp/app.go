@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/tx7do/go-utils/ddl_parser"
@@ -89,10 +90,20 @@ func (l *wailsLogger) Errorf(format string, args ...any) {
 
 // OpenProject 打开指定路径的项目，并返回项目的信息。
 func (a *App) OpenProject(projectPath string) *detect.ProjectInfo {
+	// 清理路径：去除前后空格、换行符、控制字符等
+	projectPath = strings.TrimSpace(projectPath)
+	projectPath = strings.ReplaceAll(projectPath, "\r\n", "")
+	projectPath = strings.ReplaceAll(projectPath, "\n", "")
+	projectPath = strings.ReplaceAll(projectPath, "\r", "")
+	projectPath = strings.TrimFunc(projectPath, func(r rune) bool {
+		return r < 32 && r != '\t' // 保留制表符
+	})
+
 	var err error
 	var pi *detect.ProjectInfo
 	pi, err = a.projectDetector.Detect(projectPath)
 	if err != nil {
+		runtime.LogErrorf(a.ctx, "项目检测失败：%v (路径：%q)", err, projectPath)
 		return nil
 	}
 	a.setProjectInfo(pi)

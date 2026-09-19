@@ -123,8 +123,15 @@ func entEdge(nodeName, nodeType string, currentNode *schemast.UpsertSchema, dir 
 		e = edge.To(nodeName, ent.Schema.Type)
 		desc = e.Descriptor()
 		if opts.uniqueEdgeToChild {
-			desc.Unique = true
-			desc.Name = inflect.Singularize(nodeName)
+				desc.Unique = true
+				// 如果有 edgeField 且需要使用它作为 edge name 的基础（多个 FK 指向同一表时）
+				if opts.useEdgeFieldName && opts.edgeField != "" {
+				// 从字段名提取关系名（如 payment_id -> payment）
+				baseName := strings.TrimSuffix(opts.edgeField, "_id")
+				desc.Name = inflect.Singularize(baseName)
+			} else {
+				desc.Name = inflect.Singularize(nodeName)
+			}
 		}
 		if opts.recursive {
 			desc.Name = "child_" + desc.Name
@@ -134,7 +141,14 @@ func entEdge(nodeName, nodeType string, currentNode *schemast.UpsertSchema, dir 
 		desc = e.Descriptor()
 		if opts.uniqueEdgeFromParent {
 			desc.Unique = true
-			desc.Name = inflect.Singularize(nodeName)
+			// 如果有 edgeField 且需要使用它作为 edge name 的基础（多个 FK 指向同一表时）
+			if opts.useEdgeFieldName && opts.edgeField != "" {
+				// 从字段名提取关系名（如 payment_id -> payment）
+				baseName := strings.TrimSuffix(opts.edgeField, "_id")
+				desc.Name = inflect.Singularize(baseName)
+			} else {
+				desc.Name = inflect.Singularize(nodeName)
+			}
 		}
 		if opts.edgeField != "" {
 			setEdgeField(e, opts, currentNode)
@@ -143,7 +157,13 @@ func entEdge(nodeName, nodeType string, currentNode *schemast.UpsertSchema, dir 
 		// because there can be multiple references from one node to another.
 		refName := opts.refName
 		if opts.uniqueEdgeToChild {
-			refName = inflect.Singularize(refName)
+			// 如果有 edgeField 且需要使用它作为 refName 的基础
+			if opts.useEdgeFieldName && opts.edgeField != "" {
+				baseName := strings.TrimSuffix(opts.edgeField, "_id")
+				refName = inflect.Singularize(baseName)
+			} else {
+				refName = inflect.Singularize(refName)
+			}
 		}
 		desc.RefName = refName
 		if opts.recursive {
@@ -182,8 +202,37 @@ func upsertRelation(nodeA *schemast.UpsertSchema, nodeB *schemast.UpsertSchema, 
 	tableB := tableName(nodeB.Name)
 	fromA := entEdge(tableA, nodeA.Name, nodeB, from, opts)
 	toB := entEdge(tableB, nodeB.Name, nodeA, to, opts)
-	nodeA.Edges = append(nodeA.Edges, toB)
-	nodeB.Edges = append(nodeB.Edges, fromA)
+
+	// 检查 nodeA 是否已存在同名 edge（避免重复）
+	existsInA := false
+	for _, existingEdge := range nodeA.Edges {
+		if existingEdge.Descriptor().Name == toB.Descriptor().Name {
+			existsInA = true
+			break
+		}
+	}
+	if !existsInA {
+		nodeA.Edges = append(nodeA.Edges, toB)
+	}
+
+	// 对于自引用关系（nodeA == nodeB），需要单独处理，因为上面的检查可能会误判
+	// 自引用时，fromA 和 toB 是不同的 edge，都应该添加
+	if nodeA != nodeB {
+		// 检查 nodeB 是否已存在同名 edge（避免重复）
+		existsInB := false
+		for _, existingEdge := range nodeB.Edges {
+			if existingEdge.Descriptor().Name == fromA.Descriptor().Name {
+				existsInB = true
+				break
+			}
+		}
+		if !existsInB {
+			nodeB.Edges = append(nodeB.Edges, fromA)
+		}
+	} else {
+		// 自引用场景：直接添加 fromA（不需要检查，因为 toB 刚被添加且 name 不同）
+		nodeB.Edges = append(nodeB.Edges, fromA)
+	}
 }
 
 // upsertManyToMany handles the creation of M2M relations.
@@ -398,6 +447,15 @@ func upsertOneToX(mutations map[string]schemast.Mutator, table *schema.Table) {
 		}
 		idxes[idx.Parts[0].C.Name] = idx
 	}
+	
+	// 统计每个父表的 FK 数量（用于判断是否需要区分不同 FK）
+	fkCountPerParent := make(map[string]int)
+	for _, fk := range table.ForeignKeys {
+		if len(fk.Columns) == 1 && fk.RefTable != nil {
+			fkCountPerParent[fk.RefTable.Name]++
+		}
+	}
+	
 	for _, fk := range table.ForeignKeys {
 		if len(fk.Columns) != 1 {
 			continue
@@ -405,11 +463,18 @@ func upsertOneToX(mutations map[string]schemast.Mutator, table *schema.Table) {
 		parent := fk.RefTable
 		child := table
 		colName := fk.Columns[0].Name
+		
+		// 只有当有多个 FK 指向同一表时，才使用 FK 字段名作为 edge name 的基础
+		// 否则使用表名，保持与原有行为一致
+		needsEdgeFieldName := fkCountPerParent[parent.Name] > 1
+		
 		opts := relOptions{
 			uniqueEdgeFromParent: true,
 			refName:              tableName(child.Name),
-			edgeField:            colName,
+			useEdgeFieldName:     needsEdgeFieldName,
+			edgeField:            colName, // 始终设置 edgeField 用于 Field()
 		}
+		
 		if child.Name == parent.Name {
 			opts.recursive = true
 		}
@@ -417,14 +482,17 @@ func upsertOneToX(mutations map[string]schemast.Mutator, table *schema.Table) {
 		if ok && idx.Unique {
 			opts.uniqueEdgeToChild = true
 		}
-		// If at least one table in the relation does not exist, there is no point to create it.
+		// If at least one table in the relation does not exist, skip this FK
 		parentNode, ok := mutations[parent.Name].(*schemast.UpsertSchema)
 		if !ok {
-			return
+			// 记录警告但不中断整个流程
+			fmt.Printf("Warning: parent table %s not found for FK %s.%s\n", parent.Name, table.Name, colName)
+			continue
 		}
 		childNode, ok := mutations[child.Name].(*schemast.UpsertSchema)
 		if !ok {
-			return
+			fmt.Printf("Warning: child table %s not found for FK %s.%s\n", child.Name, table.Name, colName)
+			continue
 		}
 		upsertRelation(parentNode, childNode, opts)
 	}

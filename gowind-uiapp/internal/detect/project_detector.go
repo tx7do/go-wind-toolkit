@@ -3,6 +3,7 @@ package detect
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type ProjectInfo struct {
@@ -27,13 +28,42 @@ func NewProjectDetector() *ProjectDetector {
 
 // Detect 检测指定路径下的 Go 项目，返回项目的基本信息。
 func (pd *ProjectDetector) Detect(projectPath string) (*ProjectInfo, error) {
+	// 清理路径：标准化 Windows 路径，去除控制字符和多余空格
+	projectPath = strings.TrimSpace(projectPath)
+	projectPath = strings.ReplaceAll(projectPath, "\r\n", "")
+	projectPath = strings.ReplaceAll(projectPath, "\n", "")
+	projectPath = strings.ReplaceAll(projectPath, "\r", "")
+	projectPath = strings.TrimFunc(projectPath, func(r rune) bool {
+		return r < 32 && r != '\t'
+	})
+
+	// 将正斜杠转换为反斜杠（Windows 兼容）
+	projectPath = strings.ReplaceAll(projectPath, "/", "\\")
+
+	// 使用 filepath.Clean 进一步规范化路径
+	projectPath = filepath.Clean(projectPath)
+
+	var err error
+	var pi *ProjectInfo
+	pi, err = pd.detectInternal(projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// 保存清理后的 Root 路径
+	pi.Root = projectPath
+
+	return pi, nil
+}
+
+// detectInternal 执行实际的项目检测逻辑（假设路径已清理）。
+func (pd *ProjectDetector) detectInternal(projectPath string) (*ProjectInfo, error) {
 	inspector, err := NewModuleInspectorFromGo(projectPath)
 	if err != nil {
 		return nil, err
 	}
 
 	var pi ProjectInfo
-	pi.Root = projectPath
 	pi.ModPath = inspector.ModPath
 	pi.GoVersion = inspector.GoVersion
 	pi.Main = inspector.Main

@@ -29,7 +29,8 @@ type (
 		recursive            bool
 		uniqueEdgeFromParent bool
 		refName              string
-		edgeField            string
+		edgeField            string // FK 字段名，用于设置 Edge.Field() 和（当有多个 FK 时）命名 Edge
+		useEdgeFieldName     bool   // 是否使用 edgeField 作为 edge name 的基础（多个 FK 指向同一表时需要）
 	}
 
 	// fieldFunc receives an Atlas column and converts it to an Ent field.
