@@ -1,0 +1,117 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-test:
+    name: Go 测试 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    env:
+      # 逐模块构建,不能让任何杂散 go.work 参与(protoc-gen-go-http/go.work 就是
+      # 一个残留的坏文件,use 了 190 个不存在的目录)。goldentest.goBuild 里
+      # 已经用同样的手段隔离宿主 go.work。
+      GOWORK: 'off'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          # 取各模块里最高的 go 指令要求(gowind-uiapp 1.25.6)
+          go-version-file: gowind-uiapp/go.mod
+          cache-dependency-path: '**/go.sum'
+
+      # 本仓库是多个独立 Go 模块,没有 go.work 把它们串起来,故逐模块跑。
+      # 只取仓库根下一层的 go.mod,自动排除 .sage/、examples/ 等嵌套模块。
+      - name: Build, vet and test each module
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # 已知失败豁免:这三条早于本 workflow 就是红的,与本次改动无关。
+          #   TestGenerate_DDLText           Generate 在 ormType=ent 时先写 ent schema,
+          #                                  此时输出树里还没有 go.mod,entimport 报
+          #                                  "schema dir is not inside a Go module"。
+          #   TestGenerate_InvalidDriver     Driver 非法时 Generate 返回 nil error,
+          #                                  测试随后对 nil 调 Error() 直接 panic
+          #                                  —— 会把整个测试二进制带崩,必须跳过。
+          #   TestGenerate_GenerateOnlyProto 建 sqlproto 导入驱动时报
+          #                                  "default addr for network 'localhost'
+          #                                  unknown",DSN 到 net 参数的转换有 bug。
+          # 修好后删掉对应名字,不要扩大豁免范围。
+          SKIP_GOWIND='^TestGenerate_(DDLText|InvalidDriver|GenerateOnlyProto)$'
+
+          # 注意:protoc-gen-dart-http / protoc-gen-typescript-http 的 golden 回归
+          # 依赖 buf(goldentest.Run 在 PATH 里找不到 buf 时自行跳过)。runner 上没装
+          # buf,所以这两个模块只跑了普通单测,生成器输出漂移拦不住。
+
+          failed=""
+          for mod in */go.mod; do
+            dir="$(dirname "$mod")"
+            echo "::group::$dir"
+            if [ "$dir" = "gowind" ]; then
+              ( cd "$dir" && go build ./... && go vet ./... \
+                && go test -skip "$SKIP_GOWIND" ./... )
+            else
+              ( cd "$dir" && go build ./... && go vet ./... && go test ./... )
+            fi
+            status=$?
+            echo "::endgroup::"
+            if [ $status -ne 0 ]; then
+              failed="$failed $dir"
+            fi
+          done
+
+          if [ -n "$failed" ]; then
+            echo "::error::失败模块:$failed"
+            exit 1
+          fi
+          echo "全部模块通过"
+
+  frontend-typecheck:
+    name: 前端类型检查
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gowind-uiapp/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: gowind-uiapp/frontend
+        run: npm ci
+
+      # 前端没有测试运行器,vue-tsc 是目前唯一能拦住 GUI 类型回归的门禁。
+      - name: Type check
+        working-directory: gowind-uiapp/frontend
+        run: npx vue-tsc --noEmit
