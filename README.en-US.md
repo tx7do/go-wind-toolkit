@@ -50,7 +50,9 @@ A cross-platform desktop application built with [Wails](https://wails.io/) (Go +
 
 ### Backend Code Generation
 
-Complete the full-flow generation from database schema to complete microservice code through a wizard-style interface. Supports four schema import methods: direct database connection (MySQL, PostgreSQL, SQLite, Oracle), SQL file, remote URL, and online editor. Assign each table to its microservice, configure proto package strategy (per-table / by-service / custom), select ORM type (Ent / GORM), and generate gRPC or REST service code with one click, automatically running post-processing (`go mod tidy` → `buf generate` → `ent generate` → `wire generate`).
+Complete the full-flow generation from database schema to complete microservice code through a wizard-style interface. Supports four schema import methods: direct database connection (MySQL, PostgreSQL), SQL file, remote URL, and online editor. Assign each table to its microservice, configure proto package strategy (per-table / by-service / custom), select ORM type (Ent / GORM), and generate gRPC or REST service code with one click, automatically running post-processing (`go mod tidy` → `buf generate` → `ent generate` → `wire generate`).
+
+> Supported sources are MySQL / PostgreSQL connection strings, DDL text (SQL file / remote URL / online editor) and `ent://<dir>` / `gorm://<dir>` Go source directories. SQLite and Oracle connections cannot be used as generation sources — for SQLite, export DDL first with `sqlite3 <file> .schema` and import it as a SQL file.
 
 ### Frontend Code Generation
 

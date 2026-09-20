@@ -75,6 +75,8 @@ gowind-uiapp db columns --dsn "..." --table sys_user
 
 数据源二选一：`--ddl <文件>`（本地 DDL，无需连库）或 `--dsn`。表到服务的映射用 `--mapping` JSON 文件或 `--tables` 简写。
 
+`--dsn` 除连接串外还接受 `ent://<目录>` / `gorm://<目录>`（从已有 Go 源码生成，需配 `--orm ent` / `--orm gorm`；`gorm://` 回转 DAO 要求 `--out` 落在 Go 模块内）。`--driver` 仅在 DSN 不含 `://` 时用来补全 scheme，可取 `mysql` / `postgresql`；SQLite、Oracle 连接不是可用的生成数据源，会明确报错——SQLite 先用 `sqlite3 <文件> .schema` 导出 DDL 再走 `--ddl`。
+
 ```bash
 # 表映射文件 tables.json:
 # [{"table":"user","service":"identity"},

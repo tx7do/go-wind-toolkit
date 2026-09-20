@@ -20,28 +20,32 @@ import (
 )
 
 // ensureDSNScheme ensures the DSN has a valid scheme prefix based on the driver type.
-// If the DSN already contains "://", it is returned as-is.
+// If it already carries a scheme (or is DDL text, or driver is empty), it is returned as-is:
+// such sources describe their own type, so the driver must not gate them.
 // For PostgreSQL key-value format DSN (e.g. "host=localhost port=5432 user=postgres ..."),
 // it converts to URL format (e.g. "postgres://user:pass@host:port/dbname?sslmode=disable").
-// DDL 文本（CREATE TABLE 语句）不做处理，交给下游 sqlproto 的 text:// 识别。
-func ensureDSNScheme(dsn, driver string) string {
+// A driver we have no provider for is rejected here: passing it through would let the
+// source be reinterpreted as text:// and "succeed" while generating nothing.
+func ensureDSNScheme(dsn, driver string) (string, error) {
 	if strings.Contains(dsn, "://") {
-		return dsn
+		return dsn, nil
 	}
 	if isDDLText(dsn) {
-		return dsn
+		return dsn, nil
 	}
 	switch strings.ToLower(driver) {
+	case "":
+		return dsn, nil
 	case "mysql":
-		return "mysql://" + dsn
+		return "mysql://" + dsn, nil
 	case "postgresql", "postgres":
 		// PostgreSQL key-value DSN: "host=localhost port=5432 user=postgres password=xxx dbname=mydb sslmode=disable"
 		if isPostgresKeyValueDSN(dsn) {
-			return convertPostgresKeyValueToURL(dsn)
+			return convertPostgresKeyValueToURL(dsn), nil
 		}
-		return "postgres://" + dsn
+		return "postgres://" + dsn, nil
 	default:
-		return dsn
+		return "", fmt.Errorf("sqlkratos: unsupported driver: %q (supported: mysql, postgres, postgresql; leave it empty when the source carries its own scheme)", driver)
 	}
 }
 
@@ -347,7 +351,10 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 	protoPath := path.Join(opts.OutputPath, "/api/protos/")
 
 	// 确保 DSN 有正确的 scheme 前缀
-	source := ensureDSNScheme(opts.Source, opts.Driver)
+	source, err := ensureDSNScheme(opts.Source, opts.Driver)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, server := range opts.Servers {
 		if server != "grpc" && server != "rest" {
@@ -390,7 +397,10 @@ func (g *Generator) generateOrmCode(
 	log.Println("Generating ORM code...")
 
 	// 确保 DSN 有正确的 scheme 前缀
-	source := ensureDSNScheme(opts.Source, opts.Driver)
+	source, err := ensureDSNScheme(opts.Source, opts.Driver)
+	if err != nil {
+		return err
+	}
 
 	var schemaPath string
 	var daoPath string

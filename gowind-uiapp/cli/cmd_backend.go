@@ -30,7 +30,7 @@ type tableMapping struct {
 func addBackendFlags(cmd *cobra.Command) {
 	cmd.Flags().String("ddl", "", "DDL 文件路径（CREATE TABLE 语句，与 --dsn 二选一）")
 	cmd.Flags().String("dsn", "", "数据库连接串（可用环境变量 GOWIND_DSN）")
-	cmd.Flags().String("driver", "mysql", "数据库类型: mysql | postgresql | sqlite")
+	cmd.Flags().String("driver", "mysql", "数据源类型: mysql | postgresql（仅在 --dsn 不带 scheme 时用于补全前缀；--ddl 忽略此参数）")
 	cmd.Flags().String("mapping", "", "表映射 JSON 文件: [{\"table\":\"user\",\"service\":\"identity\"}]")
 	cmd.Flags().StringSlice("tables", nil, "表映射简写: --tables user:identity,role:permission")
 	cmd.Flags().String("orm", "ent", "ORM 类型: ent | gorm")

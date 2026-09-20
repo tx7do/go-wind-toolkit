@@ -11,7 +11,8 @@ GoWind Toolkit 是一个基于 Go + Wails + Vue3 + Ant Design 的桌面端可视
 
 ## 主要特性
 
-- 支持多种主流数据库（MySQL、PostgreSQL、SQLite、SQL Server、Oracle 等）连接与表结构解析
+- 支持 MySQL、PostgreSQL、SQLite 连接与表结构解析（Oracle 连接会明确报错，暂不可用）
+- 代码生成的数据源是 MySQL / PostgreSQL 连接串与 DDL 文本，以及 `ent://` / `gorm://` Go 源码目录；SQLite 需先用 `sqlite3 <文件> .schema` 导出 DDL 再导入
 - 一键导入 SQL 或数据库表，自动生成服务端/客户端/前端代码
 - 支持 gRPC、RESTful、前端多种代码生成模板
 - 可视化操作界面，便捷的表结构与服务配置
