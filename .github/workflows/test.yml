@@ -98,10 +98,17 @@ jobs:
         run: |
           set -uo pipefail
 
-          # 已知失败豁免:TestRepoClone 真连网 clone go-kratos/service-layout 到
-          # $HOME/.kratos,ubuntu runner 报 "stat .../objects/maintenance.lock: no such
-          # file or directory";本机换冷 HOME 仍绿,是 runner 差异而非本轮回归,待单独排查。
-          # 早先同批豁免的 3 条 TestGenerate_* 已修复,不要再加回来。
+          # 已知失败豁免:TestRepoClone 只在 ubuntu runner 上红,macos 与本机等价环境下都绿。
+          # 日志定位(run 35483391871 job 106005145159):报错点是 repo_test.go 的 CopyTo,
+          # 顺序为 clone 成功 → CopyTo 内部再 Clone 时缓存已存在 → 走 git pull →
+          # "Already up to date." 之后报
+          # "stat ~/.kratos/repo/.../.git/objects/maintenance.lock: no such file or directory"。
+          # 即 git 2.55 在 pull 收尾触发的 auto-maintenance(git-config: maintenance.auto 默认
+          # true、maintenance.autoDetach 默认 true=后台分离进程)与 runner 上的锁文件竞争,
+          # 不是本项目回归。测试本身已改为用临时 HOME(clone 冷缓存、落地目录进 t.TempDir()),
+          # 换冷 HOME 也不是差异点——runner 每次本来就是冷缓存。
+          # 想撤掉这条豁免只剩两条路,都得在 ubuntu 上实测:给子进程注入
+          # GIT_CONFIG_COUNT/KEY_0=maintenance.auto/VALUE_0=false,或忍着一个偶发红。
           SKIP_GOWIND='^TestRepoClone$'
 
           # 没有上面那步 Setup buf,protoc-gen-dart-http / protoc-gen-typescript-http 的
