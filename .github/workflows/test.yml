@@ -87,7 +87,9 @@ jobs:
             | tar -xz -C "$dest" buf/bin/buf
           chmod +x "$dest/buf/bin/buf"
           echo "$dest/buf/bin" >> "$GITHUB_PATH"
-          buf --version
+          # 按绝对路径自检:$GITHUB_PATH 只对后续 step 生效,同一步里 buf 仍不在 PATH 上。
+          # 首轮 CI 就是在这行 exit 127(command not found),下载与解压其实都成功了。
+          "$dest/buf/bin/buf" --version
 
       # 本仓库是多个独立 Go 模块,没有 go.work 把它们串起来,故逐模块跑。
       # 只取仓库根下一层的 go.mod,自动排除 .sage/、examples/ 等嵌套模块。
