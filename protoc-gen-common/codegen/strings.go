@@ -7,6 +7,29 @@ func Indent(n int) string {
 	return strings.Repeat("  ", n)
 }
 
+// CommentLines renders proto doc-comment source lines as commented lines.
+// Interior blank lines become a bare marker so paragraph structure survives;
+// leading and trailing ones are dropped (LeadingComments ends with "\n").
+// No returned line carries trailing whitespace.
+func CommentLines(lines []string, marker string) []string {
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if text := strings.TrimSpace(line); text != "" {
+			out = append(out, marker+" "+text)
+			continue
+		}
+		out = append(out, marker)
+	}
+	return out
+}
+
 // LowerFirst returns s with its first character lowercased.
 func LowerFirst(s string) string {
 	if len(s) == 0 {

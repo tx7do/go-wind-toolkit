@@ -55,7 +55,7 @@ class Shipment {
   /// Behaviors: REQUIRED
   String? pickupLatestTime;
   /// The last update timestamp of the shipment.
-  /// 
+  ///
   /// Updated when create/update/delete operation is shipment.
   ///
   /// Behaviors: OUTPUT_ONLY
@@ -514,7 +514,7 @@ class Shipper {
   /// The resource name of the shipper.
   String? name;
   /// The last update timestamp of the shipper.
-  /// 
+  ///
   /// Updated when create/update/delete operation is performed.
   ///
   /// Behaviors: OUTPUT_ONLY
@@ -688,7 +688,7 @@ class Site {
   /// The resource name of the site.
   String? name;
   /// The last update timestamp of the site.
-  /// 
+  ///
   /// Updated when create/update/delete operation is performed.
   ///
   /// Behaviors: OUTPUT_ONLY
@@ -2713,15 +2713,15 @@ class DeleteShipmentRequest {
 }
 
 /// This API represents a simple freight service.
-/// 
+///
 /// It defines the following resource model:
-/// 
+///
 /// - The API has a collection of [Shipper][einride.example.freight.v1.Shipper]
 /// resources, named `shippers/*`
-/// 
+///
 /// - Each Shipper has a collection of [Site][einride.example.freight.v1.Site]
 /// resources, named `shippers/*/sites/*`
-/// 
+///
 /// - Each Shipper has a collection of [Shipment][einride.example.freight.v1.Shipment]
 /// resources, named `shippers/*/shipments/*`
 class FreightServiceClient {

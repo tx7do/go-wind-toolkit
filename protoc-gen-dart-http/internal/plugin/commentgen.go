@@ -41,12 +41,8 @@ func adaptComment(line string) string {
 
 func (c commentGenerator) generateLeading(f *codegen.File, indent int) {
 	loc := c.descriptor.ParentFile().SourceLocations().ByDescriptor(c.descriptor)
-	lines := strings.Split(loc.LeadingComments, "\n")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		f.P(t(indent), "/// ", adaptComment(strings.TrimSpace(line)))
+	for _, line := range codegen.CommentLines(strings.Split(loc.LeadingComments, "\n"), "///") {
+		f.P(t(indent), adaptComment(line))
 	}
 	if field, ok := c.descriptor.(protoreflect.FieldDescriptor); ok {
 		if behaviorComment := fieldBehaviorComment(field); len(behaviorComment) > 0 {
