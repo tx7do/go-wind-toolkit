@@ -45,6 +45,23 @@ jobs:
           go-version-file: gowind-uiapp/go.mod
           cache-dependency-path: '**/go.sum'
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gowind-uiapp/frontend/package-lock.json
+
+      # main.go 里的 //go:embed all:frontend/dist 要求真实产物,而 frontend/dist 不入库
+      # (.gitignore)。checkout 后直接 go build gowind-uiapp 会报
+      # "pattern all:frontend/dist: no matching files found",所以 Go 之前必须先出前端。
+      # 这里只跑 vite,类型检查有独立的 frontend-typecheck job,不重复。
+      - name: Build frontend assets
+        working-directory: gowind-uiapp/frontend
+        run: |
+          npm ci
+          npx vite build
+
       # 本仓库是多个独立 Go 模块,没有 go.work 把它们串起来,故逐模块跑。
       # 只取仓库根下一层的 go.mod,自动排除 .sage/、examples/ 等嵌套模块。
       - name: Build, vet and test each module
