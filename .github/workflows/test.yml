@@ -143,6 +143,59 @@ jobs:
           fi
           echo "全部模块通过"
 
+  # sqlkratos 的 TestGenerate_GenerateOnlyProto 要真连 MySQL(唯一一条 requireLocalMySQL
+  # 守卫的用例),矩阵作业里它一律跳过,等于这条路径没有门禁。
+  #
+  # 单独一个 ubuntu 作业而不是给矩阵加 services:GitHub 的 service container 只支持
+  # Linux runner,macOS 上 job 会直接以
+  # "Error: Container operations are only supported on Linux runners" 起不来。
+  #
+  # 凭据与测试常量对齐:generate_test.go 的 testMySQLAddr=127.0.0.1:3306,
+  # DSN 用 root:pass 连 test 库。端口映射到 127.0.0.1 才能被宿主机侧的 net.Dial 探到。
+  #
+  # 这里只跑 pkg/sqlkratos 一个包:同包的 TestGenerate_MySQL_DDL 断言"连不上库时报
+  # dial tcp",有真库时它按设计跳过,而它在矩阵作业里(无库)是真跑的——两条用例跨作业
+  # 合起来才全覆盖,不要把这里当唯一来源。
+  go-test-mysql:
+    name: Go 测试 (ubuntu + MySQL)
+    runs-on: ubuntu-latest
+
+    env:
+      GOWORK: 'off'
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pass
+          MYSQL_DATABASE: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ppass"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: gowind-uiapp/go.mod
+          cache-dependency-path: '**/go.sum'
+
+      # 同矩阵作业:-count=1 防 Go 测试结果缓存;TestRepoClone 仍豁免(见矩阵作业注释)。
+      - name: Test sqlkratos against a real MySQL
+        shell: bash
+        working-directory: gowind
+        run: |
+          set -uo pipefail
+          go build ./... && go vet ./...
+          go test -count=1 -skip '^TestRepoClone$' ./pkg/sqlkratos/...
+
   frontend-typecheck:
     name: 前端类型检查
     runs-on: ubuntu-latest
