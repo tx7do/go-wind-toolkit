@@ -2,6 +2,7 @@ package sqlkratos
 
 import (
 	"context"
+	"database/sql"
 	"net"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,21 +51,37 @@ func localMySQLReachable() bool {
 	return true
 }
 
+// protoFileContents 递归收集 root 下的 .proto 文件内容,键为文件名。包策略会在 v1
+// 之前多开目录层级，所以按文件名取，不写死路径。
+func protoFileContents(t *testing.T, root string) map[string]string {
+	t.Helper()
+
+	files := map[string]string{}
+	require.NoError(t, filepath.WalkDir(root, func(p string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !d.IsDir() && strings.HasSuffix(p, ".proto") {
+			body, readErr := os.ReadFile(p)
+			if readErr != nil {
+				return readErr
+			}
+			files[filepath.Base(p)] = string(body)
+		}
+		return nil
+	}))
+	return files
+}
+
 // protoBasenames 递归收集 root 下的 .proto 文件名并排序。包策略会在 v1 之前多开
 // 目录层级，所以按文件名断言，不断言路径。
 func protoBasenames(t *testing.T, root string) []string {
 	t.Helper()
 
 	var names []string
-	require.NoError(t, filepath.WalkDir(root, func(p string, d os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if !d.IsDir() && strings.HasSuffix(p, ".proto") {
-			names = append(names, filepath.Base(p))
-		}
-		return nil
-	}))
+	for name := range protoFileContents(t, root) {
+		names = append(names, name)
+	}
 	sort.Strings(names)
 	return names
 }
@@ -345,4 +363,94 @@ func TestGenerate_GenerateOnlyProto(t *testing.T) {
 	err := Generate(ctx, opts)
 	// 预期会成功
 	assert.NoError(t, err)
+}
+
+// testMySQLDB 是本包 MySQL 集成用例专用的库。单独建库而不是往 `test` 里塞表,是为了
+// 让 DROP 只落在测试私有的对象上——开发者的 `test` 库里可能真有同名业务表。
+const testMySQLDB = "gowind_sqlkratos_it"
+
+// testMySQLAdminDSN 是不带库名的管理连接(root:pass@tcp(host:port))。CI 的
+// services:mysql 容器就是这个口令;本机密码不同时用 GOWIND_TEST_MYSQL_ROOT_DSN
+// 指过去,否则用例会从"跳过"变成"红"。
+func testMySQLAdminDSN() string {
+	if v := os.Getenv("GOWIND_TEST_MYSQL_ROOT_DSN"); v != "" {
+		return v
+	}
+	return "root:pass@tcp(" + testMySQLAddr + ")"
+}
+
+// seedMySQLUsersTable 重建 testMySQLDB 并在其中建一张 users 表,返回后即清理。
+// 语句里的库名/表名都是本包常量,不接受外部输入。
+func seedMySQLUsersTable(t *testing.T) {
+	t.Helper()
+
+	// 结尾的 "/" 是必需的:go-sql-driver 拒绝没有库名分隔符的 DSN
+	// ("invalid DSN: missing the slash separating the database name"),而这里要在
+	// 建库之前就能连上,所以不指定任何库。
+	db, err := sql.Open("mysql", testMySQLAdminDSN()+"/")
+	require.NoError(t, err, "open admin connection")
+	t.Cleanup(func() { _ = db.Close() })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Cleanup(func() {
+		// 自带超时:库若在跑中途失去响应,清理不该把测试吊死。
+		dropCtx, cancelDrop := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelDrop()
+		if _, derr := db.ExecContext(dropCtx, "DROP DATABASE IF EXISTS "+testMySQLDB); derr != nil {
+			t.Logf("清理测试库 %s 失败: %v", testMySQLDB, derr)
+		}
+	})
+
+	for _, stmt := range []string{
+		"DROP DATABASE IF EXISTS " + testMySQLDB,
+		"CREATE DATABASE " + testMySQLDB,
+		"CREATE TABLE " + testMySQLDB + ".users (" +
+			"id bigint NOT NULL AUTO_INCREMENT, " +
+			"name varchar(100) NOT NULL, " +
+			"PRIMARY KEY (id))",
+	} {
+		_, err = db.ExecContext(ctx, stmt)
+		require.NoError(t, err, "seed statement failed: %s", stmt)
+	}
+}
+
+// TestGenerate_MySQLSeededTable 让 MySQL provider 这条路真正被断言:
+// TestGenerate_GenerateOnlyProto 连的是空的 `test` 库,Generate 在
+// generator.go 的 len(tables)==0 处直接返回 nil,assert.NoError 恒真。这里自建
+// 专用库并建一张 users 表,断言 information_schema 探测出来的表确实变成了
+// user.proto 且列映射成 int64 id / string name。
+func TestGenerate_MySQLSeededTable(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip integration test")
+	}
+
+	requireLocalMySQL(t)
+	seedMySQLUsersTable(t)
+
+	opts := GeneratorOptions{
+		Driver:        "mysql",
+		Source:        "mysql://" + testMySQLAdminDSN() + "/" + testMySQLDB + "?parseTime=True",
+		OrmType:       "ent",
+		GenerateProto: true,
+		Servers:       []string{"grpc"},
+		ProjectName:   "test",
+		ServiceName:   "core",
+		ModuleName:    "core",
+		ModuleVersion: "v1",
+		OutputPath:    t.TempDir(),
+	}
+
+	require.NoError(t, Generate(context.Background(), opts))
+
+	files := protoFileContents(t, filepath.Join(opts.OutputPath, "api", "protos"))
+	require.Equal(t, []string{"user.proto"}, protoBasenames(t, filepath.Join(opts.OutputPath, "api", "protos")),
+		"MySQL 探测到的表应生成 user.proto")
+
+	content := files["user.proto"]
+	// 断言前先打印,红的时候一次就能看清真实内容,不用再来一轮 CI。
+	t.Logf("生成的 user.proto:\n%s", content)
+	assert.Contains(t, content, "optional int64 id = 1")
+	assert.Contains(t, content, "optional string name = 2")
 }
