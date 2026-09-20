@@ -29,9 +29,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     env:
-      # 逐模块构建,不能让任何杂散 go.work 参与(protoc-gen-go-http/go.work 就是
-      # 一个残留的坏文件,use 了 190 个不存在的目录)。goldentest.goBuild 里
-      # 已经用同样的手段隔离宿主 go.work。
+      # 本仓库是若干互相独立的 Go 模块。GOWORK=off 保证任何杂散 workspace——开发者
+      # 自己建的、或落在上层目录的——都不会把模块串起来改变构建语义(goldentest.goBuild
+      # 与各模块 Makefile 用同样手段)。
       GOWORK: 'off'
 
     steps:
@@ -143,15 +143,20 @@ jobs:
           fi
           echo "全部模块通过"
 
-  # sqlkratos 的 TestGenerate_GenerateOnlyProto 要真连 MySQL(唯一一条 requireLocalMySQL
-  # 守卫的用例),矩阵作业里它一律跳过,等于这条路径没有门禁。
+  # sqlkratos 有两条连库用例,矩阵作业里(无 MySQL)一律跳过,等于这条路没有门禁:
+  # TestGenerate_GenerateOnlyProto 连空的 test 库,TestGenerate_MySQLSeededTable 自建
+  # 专用库 gowind_sqlkratos_it、建一张 users 表,再断言生成的是 user.proto 且列映射成
+  # int64 id / string name。前者只到"拨号+认证+空表集不报错"(Generate 在
+  # len(tables)==0 就返回),后者才真正覆盖 information_schema 探测到 proto 的映射。
   #
   # 单独一个 ubuntu 作业而不是给矩阵加 services:GitHub 的 service container 只支持
   # Linux runner,macOS 上 job 会直接以
   # "Error: Container operations are only supported on Linux runners" 起不来。
   #
-  # 凭据与测试常量对齐:generate_test.go 的 testMySQLAddr=127.0.0.1:3306,
-  # DSN 用 root:pass 连 test 库。端口映射到 127.0.0.1 才能被宿主机侧的 net.Dial 探到。
+  # 凭据与测试常量对齐:generate_test.go 的 testMySQLAddr=127.0.0.1:3306、管理员连接
+  # root:pass。端口映射到 127.0.0.1 才能被宿主机侧的 net.Dial 探到。建库需要
+  # CREATE/DROP DATABASE 权限,这里用 root;开发者本机密码不同时用
+  # GOWIND_TEST_MYSQL_ROOT_DSN 覆盖,不要用豁免把用例改回跳过。
   #
   # 这里只跑 pkg/sqlkratos 一个包:同包的 TestGenerate_MySQL_DDL 断言"连不上库时报
   # dial tcp",有真库时它按设计跳过,而它在矩阵作业里(无库)是真跑的——两条用例跨作业
@@ -187,14 +192,17 @@ jobs:
           go-version-file: gowind-uiapp/go.mod
           cache-dependency-path: '**/go.sum'
 
-      # 同矩阵作业:-count=1 防 Go 测试结果缓存;TestRepoClone 仍豁免(见矩阵作业注释)。
+      # 同矩阵作业:-count=1 防 Go 测试结果缓存;TestRepoClone 不在本包路径里,这个
+      # -skip 是防着将来把范围放宽到 ./... 时把已知红放进来。
+      # -v:这个作业的价值就在于"连库用例真的跑了",没有 -v 时跳过与通过都只打印一行
+      # ok,日志分不出来。
       - name: Test sqlkratos against a real MySQL
         shell: bash
         working-directory: gowind
         run: |
           set -uo pipefail
           go build ./... && go vet ./...
-          go test -count=1 -skip '^TestRepoClone$' ./pkg/sqlkratos/...
+          go test -count=1 -v -skip '^TestRepoClone$' ./pkg/sqlkratos/...
 
   frontend-typecheck:
     name: 前端类型检查
