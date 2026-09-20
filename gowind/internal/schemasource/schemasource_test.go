@@ -45,6 +45,9 @@ func TestLoadSQLFromFile(t *testing.T) {
 		want string
 	}{
 		{name: "existing file yields its content", path: existing, want: content},
+		// 生产路径给的是 NormalizeDSN 之后的值:裸文件路径会被补成 file://,
+		// 所以判文件之前必须先剥 scheme,否则路径本身会被当成 SQL 文本。
+		{name: "file scheme yields the file content", path: "file://" + existing, want: content},
 		{name: "text scheme is stripped", path: "text://CREATE TABLE a (id INT);", want: "CREATE TABLE a (id INT);"},
 		{name: "inline sql without scheme is returned as-is", path: "CREATE TABLE a (id INT);", want: "CREATE TABLE a (id INT);"},
 	} {

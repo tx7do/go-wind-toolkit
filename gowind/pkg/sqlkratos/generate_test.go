@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -25,43 +26,81 @@ const testMySQLAddr = "127.0.0.1:3306"
 // 没有库时应当跳过而不是失败。
 func requireLocalMySQL(t *testing.T) {
 	t.Helper()
-	conn, err := net.DialTimeout("tcp", testMySQLAddr, 500*time.Millisecond)
-	if err != nil {
-		t.Skipf("no MySQL reachable at %s: %v", testMySQLAddr, err)
+	if !localMySQLReachable() {
+		t.Skipf("no MySQL reachable at %s", testMySQLAddr)
 	}
-	_ = conn.Close()
 }
 
-// TestGenerate_MySQL_DDL 测试从 MySQL DDL 生成完整代码
+// skipIfLocalMySQL 把守反向前提:断言"连不上库时必须报 dial 错"的用例,一旦本机真有
+// MySQL 在监听,报错就变成认证/协议错而不含 "dial tcp",断言便无端转红。
+func skipIfLocalMySQL(t *testing.T) {
+	t.Helper()
+	if localMySQLReachable() {
+		t.Skipf("something is listening on %s, the connection-failure assertion no longer holds", testMySQLAddr)
+	}
+}
+
+func localMySQLReachable() bool {
+	conn, err := net.DialTimeout("tcp", testMySQLAddr, 500*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// protoBasenames 递归收集 root 下的 .proto 文件名并排序。包策略会在 v1 之前多开
+// 目录层级，所以按文件名断言，不断言路径。
+func protoBasenames(t *testing.T, root string) []string {
+	t.Helper()
+
+	var names []string
+	require.NoError(t, filepath.WalkDir(root, func(p string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !d.IsDir() && strings.HasSuffix(p, ".proto") {
+			names = append(names, filepath.Base(p))
+		}
+		return nil
+	}))
+	sort.Strings(names)
+	return names
+}
+
+// TestGenerate_MySQL_DDL 测试 MySQL 连接串走的是 schemasource 拨号路径:断言的是
+// "连不上库时报错",因此本机一旦真有 MySQL 在监听,报错会变成认证/协议错而不是
+// dial tcp,该前提不再成立,直接跳过。
 func TestGenerate_MySQL_DDL(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skip integration test")
 	}
+	skipIfLocalMySQL(t)
 
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
-	dsn := "mysql://root:password@tcp(localhost:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "mysql://root:password@tcp(" + testMySQLAddr + ")/test?charset=utf8mb4&parseTime=True&loc=Local"
 	opts := GeneratorOptions{
-		Driver:          "mysql",
-		Source:          dsn,
-		OrmType:         "ent",
-		UseRepo:         true,
-		GenerateProto:   true,
-		GenerateORM:     true,
-		GenerateData:    true,
-		GenerateService: true,
-		GenerateServer:  true,
-		GenerateMain:    true,
-		GenerateConfig:  true,
+		Driver:           "mysql",
+		Source:           dsn,
+		OrmType:          "ent",
+		UseRepo:          true,
+		GenerateProto:    true,
+		GenerateORM:      true,
+		GenerateData:     true,
+		GenerateService:  true,
+		GenerateServer:   true,
+		GenerateMain:     true,
+		GenerateConfig:   true,
 		GenerateMakefile: true,
-		Servers:         []string{"grpc"},
-		ProjectName:     "test-project",
-		ServiceName:     "core",
-		ModuleName:      "core",
-		ModuleVersion:   "v1",
-		OutputPath:      tmpDir,
-		IncludedTables:  []string{"users", "orders"},
+		Servers:          []string{"grpc"},
+		ProjectName:      "test-project",
+		ServiceName:      "core",
+		ModuleName:       "core",
+		ModuleVersion:    "v1",
+		OutputPath:       tmpDir,
+		IncludedTables:   []string{"users", "orders"},
 	}
 
 	err := Generate(ctx, opts)
@@ -139,18 +178,8 @@ func TestGenerate_DDLText(t *testing.T) {
 
 	// 验证 proto 文件存在。生产路径写在 <OutputPath>/api/protos/<proto包>/v1/*.proto
 	// (见 generator.go 的 protoPath),包策略会多一层目录,所以递归找。
-	var protoFiles []string
-	require.NoError(t, filepath.WalkDir(filepath.Join(tmpDir, "api", "protos"),
-		func(p string, d os.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
-			}
-			if !d.IsDir() && strings.HasSuffix(p, ".proto") {
-				protoFiles = append(protoFiles, p)
-			}
-			return nil
-		}))
-	assert.NotEmpty(t, protoFiles, "Proto files should be generated")
+	assert.NotEmpty(t, protoBasenames(t, filepath.Join(tmpDir, "api", "protos")),
+		"Proto files should be generated")
 }
 
 // TestGenerate_InvalidDriver 测试无效驱动的处理
@@ -236,28 +265,51 @@ func TestEnsureDSNScheme_RejectsUnsupportedDriver(t *testing.T) {
 	}
 }
 
-// TestGenerate_EmptyTables 测试空表列表的处理
-func TestGenerate_EmptyTables(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skip integration test")
+// TestGenerate_TableFilter 固定住表过滤契约:IncludedTables 为空 = 全部表
+// (见 sqlproto/internal/options.go 的 "all if empty"),非空 = 只导入列出的表。
+//
+// 替代原 TestGenerate_EmptyTables:那条用 mysql://localhost/test 当 source、
+// 又不设任何 Generate* 开关,Generate 全程 no-op 返回 nil,assert.NoError 恒真。
+func TestGenerate_TableFilter(t *testing.T) {
+	const ddl = `CREATE TABLE users (
+		id bigint(20) NOT NULL AUTO_INCREMENT,
+		name varchar(100) NOT NULL,
+		PRIMARY KEY (id)
+	);
+
+	CREATE TABLE orders (
+		id bigint(20) NOT NULL AUTO_INCREMENT,
+		total decimal(10,2) NOT NULL,
+		PRIMARY KEY (id)
+	);`
+
+	for _, c := range []struct {
+		name    string
+		include []string
+		want    []string
+	}{
+		{name: "empty include list yields every table", include: nil, want: []string{"order.proto", "user.proto"}},
+		{name: "explicit include list narrows to that table", include: []string{"users"}, want: []string{"user.proto"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			// 只生成 proto:不连库、不跑 ent 代码生成,所以不需要 -short 豁免也不需要 go.mod。
+			opts := GeneratorOptions{
+				Source:         ddl,
+				OrmType:        "ent",
+				GenerateProto:  true,
+				Servers:        []string{"grpc"},
+				ProjectName:    "test",
+				ServiceName:    "core",
+				ModuleName:     "core",
+				ModuleVersion:  "v1",
+				OutputPath:     t.TempDir(),
+				IncludedTables: c.include,
+			}
+
+			require.NoError(t, Generate(context.Background(), opts))
+			assert.Equal(t, c.want, protoBasenames(t, filepath.Join(opts.OutputPath, "api", "protos")))
+		})
 	}
-
-	ctx := context.Background()
-	tmpDir := t.TempDir()
-
-	opts := GeneratorOptions{
-		Driver:        "mysql",
-		Source:        "mysql://localhost/test",
-		OrmType:       "ent",
-		ProjectName:   "test",
-		ServiceName:   "core",
-		OutputPath:    tmpDir,
-		IncludedTables: []string{}, // 空表列表
-	}
-
-	err := Generate(ctx, opts)
-	// 预期会成功（即使没有表也要生成基础结构）
-	assert.NoError(t, err)
 }
 
 // TestGenerate_GenerateOnlyProto 测试仅生成 Proto —— 需要真实 MySQL,无库时跳过。
@@ -272,22 +324,22 @@ func TestGenerate_GenerateOnlyProto(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	opts := GeneratorOptions{
-		Driver:          "mysql",
-		Source:          "mysql://root:pass@tcp(" + testMySQLAddr + ")/test?parseTime=True",
-		OrmType:         "ent",
-		UseRepo:         false,
-		GenerateProto:   true,
-		GenerateORM:     false,
-		GenerateData:    false,
-		GenerateService: false,
-		GenerateServer:  false,
-		GenerateMain:    false,
-		GenerateConfig:  false,
+		Driver:           "mysql",
+		Source:           "mysql://root:pass@tcp(" + testMySQLAddr + ")/test?parseTime=True",
+		OrmType:          "ent",
+		UseRepo:          false,
+		GenerateProto:    true,
+		GenerateORM:      false,
+		GenerateData:     false,
+		GenerateService:  false,
+		GenerateServer:   false,
+		GenerateMain:     false,
+		GenerateConfig:   false,
 		GenerateMakefile: false,
-		Servers:         []string{"grpc"},
-		ProjectName:     "test",
-		ServiceName:     "core",
-		OutputPath:      tmpDir,
+		Servers:          []string{"grpc"},
+		ProjectName:      "test",
+		ServiceName:      "core",
+		OutputPath:       tmpDir,
 	}
 
 	err := Generate(ctx, opts)
