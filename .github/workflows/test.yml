@@ -68,6 +68,27 @@ jobs:
           npm ci
           npx vite build
 
+      # goldentest.Run 在 PATH 里找不到 buf 就自行跳过,不装 buf 就拦不住 protoc-gen-dart-http
+      # / protoc-gen-typescript-http 的生成物漂移(基线曾在 d0c6e90 之后一直是旧的而无人察觉)。
+      # 版本钉死:输出里注释段落的形态取决于 buf 对 LeadingComments 的归一化,buf 版本漂移
+      # 会让 golden 无故转红;1.66.0 与本地生成基线时用的版本一致。
+      # 副作用:examples/proto/buf.yaml 依赖 buf.build/googleapis/googleapis,所以这一步
+      # 之后 job 需要能访问 BSR —— 拉不到时先怀疑网络而不是生成器。
+      - name: Setup buf
+        shell: bash
+        env:
+          BUF_VERSION: '1.66.0'
+        run: |
+          # 发布产物文件名就是 "<uname -s>-<uname -m>"(Darwin-arm64 / Linux-x86_64),
+          # 直接拼即可,arch 无需再映射(macos 是 arm64、ubuntu 是 x86_64)。
+          dest="$RUNNER_TEMP/buf"
+          mkdir -p "$dest"
+          curl -fsSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-$(uname -s)-$(uname -m).tar.gz" \
+            | tar -xz -C "$dest" buf/bin/buf
+          chmod +x "$dest/buf/bin/buf"
+          echo "$dest/buf/bin" >> "$GITHUB_PATH"
+          buf --version
+
       # 本仓库是多个独立 Go 模块,没有 go.work 把它们串起来,故逐模块跑。
       # 只取仓库根下一层的 go.mod,自动排除 .sage/、examples/ 等嵌套模块。
       - name: Build, vet and test each module
@@ -81,9 +102,14 @@ jobs:
           # 早先同批豁免的 3 条 TestGenerate_* 已修复,不要再加回来。
           SKIP_GOWIND='^TestRepoClone$'
 
-          # 注意:protoc-gen-dart-http / protoc-gen-typescript-http 的 golden 回归
-          # 依赖 buf(goldentest.Run 在 PATH 里找不到 buf 时自行跳过)。runner 上没装
-          # buf,所以这两个模块只跑了普通单测,生成器输出漂移拦不住。
+          # 没有上面那步 Setup buf,protoc-gen-dart-http / protoc-gen-typescript-http 的
+          # golden 回归会静默跳过、只剩普通单测。
+          #
+          # -count=1 是这条门禁的有效性所在,不是性能选项:golden 测试的测试二进制并不链接
+          # 生成器代码(goldentest 在运行时才 go build 出插件再 buf generate),所以只改生成器
+          # 时测试二进制哈希不变,Go 会直接复用缓存里的 PASS。实测把 codegen.CommentLines
+          # 改坏后 `go test ./...` 仍报 "ok (cached)",加 -count=1 才 FAIL。
+          # actions/setup-go 会跨 run 缓存测试结果,所以 CI 上同样会被骗过去。
 
           failed=""
           for mod in */go.mod; do
@@ -91,9 +117,9 @@ jobs:
             echo "::group::$dir"
             if [ "$dir" = "gowind" ]; then
               ( cd "$dir" && go build ./... && go vet ./... \
-                && go test -skip "$SKIP_GOWIND" ./... )
+                && go test -count=1 -skip "$SKIP_GOWIND" ./... )
             else
-              ( cd "$dir" && go build ./... && go vet ./... && go test ./... )
+              ( cd "$dir" && go build ./... && go vet ./... && go test -count=1 ./... )
             fi
             status=$?
             echo "::endgroup::"
