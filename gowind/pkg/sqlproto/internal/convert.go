@@ -3,7 +3,6 @@ package internal
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"entgo.io/ent/dialect"
 
@@ -65,7 +64,7 @@ func schemaTables(fnc fieldTypeFunc, tables []*schema.Table) ([]*TableData, erro
 			continue
 		}
 
-		log.Println("***********", table.Name)
+		log.Println("表:", table.Name)
 
 		node, err := convertTable(fnc, table)
 		if err != nil {
@@ -113,12 +112,15 @@ func convertTable(fnc fieldTypeFunc, table *schema.Table) (*TableData, error) {
 		fieldData := FieldData{
 			Name:         column.Name,
 			Type:         fnc(column.Type.Raw),
-			SqlType:      strings.ToUpper(strings.TrimSpace(strings.SplitN(column.Type.Raw, "(", 2)[0])),
+			SqlType:      schemasource.ParseSQLType(column.Type.Raw).Key(),
 			Null:         column.Type.Null,
 			IsPrimaryKey: pkSet[column.Name],
 		}
 
 		if fieldData.Type == "" {
+			// 兜底成 string 不等于类型正确:int64 的精度、二进制的字节串都会在这个
+			// 看不见的转换里丢失,所以必须留下能定位到表与列的告警。
+			log.Printf("sqlproto: 表 %s 的列 %s 类型 %q 没有对应的 Proto 映射,按 string 处理", table.Name, column.Name, column.Type.Raw)
 			fieldData.Type = "string"
 		}
 

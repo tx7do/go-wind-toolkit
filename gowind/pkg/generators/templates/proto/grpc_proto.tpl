@@ -36,6 +36,9 @@ service {{pascal .Model}}Service {
 
 // {{.ModelName}}
 message {{pascal .Model}} {
+{{- /* 每个字段都带 optional 是必需的,不是"没把列的 NULL 信息传进来":生成的更新路径
+       对每一列都发 SetNillableXxx(req.Data.Xxx),而标量字段只有带 presence 时才是指针。
+       动这行之前先读 pkg/generators/types.go 里 ProtoField 的注释。 */}}
 {{range .Fields}}  optional {{.Type}} {{snake .Name}} = {{.Number}} [
     json_name = "{{camel .Name}}",
     (gnostic.openapi.v3.property) = {description: "{{.Comment}}"}

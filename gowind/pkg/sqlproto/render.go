@@ -93,6 +93,9 @@ func WriteServicesProto(
 				Name:    field.Name,
 				Comment: field.Comment,
 				Type:    field.Type,
+				// 模板当前不渲染它(见 generators.ProtoField 的注释),但必须是真的:
+				// 留成恒 false 会让"哪天有人拿 .Null 做判断"变成静默缺陷。
+				Null: field.Null,
 			})
 		}
 
