@@ -70,26 +70,12 @@ jobs:
 
       # goldentest.Run 在 PATH 里找不到 buf 就自行跳过,不装 buf 就拦不住 protoc-gen-dart-http
       # / protoc-gen-typescript-http 的生成物漂移(基线曾在 d0c6e90 之后一直是旧的而无人察觉)。
-      # 版本钉死:输出里注释段落的形态取决于 buf 对 LeadingComments 的归一化,buf 版本漂移
-      # 会让 golden 无故转红;1.66.0 与本地生成基线时用的版本一致。
+      # 为何钉死 1.66.0、以及安装与自检的细节:见 .github/actions/setup-buf/action.yml
+      # (release-protoc-gen-dart-http / -typescript-http 的 test job 用同一份)。
       # 副作用:examples/proto/buf.yaml 依赖 buf.build/googleapis/googleapis,所以这一步
       # 之后 job 需要能访问 BSR —— 拉不到时先怀疑网络而不是生成器。
       - name: Setup buf
-        shell: bash
-        env:
-          BUF_VERSION: '1.66.0'
-        run: |
-          # 发布产物文件名就是 "<uname -s>-<uname -m>"(Darwin-arm64 / Linux-x86_64),
-          # 直接拼即可,arch 无需再映射(macos 是 arm64、ubuntu 是 x86_64)。
-          dest="$RUNNER_TEMP/buf"
-          mkdir -p "$dest"
-          curl -fsSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-$(uname -s)-$(uname -m).tar.gz" \
-            | tar -xz -C "$dest" buf/bin/buf
-          chmod +x "$dest/buf/bin/buf"
-          echo "$dest/buf/bin" >> "$GITHUB_PATH"
-          # 按绝对路径自检:$GITHUB_PATH 只对后续 step 生效,同一步里 buf 仍不在 PATH 上。
-          # 首轮 CI 就是在这行 exit 127(command not found),下载与解压其实都成功了。
-          "$dest/buf/bin/buf" --version
+        uses: ./.github/actions/setup-buf
 
       # 本仓库是多个独立 Go 模块,没有 go.work 把它们串起来,故逐模块跑。
       # 只取仓库根下一层的 go.mod,自动排除 .sage/、examples/ 等嵌套模块。
@@ -146,8 +132,10 @@ jobs:
   # sqlkratos 有两条连库用例,矩阵作业里(无 MySQL)一律跳过,等于这条路没有门禁:
   # TestGenerate_GenerateOnlyProto 连空的 test 库,TestGenerate_MySQLSeededTable 自建
   # 专用库 gowind_sqlkratos_it、建一张 users 表,再断言生成的是 user.proto 且列映射成
-  # int64 id / string name。前者只到"拨号+认证+空表集不报错"(Generate 在
-  # len(tables)==0 就返回),后者才真正覆盖 information_schema 探测到 proto 的映射。
+  # int64 id / string name / uint64 uid / uint32 score。前者只到"拨号+认证+空表集不报
+  # 错"(Generate 在 len(tables)==0 就返回),后者才真正覆盖 information_schema 探测一路
+  # 走到 proto 落地。两条无符号列断言的是 8.4 的 COLUMN_TYPE 形式(整型不再带显示宽度);
+  # 带宽度的写法由 pkg/sqlproto/internal 的 TestLiveLegAtlasRawMapping 在不连库时守住。
   #
   # 单独一个 ubuntu 作业而不是给矩阵加 services:GitHub 的 service container 只支持
   # Linux runner,macOS 上 job 会直接以

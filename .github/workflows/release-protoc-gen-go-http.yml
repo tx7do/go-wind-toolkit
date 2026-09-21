@@ -29,7 +29,9 @@ jobs:
         working-directory: protoc-gen-go-http
         env:
           GOWORK: off
-        run: go test ./...
+        # 本模块的用例是纯内存单测(不依赖 buf),门禁本身有效;加 -count=1 只是堵住
+        # actions/setup-go 跨 run 的测试结果缓存,与 test.yml 同一口径。
+        run: go build ./... && go vet ./... && go test -count=1 ./...
 
   build:
     needs: test

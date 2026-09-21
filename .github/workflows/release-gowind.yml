@@ -12,7 +12,33 @@ env:
   CGO_ENABLED: 0
 
 jobs:
+  # 原先 build 直接进 release,这条链上没有任何测试——改坏生成器也能把二进制发出去。
+  # 口径与 test.yml 的 gowind 腿保持一致(含同一条 TestRepoClone 豁免,根因见那边注释)。
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      GOWORK: off
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          # 取各模块里最高的 go 指令要求(gowind-uiapp 1.25.6),与 test.yml 同源。
+          go-version-file: gowind-uiapp/go.mod
+          cache-dependency-path: gowind/go.sum
+
+      - name: Build, vet and test
+        working-directory: gowind
+        run: |
+          go build ./... && go vet ./... \
+            && go test -count=1 -skip '^TestRepoClone$' ./...
+
   build:
+    needs: test
     strategy:
       matrix:
         include:

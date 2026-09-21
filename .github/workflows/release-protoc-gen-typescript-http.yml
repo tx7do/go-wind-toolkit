@@ -25,11 +25,30 @@ jobs:
           go-version-file: protoc-gen-typescript-http/go.mod
           cache-dependency-path: protoc-gen-typescript-http/go.sum
 
+      - name: Setup buf
+        uses: ./.github/actions/setup-buf
+
+      # 同 dart-http:本模块只有 TestGoldenExamples 一个用例,缺 buf 就自行 t.Skip,
+      # 于是 `go test ./...` 恒绿。装 buf + 要求该用例真的 PASS 才是门禁。
+      # -count=1 堵住 Go 的跨 run 测试缓存(测试二进制不链接生成器代码)。
       - name: Test
         working-directory: protoc-gen-typescript-http
+        shell: bash
         env:
           GOWORK: off
-        run: go test ./...
+        run: |
+          set -uo pipefail
+          log="$RUNNER_TEMP/ts-http-test.log"
+          go test -count=1 -v ./... 2>&1 | tee "$log"
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::go test 失败(rc=$rc)"
+            exit "$rc"
+          fi
+          if ! grep -q -- '--- PASS: TestGoldenExamples' "$log"; then
+            echo '::error::TestGoldenExamples 未 PASS:被跳过(buf 不在 PATH)或基线漂移,门禁已失效'
+            exit 1
+          fi
 
   build:
     needs: test
