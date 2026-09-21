@@ -10,8 +10,8 @@ import { useVbenForm } from '#/adapter/form';
 import {
   useCreateDictType,
   useUpdateDictType,
+  statusList,
 } from '#/api';
-import { statusList } from '#/api';
 const { mutateAsync: createDictType } = useCreateDictType();
 const { mutateAsync: updateDictType } = useUpdateDictType();
 

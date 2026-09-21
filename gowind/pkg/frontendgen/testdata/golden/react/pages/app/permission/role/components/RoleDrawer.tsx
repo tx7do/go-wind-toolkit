@@ -6,7 +6,7 @@ import {
   ProFormTextArea,
   ProFormSwitch,
   ProFormDigit,
-  ProFormRadio.Group,
+  ProFormRadio,
 } from '@ant-design/pro-components';
 import { App } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';

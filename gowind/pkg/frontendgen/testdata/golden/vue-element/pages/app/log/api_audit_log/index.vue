@@ -7,13 +7,6 @@
           {{ enableBoolToName(scope.row.isSuccess) }}
         </ElTag>
       </template>
-
-      <!-- 请求方法 -->
-      <template #requestMethod="scope">
-        <ElTag size="small" effect="dark" round :color="statusToColor(scope.row.requestMethod)">
-          {{ statusToName(scope.row.requestMethod) }}
-        </ElTag>
-      </template>
     </ProPage>
 
     <!-- 新增/编辑抽屉 -->
@@ -132,8 +125,7 @@ const pageConfig = computed<ProPageConfig>(() => ({
       {
         prop: "requestMethod",
         label: $t("pages.apiAuditLog.requestMethod"),
-        width: 100,
-        slotName: "requestMethod",
+        minWidth: 120,
       },
       {
         prop: "requestPath",

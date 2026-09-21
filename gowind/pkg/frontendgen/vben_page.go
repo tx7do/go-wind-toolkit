@@ -417,6 +417,15 @@ func vbenDrawerCode(service *ParsedService, serviceName string) string {
 	if hasUpdate {
 		apiImports = append(apiImports, "useUpdate"+modelPascal)
 	}
+	if hasStatusEnum {
+		apiImports = append(apiImports, "statusList")
+	}
+	// 只读服务(仅 List/Get)没有 Create/Update,此时不能留下 `import {\n  ,\n}` 的空壳:
+	// 那是一行都过不了解析的语法错误。
+	apiImportBlock := ""
+	if len(apiImports) > 0 {
+		apiImportBlock = "import {\n  " + strings.Join(apiImports, ",\n  ") + ",\n} from '#/api';\n"
+	}
 
 	_ = serviceName
 	var sb strings.Builder
@@ -429,13 +438,7 @@ import { $t } from '@vben/locales';
 import { notification } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
-import {
-  ` + strings.Join(apiImports, ",\n  ") + `,
-} from '#/api';
-`)
-	if hasStatusEnum {
-		sb.WriteString("import { statusList } from '#/api';\n")
-	}
+` + apiImportBlock)
 
 	if hasCreate {
 		sb.WriteString("const { mutateAsync: create" + modelPascal + " } = useCreate" + modelPascal + "();\n")

@@ -345,30 +345,37 @@ export default ` + modelPascal + `Management;
 // 编辑抽屉 *Drawer.tsx
 // ==============================
 
-// reactFormFieldComponent 推断 ProForm 组件
-func reactFormFieldComponent(field *ParsedField) (component, extraProps string) {
+// reactEnumOptionsFn 枚举字段对应的选项工厂函数名: "requestMethod" -> "getRequestMethodOptions"
+func reactEnumOptionsFn(field *ParsedField) string {
+	return "get" + toPascalCase(field.Name) + "Options"
+}
+
+// reactFormFieldComponent 推断 ProForm 组件。
+// 第三个返回值是 extraProps 里引用到的 constants.ts 导出名——引用与 import 由同一个返回值驱动,
+// 避免出现「模板用了 requestMethodOptions,却没有文件声明它」这种一渲染就炸的产物。
+func reactFormFieldComponent(field *ParsedField) (component, extraProps, constantsSymbol string) {
 	lower := strings.ToLower(field.Name)
 	if field.IsBoolean {
-		return "ProFormSwitch", ""
+		return "ProFormSwitch", "", ""
 	}
 	if field.IsEnum && len(field.EnumValues) > 0 {
 		if strings.Contains(lower, "status") {
 			return "ProFormRadio.Group",
 				"        options={getStatusOptions(t)}\n" +
-					"        fieldProps={{ optionType: 'button', buttonStyle: 'solid' }}"
+					"        fieldProps={{ optionType: 'button', buttonStyle: 'solid' }}", "getStatusOptions"
 		}
-		return "ProFormSelect", "        options={" + field.Name + "Options}"
+		return "ProFormSelect", "        options={" + reactEnumOptionsFn(field) + "(t)}", reactEnumOptionsFn(field)
 	}
 	if field.IsInteger && strings.Contains(lower, "sort") {
-		return "ProFormDigit", "        fieldProps={{ precision: 0, min: 0 }}"
+		return "ProFormDigit", "        fieldProps={{ precision: 0, min: 0 }}", ""
 	}
 	if field.IsDate {
-		return "ProFormDateTimePicker", "        fieldProps={{ style: { width: '100%' } }}"
+		return "ProFormDateTimePicker", "        fieldProps={{ style: { width: '100%' } }}", ""
 	}
 	if strings.Contains(lower, "description") || strings.Contains(lower, "remark") {
-		return "ProFormTextArea", "        fieldProps={{ allowClear: true, rows: 2 }}"
+		return "ProFormTextArea", "        fieldProps={{ allowClear: true, rows: 2 }}", ""
 	}
-	return "ProFormText", "        fieldProps={{ allowClear: true }}"
+	return "ProFormText", "        fieldProps={{ allowClear: true }}", ""
 }
 
 // reactDrawerCode 生成 DrawerForm 编辑抽屉
@@ -390,16 +397,20 @@ func reactDrawerCode(service *ParsedService, serviceName string) string {
 		}
 	}
 
-	hasStatusEnum := anyStatusField(service.Fields)
-
-	// 收集所有需要 import 的 ProForm 组件（保持出现序去重）
+	// 收集所有需要 import 的 ProForm 组件与 constants 工厂（保持出现序去重）
 	componentSet := map[string]bool{}
 	var formComponents []string
+	var constantsSymbols []string
+	constantsSet := map[string]bool{}
 	for i := range formFields {
-		component, _ := reactFormFieldComponent(&formFields[i])
+		component, _, symbol := reactFormFieldComponent(&formFields[i])
 		if !componentSet[component] {
 			componentSet[component] = true
 			formComponents = append(formComponents, component)
+		}
+		if symbol != "" && !constantsSet[symbol] {
+			constantsSet[symbol] = true
+			constantsSymbols = append(constantsSymbols, symbol)
 		}
 	}
 
@@ -407,7 +418,7 @@ func reactDrawerCode(service *ParsedService, serviceName string) string {
 	var formItemCodes []string
 	for i := range formFields {
 		f := &formFields[i]
-		component, extraProps := reactFormFieldComponent(f)
+		component, extraProps, _ := reactFormFieldComponent(f)
 		isRequired := !f.IsBoolean && f.Name != "sortOrder" && f.Name != "description" && f.Name != "remark"
 
 		var item strings.Builder
@@ -450,13 +461,21 @@ func reactDrawerCode(service *ParsedService, serviceName string) string {
 	}
 
 	var componentImportLines []string
+	importedComponents := map[string]bool{}
 	for _, c := range formComponents {
-		componentImportLines = append(componentImportLines, "  "+c+",")
+		// 复合组件在 JSX 里写作 ProFormRadio.Group,import 却只能取其基名
+		base := strings.SplitN(c, ".", 2)[0]
+		if importedComponents[base] {
+			continue
+		}
+		importedComponents[base] = true
+		componentImportLines = append(componentImportLines, "  "+base+",")
 	}
 
-	statusImport := ""
-	if hasStatusEnum {
-		statusImport = "import { getStatusOptions } from '../constants';\n"
+	// 抽屉用到的 constants 工厂一次性导入:引用哪个就导入哪个,不多也不少
+	constantsImport := ""
+	if len(constantsSymbols) > 0 {
+		constantsImport = "import { " + strings.Join(constantsSymbols, ", ") + " } from '../constants';\n"
 	}
 
 	createBlock := ""
@@ -531,7 +550,7 @@ import { useTranslation } from 'react-i18next';
 	_ = serviceName
 	sb.WriteString("import type { " + prefix + "_" + modelPascal + " as " + modelPascal + " } from '@/api/generated/" + serviceName + "/service/v1';\n")
 	sb.WriteString("import { useCreate" + modelPascal + ", useUpdate" + modelPascal + " } from '@/api/hooks/" + fileName + "';\n")
-	sb.WriteString(statusImport)
+	sb.WriteString(constantsImport)
 	sb.WriteString("\n")
 	sb.WriteString(`interface ` + modelPascal + `DrawerProps {
   open: boolean;
@@ -618,29 +637,62 @@ export default ` + modelPascal + `Drawer;
 // constants.ts
 // ==============================
 
-// reactConstantsCode 生成 constants.ts（包含 status 枚举时），否则返回空串
+// reactConstantsCode 生成 constants.ts（服务里任一枚举字段都会拿到一个选项工厂），
+// 没有枚举时返回空串。抽屉的 options={< getXxxOptions >(t)} 与这里的导出必须同名同源,
+// 之前只为 status 出文件,非 status 枚举(requestMethod 等)引用了一个不存在的常量。
 func reactConstantsCode(service *ParsedService) string {
-	statusField := FindStatusField(service)
-	if statusField == nil || len(statusField.EnumValues) == 0 {
-		return ""
+	var blocks []string
+
+	if statusField := FindStatusField(service); statusField != nil && len(statusField.EnumValues) > 0 {
+		var statusMapEntries, statusOptions []string
+		for _, v := range statusField.EnumValues {
+			label := v
+			if v == "ON" {
+				label = "启用"
+			} else if v == "OFF" {
+				label = "禁用"
+			}
+			color := "default"
+			if v == "ON" {
+				color = "success"
+			} else if v == "OFF" {
+				color = "error"
+			}
+			statusMapEntries = append(statusMapEntries, "    "+v+": { text: t('"+label+"'), color: '"+color+"' },")
+			statusOptions = append(statusOptions, "    { label: t('"+label+"'), value: '"+v+"' },")
+		}
+
+		blocks = append(blocks, `/** 状态映射 */
+export function getStatusMap(t: TFn) {
+  return {
+`+strings.Join(statusMapEntries, "\n")+`
+  };
+}
+
+/** 状态选项 */
+export function getStatusOptions(t: TFn) {
+  return [
+`+strings.Join(statusOptions, "\n")+`
+  ];
+}`)
 	}
 
-	var statusMapEntries, statusOptions []string
-	for _, v := range statusField.EnumValues {
-		label := v
-		if v == "ON" {
-			label = "启用"
-		} else if v == "OFF" {
-			label = "禁用"
+	for i := range service.Fields {
+		f := &service.Fields[i]
+		if !f.IsEnum || len(f.EnumValues) == 0 || isStatusField(f) {
+			continue
 		}
-		color := "default"
-		if v == "ON" {
-			color = "success"
-		} else if v == "OFF" {
-			color = "error"
+		// label 走 t(value):词条缺失时 i18n 回显 key,即 enum 原值,不需要工程预置 enum.* 命名空间
+		options := make([]string, 0, len(f.EnumValues))
+		for _, v := range f.EnumValues {
+			options = append(options, "    { label: t('"+v+"'), value: '"+v+"' },")
 		}
-		statusMapEntries = append(statusMapEntries, "    "+v+": { text: t('"+label+"'), color: '"+color+"' },")
-		statusOptions = append(statusOptions, "    { label: t('"+label+"'), value: '"+v+"' },")
+		blocks = append(blocks, "/** "+f.Description+" 选项 */\nexport function "+reactEnumOptionsFn(f)+"(t: TFn) {\n  return [\n"+
+			strings.Join(options, "\n")+"\n  ];\n}")
+	}
+
+	if len(blocks) == 0 {
+		return ""
 	}
 
 	return `/**
@@ -649,18 +701,5 @@ func reactConstantsCode(service *ParsedService) string {
 
 type TFn = (key: string, options?: Record<string, any>) => string;
 
-/** 状态映射 */
-export function getStatusMap(t: TFn) {
-  return {
-` + strings.Join(statusMapEntries, "\n") + `
-  };
-}
-
-/** 状态选项 */
-export function getStatusOptions(t: TFn) {
-  return [
-` + strings.Join(statusOptions, "\n") + `
-  ];
-}
-`
+` + strings.Join(blocks, "\n\n") + "\n"
 }

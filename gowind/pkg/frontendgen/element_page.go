@@ -25,7 +25,7 @@ func elementGetFieldFormType(field *ParsedField) elementFormType {
 		return elementFormType{
 			typeName:  "select",
 			component: "ElSelect",
-			attrs:     "\n          <ElOption v-for=\"item in " + field.Name + "List\" :key=\"item.value\" :label=\"item.label\" :value=\"item.value\" />",
+			attrs:     "\n          <ElOption v-for=\"item in " + elementEnumListVar(field) + "\" :key=\"item.value\" :label=\"item.label\" :value=\"item.value\" />",
 		}
 	}
 	if field.IsInteger && strings.Contains(lower, "sort") {
@@ -53,6 +53,19 @@ func elementGetFieldFormType(field *ParsedField) elementFormType {
 		}
 	}
 	return elementFormType{typeName: "input", component: "ElInput", attrs: ""}
+}
+
+// elementEnumListVar 枚举字段在抽屉 <script setup> 里的选项常量名。
+// 模板里的 v-for 与脚本里的声明必须共用这个函数,否则又会引用一个没人声明的标识符。
+func elementEnumListVar(field *ParsedField) string {
+	return field.Name + "List"
+}
+
+// isElementStatusEnum 判定枚举列是否走 statusToColor/statusToName 的标签渲染。
+// 这两个函数由目标工程的 @/api/composables 提供,只承载 status 语义;
+// 拿去渲染 requestMethod 之类的枚举,既 import 不到也译不出名字。
+func isElementStatusEnum(field *ParsedField) bool {
+	return field.IsEnum && len(field.EnumValues) > 0 && field.Name == "status"
 }
 
 var elementSearchSkipFields = map[string]bool{
@@ -134,7 +147,7 @@ func elementPageCode(service *ParsedService, serviceName, modulePath string) str
 				"        minWidth: 120,\n" +
 				"        fixed: \"left\",\n" +
 				"      },"
-		} else if field.IsBoolean || field.IsEnum {
+		} else if field.IsBoolean || isElementStatusEnum(field) {
 			col = "      {\n" +
 				"        prop: \"" + field.Name + "\",\n" +
 				"        label: $t(\"" + i18nModuleKey + "." + field.Name + "\"),\n" +
@@ -179,11 +192,14 @@ func elementPageCode(service *ParsedService, serviceName, modulePath string) str
         ],
       },`)
 
-	// 模板中的 slot 定义
+	// 模板中的 slot 定义。slot 与 import 必须同源:模板引用了谁,脚本就得导入谁,
+	// 反之导入没被用到的符号也是多余的。
 	var slotCodes []string
+	hasBoolSlot, hasStatusSlot := false, false
 	for i := range tableFields {
 		field := &tableFields[i]
 		if field.IsBoolean {
+			hasBoolSlot = true
 			slotCodes = append(slotCodes,
 				"      <!-- "+field.Description+" -->\n"+
 					"      <template #"+field.Name+"=\"scope\">\n"+
@@ -191,7 +207,8 @@ func elementPageCode(service *ParsedService, serviceName, modulePath string) str
 					"          {{ enableBoolToName(scope.row."+field.Name+") }}\n"+
 					"        </ElTag>\n"+
 					"      </template>")
-		} else if field.IsEnum && len(field.EnumValues) > 0 {
+		} else if isElementStatusEnum(field) {
+			hasStatusSlot = true
 			slotCodes = append(slotCodes,
 				"      <!-- "+field.Description+" -->\n"+
 					"      <template #"+field.Name+"=\"scope\">\n"+
@@ -203,22 +220,18 @@ func elementPageCode(service *ParsedService, serviceName, modulePath string) str
 	}
 
 	// composable imports
-	composableImports := []string{"enableBoolToName"}
+	var composableImports []string
+	if hasBoolSlot {
+		composableImports = append(composableImports, "enableBoolToName")
+	}
 	if hasList {
 		composableImports = append(composableImports, "fetchList"+modelPascal+"s")
 	}
 	if hasDelete {
 		composableImports = append(composableImports, "useDelete"+modelPascal)
 	}
-	hasStatusEnum := false
-	for i := range service.Fields {
-		if service.Fields[i].IsEnum && service.Fields[i].Name == "status" {
-			hasStatusEnum = true
-			break
-		}
-	}
-	if hasStatusEnum {
-		composableImports = append(composableImports, "statusToColor", "statusToName", "statusList")
+	if hasStatusSlot {
+		composableImports = append(composableImports, "statusToColor", "statusToName")
 	}
 
 	deleteLine := ""
@@ -230,6 +243,12 @@ func elementPageCode(service *ParsedService, serviceName, modulePath string) str
 		deleteAction = "\n    deleteAction: async (ids: string) => {\n" +
 			"      await delete" + modelPascal + "({ id: ids as any });\n" +
 			"    },"
+	}
+
+	// ElTag 只在真的有标签 slot 时才导入
+	tagImport := ""
+	if hasBoolSlot || hasStatusSlot {
+		tagImport = "import { ElTag } from \"element-plus\";\n"
 	}
 
 	var sb strings.Builder
@@ -246,8 +265,7 @@ func elementPageCode(service *ParsedService, serviceName, modulePath string) str
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
-import { ElTag } from "element-plus";
-
+` + tagImport + `
 import ProPage from "@/components/Pro/ProPage/index.vue";
 import type { ProPageConfig } from "@/components/Pro/ProPage/types";
 import ` + modelPascal + `Drawer from "./` + service.KebabName + `-drawer.vue";
@@ -402,6 +420,28 @@ func elementDrawerCode(service *ParsedService) string {
 		}
 	}
 
+	// 枚举选项常量:elementGetFieldFormType 只写下 `<ElOption v-for="item in xList">` 的引用,
+	// 声明必须在这里补上,否则生成的抽屉一渲染就 ReferenceError。
+	// label 直接用 enum 原值,不依赖工程里未必存在的 enum.* 词条。
+	var enumListDecls []string
+	for i := range formFields {
+		f := &formFields[i]
+		if elementGetFieldFormType(f).typeName != "select" {
+			continue
+		}
+		items := make([]string, 0, len(f.EnumValues))
+		for _, v := range f.EnumValues {
+			items = append(items, "  { label: \""+v+"\", value: \""+v+"\" },")
+		}
+		enumListDecls = append(enumListDecls,
+			"// "+f.Description+" 选项(取自 OpenAPI enum)\n"+
+				"const "+elementEnumListVar(f)+" = [\n"+strings.Join(items, "\n")+"\n];")
+	}
+	enumDeclBlock := ""
+	if len(enumListDecls) > 0 {
+		enumDeclBlock = strings.Join(enumListDecls, "\n\n") + "\n\n"
+	}
+
 	// formData 字段默认值
 	var formDataDefaults []string
 	for i := range formFields {
@@ -471,6 +511,13 @@ func elementDrawerCode(service *ParsedService) string {
 		updateLine = "const { mutateAsync: update" + modelPascal + " } = useUpdate" + modelPascal + "();"
 	}
 
+	// 只读服务(仅 List/Get)既没有 Create 也没有 Update,这时整条 composable import
+	// 必须省略——留着 `import {\n  ,\n}` 的壳是一行都过不了解析的语法错误。
+	composableImportBlock := ""
+	if len(composableImports) > 0 {
+		composableImportBlock = "import {\n  " + strings.Join(composableImports, ",\n  ") + ",\n} from \"@/api/composables\";\n"
+	}
+
 	// handleSubmit 分支
 	var submitBranch string
 	if hasCreate {
@@ -529,10 +576,7 @@ func elementDrawerCode(service *ParsedService) string {
 import { computed, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
 
-import {
-  ` + strings.Join(composableImports, ",\n  ") + `,
-} from "@/api/composables";
-import { $t } from "@/core/i18n";
+` + composableImportBlock + `import { $t } from "@/core/i18n";
 import { DRAWER_WIDTH } from "@/constants";
 
 const emit = defineEmits<{
@@ -546,7 +590,7 @@ const isCreate = ref(true);
 const currentId = ref<number>();
 const formRef = ref();
 
-// 表单数据
+` + enumDeclBlock + `// 表单数据
 const formData = reactive({
 ` + strings.Join(formDataDefaults, "\n") + `
 });
