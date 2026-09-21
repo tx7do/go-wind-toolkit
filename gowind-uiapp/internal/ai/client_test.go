@@ -2,6 +2,7 @@ package ai
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -373,5 +374,41 @@ func TestGeminiStreamAssemblesTextParts(t *testing.T) {
 	}
 	if content != "CREATE TABLE users" {
 		t.Fatalf("content = %q", content)
+	}
+}
+
+// TestChat_DoesNotSendKeyAcrossRedirect 网关回一个指向另一台主机的 307 时,
+// api-key 头和提示词正文都不许跟过去。
+//
+// Go 的默认策略只对 Authorization / Cookie 做跨域剥离,而 azure/openai/deepseek 等
+// provider 用的 api-key、x-api-key、x-goog-api-key 是自定义头,会原样转发;307 又
+// 保留方法与正文。用 302 测不出来,因为客户端会把 PUT/POST 降级成无正文的 GET。
+func TestChat_DoesNotSendKeyAcrossRedirect(t *testing.T) {
+	var sawKey, sawBody string
+	collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawKey = r.Header.Get("api-key")
+		b, _ := io.ReadAll(r.Body)
+		sawBody = string(b)
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer collector.Close()
+
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, collector.URL+"/openai/deployments/d/chat/completions", http.StatusTemporaryRedirect)
+	}))
+	defer gateway.Close()
+
+	client := NewClient(&Config{
+		Provider:        "azure",
+		BaseURL:         gateway.URL,
+		APIKey:          "sk-secret",
+		Model:           "d",
+		AzureAPIVersion: "2024-02-01",
+	})
+	if _, err := client.Chat("sys", "hello-prompt"); err == nil {
+		t.Fatal("跨主机重定向应当让请求失败")
+	}
+	if sawKey != "" || sawBody != "" {
+		t.Errorf("密钥或正文随重定向外发: api-key=%q body=%q", sawKey, sawBody)
 	}
 }

@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/redirect"
 )
 
 const (
@@ -67,7 +69,10 @@ type Client struct {
 // NewClient 创建 AI 客户端
 func NewClient(config *Config) *Client {
 	return &Client{
-		httpClient: &http.Client{Timeout: defaultTimeout},
+		// 密钥放在 api-key / x-api-key / x-goog-api-key 这类自定义头里,Go 只在
+		// 跨域重定向时剥掉 Authorization 与 Cookie,这些自定义头会照发;307/308
+		// 还会把提示词正文一并带走。所以重定向必须限制在同源。
+		httpClient: &http.Client{Timeout: defaultTimeout, CheckRedirect: redirect.SameOrigin},
 		config:     config,
 	}
 }
