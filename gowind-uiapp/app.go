@@ -17,6 +17,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlkratos"
 )
@@ -409,9 +410,10 @@ func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string, serv
 
 // GenerateRestCode 生成代码
 func (a *App) GenerateRestCode(serviceName string, protoPackageStrategy string) string {
-	if len(serviceName) == 0 {
-		runtime.LogErrorf(a.ctx, "服务名称不能为空")
-		return "服务名称不能为空"
+	// serviceName 会进 GeneratorOptions.ServiceName,而生成器拿它拼输出目录。
+	if err := svcname.Validate(serviceName); err != nil {
+		runtime.LogErrorf(a.ctx, "服务名称无效: %v", err)
+		return err.Error()
 	}
 
 	pi := a.getProjectInfo()
