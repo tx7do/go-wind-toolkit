@@ -21,7 +21,10 @@ func Importer(ctx context.Context, dsn, schemaPath *string, includeTables, exclu
 	_ = os.MkdirAll(*schemaPath, 0o755)
 
 	// Normalize the DSN to ensure it has a valid scheme
-	normalizedDSN := schemasource.NormalizeDSN(*dsn)
+	normalizedDSN, err := schemasource.NormalizeDSN(*dsn)
+	if err != nil {
+		return err
+	}
 
 	drv, err := schemasource.Default.Open(normalizedDSN)
 	if err != nil {

@@ -36,7 +36,10 @@ func Convert(
 	_ = os.MkdirAll(*outputPath, 0o755)
 
 	// Normalize the DSN to ensure it has a valid scheme
-	normalizedDSN := schemasource.NormalizeDSN(*dsn)
+	normalizedDSN, err := schemasource.NormalizeDSN(*dsn)
+	if err != nil {
+		return nil, err
+	}
 
 	convertDriver, err := schemasource.Default.Open(normalizedDSN)
 	if err != nil {
