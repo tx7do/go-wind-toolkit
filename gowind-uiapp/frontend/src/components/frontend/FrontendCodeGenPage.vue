@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, computed} from 'vue'
+import {ref, computed, watch} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
@@ -23,8 +23,11 @@ import {SelectFolder} from "../../../wailsjs/go/main/App";
 import {frontendgen, type main} from "../../../wailsjs/go/models";
 
 import MonacoEditor from "../backend/MonacoEditor.vue";
+import {useProject} from "../../stores/project";
 
 const {t} = useI18n()
+
+const {projectInfo} = useProject()
 
 const confirmLoading = ref(false)
 
@@ -354,6 +357,13 @@ function resetState() {
   generateOptions.value.outputDir = ''
 }
 
+// 项目是全局状态:换项目后本页残留的旧 YAML 与旧 outputDir 会让"生成"仍然按上一个
+// 项目的解析结果往上个项目目录里写文件,用户以为在操作当前项目。
+watch(projectInfo, (pi, prev) => {
+  if (pi?.ModPath === prev?.ModPath) return
+  currentStep.value = 0
+  resetState()
+})
 
 function getOperationTag(type: string) {
   const map: Record<string, { color: string; text: string }> = {

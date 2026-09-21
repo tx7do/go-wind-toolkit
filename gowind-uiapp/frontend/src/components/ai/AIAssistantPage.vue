@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, reactive, computed, onMounted, onUnmounted} from 'vue'
+import {ref, reactive, computed, onMounted, onUnmounted, watch} from 'vue'
 import {message, Modal} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
@@ -323,6 +323,20 @@ onMounted(() => {
 
 onUnmounted(() => {
   EventsOff('ai:stream')
+})
+
+// 换项目后必须丢掉上一个项目的产物:第 5 步 AIGenerateBackendCode 直接写当前
+// projectInfo 指向的目录,残留的 DDL/划分结果会落到新项目里。
+// 生成中/审查中的标志一并清掉,否则在途的 ai:stream 分块会继续往已重置的正文里追加。
+watch(projectInfo, (pi, prev) => {
+  if (pi?.ModPath === prev?.ModPath) return
+  currentStep.value = 0
+  ddlContent.value = ''
+  ddlGenerating.value = false
+  partitions.value = []
+  openapiFiles.value = []
+  reviewResult.value = ''
+  reviewLoading.value = false
 })
 
 // 初始化
