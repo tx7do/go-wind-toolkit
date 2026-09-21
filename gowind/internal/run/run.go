@@ -92,7 +92,7 @@ func Run(cmd *cobra.Command, args []string) error {
 					dir:  wd,
 				}})
 			}
-			return runService(wd)
+			return runService(cmd.Context(), wd)
 		}
 
 		// 当前目录不是服务目录:枚举并一并运行模块内全部服务。
@@ -110,7 +110,7 @@ func Run(cmd *cobra.Command, args []string) error {
 			}
 			return watchServices(inspector.Root, targets)
 		}
-		return runAllServices(inspector.Root, names)
+		return runAllServices(cmd.Context(), inspector.Root, names)
 	}
 
 	if watchEnabled {
@@ -122,16 +122,17 @@ func Run(cmd *cobra.Command, args []string) error {
 
 	servicePath := path.Join(inspector.Root, "/app/", serviceName, "/service")
 
-	return runService(servicePath)
+	return runService(cmd.Context(), servicePath)
 }
 
 // runService 运行单个服务:先编译服务二进制再直接执行。
 // 直接执行二进制(而非 go run)使终止语义精确——SIGINT/SIGTERM 经信号
 // 上下文由 exec 撤销的就是服务进程本身,不会留下 go run 包装进程已死、
 // 服务进程仍存的孤儿(与 runAllServices 同一语义)。
-func runService(serviceWorkPath string) error {
+func runService(ctx context.Context, serviceWorkPath string) error {
 	// 信号上下文:中断/终止时由 exec 撤销子进程(编译阶段一并覆盖)。
-	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// 派生自 cmd.Context(),使上层取消同样能撤销。
+	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	name := deriveWatchServiceName(serviceWorkPath)
@@ -151,17 +152,36 @@ func runService(serviceWorkPath string) error {
 		return fmt.Errorf("failed to start service: %w", err)
 	}
 
-	// 服务退出或信号到达前保持前台;取消后 exec 已杀掉子进程,等待回收。
-	<-sigCtx.Done()
-	_ = proc.Wait()
-	return nil
+	// 两种收束路径都得走,不能只等信号:服务自行退出(正常结束、端口被占、
+	// 配置错)若只 <-sigCtx.Done() 就永久挂起且退出码恒 0。
+	return waitOrSignal(sigCtx, proc.Wait)
+}
+
+// waitOrSignal 在"子进程退出"与"信号到达"之间竞取先发生者。
+// 信号驱动的终止不作为服务的失败;服务自行退出则原样回传其退出错误。
+func waitOrSignal(sigCtx context.Context, wait func() error) error {
+	waitCh := make(chan error, 1)
+	go func() { waitCh <- wait() }()
+
+	select {
+	case waitErr := <-waitCh:
+		if sigCtx.Err() != nil {
+			// 由信号撤销子进程,退出码不属于服务的语义。
+			return nil
+		}
+		return waitErr
+	case <-sigCtx.Done():
+		// exec 已发出 Kill,等它回收完再返回,不留僵尸。
+		<-waitCh
+		return nil
+	}
 }
 
 // runAllServices 一并运行模块内全部服务:先编译全部服务二进制,再并发拉起。
 // 各服务输出按行加名称前缀;SIGINT/SIGTERM 统一停止全部进程。
 // 直接执行二进制(而非 go run)使终止语义精确——杀掉的就是服务进程本身,
 // 不会留下 go run 包装进程已死、服务进程仍存的孤儿。
-func runAllServices(root string, names []string) error {
+func runAllServices(ctx context.Context, root string, names []string) error {
 	type serviceProc struct {
 		name    string
 		svcDir  string
@@ -170,7 +190,7 @@ func runAllServices(root string, names []string) error {
 
 	// 信号上下文:中断/终止时由 exec 撤销全部子进程。置于编译阶段之前,
 	// 使 Ctrl+C 同样能中断卡住的构建。
-	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	// 阶段一:编译全部服务(任一失败即中止,不启动任何进程)。
@@ -193,6 +213,9 @@ func runAllServices(root string, names []string) error {
 	stdoutMu := &sync.Mutex{}
 	stderrMu := &sync.Mutex{}
 	var wg sync.WaitGroup
+	// failedMu 保护 failed:告警在各自的 Wait 协程里发生,退出码要在汇合后统一回传。
+	var failedMu sync.Mutex
+	var failed []string
 	type startedProc struct {
 		name string
 		cmd  *exec.Cmd
@@ -217,6 +240,11 @@ func runAllServices(root string, names []string) error {
 				return // 整组停止,不逐个告警
 			}
 			_, _ = fmt.Fprintf(os.Stderr, "\033[33mWARNING: service '%s' exited: %v\033[m\n", name, err)
+			if err != nil {
+				failedMu.Lock()
+				failed = append(failed, name)
+				failedMu.Unlock()
+			}
 		}(p.name, proc)
 	}
 
@@ -237,6 +265,12 @@ func runAllServices(root string, names []string) error {
 	_, _ = fmt.Fprintf(os.Stdout, "\033[36mStarted %d service(s); Ctrl+C stops all of them.\033[m\n", len(startedProcs))
 
 	wg.Wait()
+
+	failedMu.Lock()
+	defer failedMu.Unlock()
+	if len(failed) > 0 {
+		return fmt.Errorf("以下服务异常退出: %s", strings.Join(failed, ", "))
+	}
 	return nil
 }
 

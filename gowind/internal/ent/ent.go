@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
@@ -14,7 +15,9 @@ import (
 
 // EntCmd 封装 ent 命令调用的数据和行为。
 type EntCmd struct {
-	Args      []string
+	Args []string
+	// TargetDir 一律是 ent 的 schema 目录本身(如 <service>/internal/data/ent/schema),
+	// 与 RunNew 的 --target、RunGenerate 的位置参数同一语义。
 	TargetDir string
 	Timeout   time.Duration
 	goCmd     *pkg.GoCmd
@@ -29,14 +32,15 @@ func NewEntCmd(targetDir string) *EntCmd {
 		TargetDir: filepath.Clean(targetDir),
 		Timeout:   timeout,
 	}
-	e.goCmd = pkg.NewGoCmdWithTimeout(targetDir, timeout)
+	e.goCmd = pkg.NewGoCmdWithTimeout(e.TargetDir, timeout)
 	return e
 }
 
-// tryGoRunFirst 尝试在项目中通过 `go run entgo.io/ent/cmd/ent ...` 执行命令（向上查找可执行目录）。
+// tryGoRunFirst 尝试在项目中通过 `go run entgo.io/ent/cmd/ent ...` 执行命令
+// （从 schema 目录起向上查找可执行的模块根）。
 // 成功时打印输出并返回 nil；失败时返回最后一次错误以便调用方决定后续处理。
 func (e *EntCmd) tryGoRunFirst(ctx context.Context, args ...string) error {
-	out, err := e.goCmd.RunUpwardUntilSucceeds(ctx, "", args...)
+	out, err := e.goCmd.RunUpwardUntilSucceeds(ctx, e.TargetDir, args...)
 	if err == nil {
 		// 打印 combined output（stdout+stderr）
 		if len(out) > 0 {
@@ -88,6 +92,32 @@ func (e *EntCmd) runGlobalEntIfAvailable(ctx context.Context, args ...string) er
 	return nil
 }
 
+// schemaTargetArg 把 `ent new` 的落点钉成绝对路径。ent 的 --target 默认值是相对工作目录的
+// "ent/schema",而 go run 分支会沿 RunUpwardUntilSucceeds 向上漂到模块根——不显式传 --target
+// 时 schema 就落到 CWD 而非服务目录,命令照样退出 0。
+func (e *EntCmd) schemaTargetArg() string {
+	abs, err := filepath.Abs(e.TargetDir)
+	if err != nil {
+		abs = e.TargetDir
+	}
+	return "--target=" + abs
+}
+
+// verifySchemasCreated ent 退出码 0 不等于文件落在了预期的 schema 目录。按 ent 自己的命名
+// 规则(<小写名>.go)复核一遍,把"报成功但 schema 没进生成"变成显式失败。
+func (e *EntCmd) verifySchemasCreated(names []string) error {
+	var missing []string
+	for _, name := range names {
+		if _, err := os.Stat(filepath.Join(e.TargetDir, strings.ToLower(name)+".go")); err != nil {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("ent new 退出正常但 %s 下缺少 schema 文件: %s", e.TargetDir, strings.Join(missing, ", "))
+	}
+	return nil
+}
+
 // RunNew 使用优先使用项目内的 go run，如果失败则尝试全局 ent 可执行程序来执行 `ent new`。
 func (e *EntCmd) RunNew(ctx context.Context, names []string) error {
 	if len(names) == 0 {
@@ -97,17 +127,22 @@ func (e *EntCmd) RunNew(ctx context.Context, names []string) error {
 		return fmt.Errorf("create schema dir failed: %w", err)
 	}
 
+	targetArg := e.schemaTargetArg()
+
 	// 尝试 go run first
-	goArgs := []string{"run", "entgo.io/ent/cmd/ent", "new"}
+	goArgs := []string{"run", "entgo.io/ent/cmd/ent", "new", targetArg}
 	goArgs = append(goArgs, names...)
 
 	if err := e.tryGoRunFirst(ctx, goArgs...); err == nil {
-		return nil
+		return e.verifySchemasCreated(names)
 	}
 
 	// 如果 go run 不可用，则尝试全局 ent
-	entArgs := append([]string{"new"}, names...)
-	return e.runGlobalEntIfAvailable(ctx, entArgs...)
+	entArgs := append([]string{"new", targetArg}, names...)
+	if err := e.runGlobalEntIfAvailable(ctx, entArgs...); err != nil {
+		return err
+	}
+	return e.verifySchemasCreated(names)
 }
 
 // RunGenerate 使用优先使用项目内的 go run，如果失败则尝试全局 ent 可执行程序来执行 `ent generate`。
