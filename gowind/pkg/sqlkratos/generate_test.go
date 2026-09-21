@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -283,6 +284,36 @@ func TestEnsureDSNScheme_RejectsUnsupportedDriver(t *testing.T) {
 	}
 }
 
+// TestConvertPostgresKeyValueToURL_RoundTrips 转换后的 URL 必须能被解析回同样的
+// 分量——口令里带 / : @ # % + 这类字符时,拼出来的串很容易把 host 或 path 改掉。
+func TestConvertPostgresKeyValueToURL_RoundTrips(t *testing.T) {
+	for _, password := range []string{"plain", "p@ss", "p:ss", "p/ss", "p#ss", "p%ss", "p+ss", "p=ss&x=1"} {
+		t.Run(password, func(t *testing.T) {
+			dsn := convertPostgresKeyValueToURL("host=db.internal port=6000 user=app password=" + password + " dbname=mydb")
+
+			u, err := url.Parse(dsn)
+			require.NoError(t, err, "生成的 URL 无法解析: %s", dsn)
+			assert.Equal(t, "db.internal:6000", u.Host, "host 被口令里的字符改写掉了: %s", dsn)
+			assert.Equal(t, "/mydb", u.Path, "path 被改写掉了: %s", dsn)
+			require.NotNil(t, u.User)
+			assert.Equal(t, "app", u.User.Username())
+			got, ok := u.User.Password()
+			require.True(t, ok, "口令丢失: %s", dsn)
+			assert.Equal(t, password, got, "口令没有原样往返: %s", dsn)
+		})
+	}
+}
+
+// TestConvertPostgresKeyValueToURL_StableOrder 剩余参数来自 map 遍历,顺序必须稳定,
+// 否则同一份配置每次生成的 DSN 都不一样。
+func TestConvertPostgresKeyValueToURL_StableOrder(t *testing.T) {
+	in := "user=app dbname=mydb sslmode=disable search_path=public application_name=gow"
+	first := convertPostgresKeyValueToURL(in)
+	for i := 0; i < 30; i++ {
+		require.Equal(t, first, convertPostgresKeyValueToURL(in), "第 %d 次生成不一致", i+1)
+	}
+}
+
 // TestGenerate_TableFilter 固定住表过滤契约:IncludedTables 为空 = 全部表
 // (见 sqlproto/internal/options.go 的 "all if empty"),非空 = 只导入列出的表。
 //
@@ -292,6 +323,7 @@ func TestGenerate_TableFilter(t *testing.T) {
 	const ddl = `CREATE TABLE users (
 		id bigint(20) NOT NULL AUTO_INCREMENT,
 		name varchar(100) NOT NULL,
+		score int(10) unsigned NOT NULL,
 		PRIMARY KEY (id)
 	);
 
@@ -325,7 +357,14 @@ func TestGenerate_TableFilter(t *testing.T) {
 			}
 
 			require.NoError(t, Generate(context.Background(), opts))
-			assert.Equal(t, c.want, protoBasenames(t, filepath.Join(opts.OutputPath, "api", "protos")))
+			protos := filepath.Join(opts.OutputPath, "api", "protos")
+			assert.Equal(t, c.want, protoBasenames(t, protos))
+
+			// 表过滤之外还要断言类型映射:sqlkratos 走的是 text 腿,DDL 原文里的
+			// unsigned 一旦被中间解析器丢掉,这列会静默退化成 int32。
+			userProto := protoFileContents(t, protos)["user.proto"]
+			t.Logf("生成的 user.proto:\n%s", userProto)
+			assert.Contains(t, userProto, "optional uint32 score = 3")
 		})
 	}
 }
@@ -409,6 +448,8 @@ func seedMySQLUsersTable(t *testing.T) {
 		"CREATE TABLE " + testMySQLDB + ".users (" +
 			"id bigint NOT NULL AUTO_INCREMENT, " +
 			"name varchar(100) NOT NULL, " +
+			"uid bigint unsigned NOT NULL, " +
+			"score int unsigned NOT NULL, " +
 			"PRIMARY KEY (id))",
 	} {
 		_, err = db.ExecContext(ctx, stmt)
@@ -420,7 +461,12 @@ func seedMySQLUsersTable(t *testing.T) {
 // TestGenerate_GenerateOnlyProto 连的是空的 `test` 库,Generate 在
 // generator.go 的 len(tables)==0 处直接返回 nil,assert.NoError 恒真。这里自建
 // 专用库并建一张 users 表,断言 information_schema 探测出来的表确实变成了
-// user.proto 且列映射成 int64 id / string name。
+// user.proto 且列映射成 int64 id / string name / uint64 uid / uint32 score。
+//
+// 两条无符号列断言的是"unsigned 能活着走完真实服务器的一整圈"(建表 →
+// information_schema → atlas Raw → 映射 → proto)。MySQL 8.4 的 COLUMN_TYPE 已不给
+// 整型带显示宽度,所以这里是 "bigint unsigned" 这种形式;带宽度的写法由
+// pkg/sqlproto/internal 的 TestLiveLegAtlasRawMapping 在不连库时守住。
 func TestGenerate_MySQLSeededTable(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skip integration test")
@@ -453,4 +499,8 @@ func TestGenerate_MySQLSeededTable(t *testing.T) {
 	t.Logf("生成的 user.proto:\n%s", content)
 	assert.Contains(t, content, "optional int64 id = 1")
 	assert.Contains(t, content, "optional string name = 2")
+	// 这两列守住的是"真实服务器带回的 unsigned 没有在半路被丢":atlas 交回的
+	// Raw 直接来自 information_schema.COLUMNS.COLUMN_TYPE,少一环映射就退回有符号。
+	assert.Contains(t, content, "optional uint64 uid = 3")
+	assert.Contains(t, content, "optional uint32 score = 4")
 }

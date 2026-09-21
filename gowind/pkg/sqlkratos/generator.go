@@ -64,6 +64,9 @@ func isDDLText(dsn string) bool {
 // convertPostgresKeyValueToURL converts PostgreSQL key-value DSN to URL format.
 // Input:  "host=localhost port=5432 user=postgres password=xxx dbname=mydb sslmode=disable"
 // Output: "postgres://postgres:xxx@localhost:5432/mydb?sslmode=disable"
+//
+// 编码交给 url.URL:手写 url.QueryEscape 走的是表单规则,空格编成 "+",而 userinfo
+// 与 path 里的 "+" 是字面量,含空格或 "+" 的口令会被原样送到服务端。
 func convertPostgresKeyValueToURL(dsn string) string {
 	parts := strings.Fields(dsn)
 	vals := make(map[string]string)
@@ -86,35 +89,34 @@ func convertPostgresKeyValueToURL(dsn string) string {
 	password := vals["password"]
 	dbname := vals["dbname"]
 
-	// Build URL: postgres://user:password@host:port/dbname?params
-	result := "postgres://"
-	if user != "" {
-		result += url.QueryEscape(user)
-		if password != "" {
-			result += ":" + url.QueryEscape(password)
-		}
-		result += "@"
+	u := &url.URL{
+		Scheme: "postgres",
+		Host:   host + ":" + port,
 	}
-	result += host + ":" + port
+	switch {
+	case user != "" && password != "":
+		u.User = url.UserPassword(user, password)
+	case user != "":
+		// 无口令时不能留 "user:" 的空冒号:那会被解成一个空口令。
+		u.User = url.User(user)
+	}
 	if dbname != "" {
-		result += "/" + url.QueryEscape(dbname)
+		u.Path = "/" + dbname
 	}
 
-	// Collect remaining params as query string
-	var params []string
+	// Values.Encode 按键排序,同一份 DSN 每次得到同一个字符串。
+	params := url.Values{}
 	for k, v := range vals {
 		switch k {
 		case "host", "port", "user", "password", "dbname":
 			// already handled
 		default:
-			params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(v))
+			params.Set(k, v)
 		}
 	}
-	if len(params) > 0 {
-		result += "?" + strings.Join(params, "&")
-	}
+	u.RawQuery = params.Encode()
 
-	return result
+	return u.String()
 }
 
 func Generate(ctx context.Context, opts GeneratorOptions) error {
