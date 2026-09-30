@@ -47,10 +47,14 @@ func TestWriteSchema_ProcessCWDOutsideGoModule(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, generated, "schema files should be written")
 
-	// 进程 CWD 应被恢复
+	// 进程 CWD 应被恢复。os.Getwd() 在 macOS 上返回符号链接解析后的路径
+	// (/var → /private/var),而 t.TempDir() 给的是未解析的那一个,
+	// 所以期望值也要先解析——Linux 上 EvalSymlinks 原样返回。
 	wd, err := os.Getwd()
 	require.NoError(t, err)
-	assert.Equal(t, outside, wd)
+	resolved, err := filepath.EvalSymlinks(outside)
+	require.NoError(t, err)
+	assert.Equal(t, resolved, wd)
 }
 
 // TestWriteSchema_SchemaDirOutsideGoModule 保证错误可诊断:

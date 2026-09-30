@@ -96,32 +96,32 @@ export type ChatMessage = {
 };
 
 // This API demonstrates streaming RPC patterns with HTTP annotations.
-// 
+//
 // - Unary RPCs use the standard RequestHandler (fetch/axios).
 // - Server-streaming RPCs are mapped to SSE (Server-Sent Events).
 // - Bidirectional streaming RPCs are mapped to WebSocket.
 export interface StreamService {
   // Get a single log entry.
-  // 
+  //
   // Unary request/response — uses RequestHandler.
   GetLog(
     request: GetLogRequest,
   ): Promise<LogEntry>;
   // List log entries.
-  // 
+  //
   // Unary request/response with pagination — uses RequestHandler.
   ListLogs(
     request: ListLogsRequest,
   ): Promise<ListLogsResponse>;
   // Tail log entries in real time.
-  // 
+  //
   // Server-streaming RPC → generated as SSE (Server-Sent Events).
   // The client subscribes to a stream of log entries pushed by the server.
   TailLogs(
     request: TailLogsRequest,
   ): ServerStream<LogEntry>;
   // Realtime bidirectional chat.
-  // 
+  //
   // Bidirectional streaming RPC → generated as WebSocket.
   // Both client and server can send messages independently.
   Chat(): DuplexStream<ChatMessage, ChatMessage>;

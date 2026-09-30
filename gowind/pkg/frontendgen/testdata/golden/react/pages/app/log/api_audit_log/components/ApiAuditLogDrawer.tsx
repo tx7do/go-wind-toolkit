@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { auditservicev1_ApiAuditLog as ApiAuditLog } from '@/api/generated/admin/service/v1';
 import { useCreateApiAuditLog, useUpdateApiAuditLog } from '@/api/hooks/api-audit-log';
+import { getRequestMethodOptions } from '../constants';
 
 interface ApiAuditLogDrawerProps {
   open: boolean;
@@ -118,7 +119,7 @@ const ApiAuditLogDrawer: React.FC<ApiAuditLogDrawerProps> = ({
         label={t('requestMethod')}
         placeholder={t('requestMethodPlaceholder')}
         rules={[{ required: true, message: t('requiredRequestMethod') }]}
-        options={requestMethodOptions}
+        options={getRequestMethodOptions(t)}
       />
 
       <ProFormText

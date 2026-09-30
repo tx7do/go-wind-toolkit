@@ -15,6 +15,9 @@ func init() {
 	Default.RegisterProvider(mysqlProvider, "mysql")
 	Default.RegisterProvider(postgresProvider, "postgres", "postgresql")
 	Default.RegisterProvider(textProvider, "text", "file")
+	// Go 源码 schema 源:直接以用户已有的 ent schema / gorm model 目录为输入。
+	Default.RegisterProvider(entSchemaProvider, "ent")
+	Default.RegisterProvider(gormSchemaProvider, "gorm")
 }
 
 func mysqlProvider(dsn string) (*Driver, error) {

@@ -20,28 +20,32 @@ import (
 )
 
 // ensureDSNScheme ensures the DSN has a valid scheme prefix based on the driver type.
-// If the DSN already contains "://", it is returned as-is.
+// If it already carries a scheme (or is DDL text, or driver is empty), it is returned as-is:
+// such sources describe their own type, so the driver must not gate them.
 // For PostgreSQL key-value format DSN (e.g. "host=localhost port=5432 user=postgres ..."),
 // it converts to URL format (e.g. "postgres://user:pass@host:port/dbname?sslmode=disable").
-// DDL 文本（CREATE TABLE 语句）不做处理，交给下游 sqlproto 的 text:// 识别。
-func ensureDSNScheme(dsn, driver string) string {
+// A driver we have no provider for is rejected here: passing it through would let the
+// source be reinterpreted as text:// and "succeed" while generating nothing.
+func ensureDSNScheme(dsn, driver string) (string, error) {
 	if strings.Contains(dsn, "://") {
-		return dsn
+		return dsn, nil
 	}
 	if isDDLText(dsn) {
-		return dsn
+		return dsn, nil
 	}
 	switch strings.ToLower(driver) {
+	case "":
+		return dsn, nil
 	case "mysql":
-		return "mysql://" + dsn
+		return "mysql://" + dsn, nil
 	case "postgresql", "postgres":
 		// PostgreSQL key-value DSN: "host=localhost port=5432 user=postgres password=xxx dbname=mydb sslmode=disable"
 		if isPostgresKeyValueDSN(dsn) {
-			return convertPostgresKeyValueToURL(dsn)
+			return convertPostgresKeyValueToURL(dsn), nil
 		}
-		return "postgres://" + dsn
+		return "postgres://" + dsn, nil
 	default:
-		return dsn
+		return "", fmt.Errorf("sqlkratos: unsupported driver: %q (supported: mysql, postgres, postgresql; leave it empty when the source carries its own scheme)", driver)
 	}
 }
 
@@ -60,6 +64,9 @@ func isDDLText(dsn string) bool {
 // convertPostgresKeyValueToURL converts PostgreSQL key-value DSN to URL format.
 // Input:  "host=localhost port=5432 user=postgres password=xxx dbname=mydb sslmode=disable"
 // Output: "postgres://postgres:xxx@localhost:5432/mydb?sslmode=disable"
+//
+// 编码交给 url.URL:手写 url.QueryEscape 走的是表单规则,空格编成 "+",而 userinfo
+// 与 path 里的 "+" 是字面量,含空格或 "+" 的口令会被原样送到服务端。
 func convertPostgresKeyValueToURL(dsn string) string {
 	parts := strings.Fields(dsn)
 	vals := make(map[string]string)
@@ -82,35 +89,34 @@ func convertPostgresKeyValueToURL(dsn string) string {
 	password := vals["password"]
 	dbname := vals["dbname"]
 
-	// Build URL: postgres://user:password@host:port/dbname?params
-	result := "postgres://"
-	if user != "" {
-		result += url.QueryEscape(user)
-		if password != "" {
-			result += ":" + url.QueryEscape(password)
-		}
-		result += "@"
+	u := &url.URL{
+		Scheme: "postgres",
+		Host:   host + ":" + port,
 	}
-	result += host + ":" + port
+	switch {
+	case user != "" && password != "":
+		u.User = url.UserPassword(user, password)
+	case user != "":
+		// 无口令时不能留 "user:" 的空冒号:那会被解成一个空口令。
+		u.User = url.User(user)
+	}
 	if dbname != "" {
-		result += "/" + url.QueryEscape(dbname)
+		u.Path = "/" + dbname
 	}
 
-	// Collect remaining params as query string
-	var params []string
+	// Values.Encode 按键排序,同一份 DSN 每次得到同一个字符串。
+	params := url.Values{}
 	for k, v := range vals {
 		switch k {
 		case "host", "port", "user", "password", "dbname":
 			// already handled
 		default:
-			params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(v))
+			params.Set(k, v)
 		}
 	}
-	if len(params) > 0 {
-		result += "?" + strings.Join(params, "&")
-	}
+	u.RawQuery = params.Encode()
 
-	return result
+	return u.String()
 }
 
 func Generate(ctx context.Context, opts GeneratorOptions) error {
@@ -347,7 +353,10 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 	protoPath := path.Join(opts.OutputPath, "/api/protos/")
 
 	// 确保 DSN 有正确的 scheme 前缀
-	source := ensureDSNScheme(opts.Source, opts.Driver)
+	source, err := ensureDSNScheme(opts.Source, opts.Driver)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, server := range opts.Servers {
 		if server != "grpc" && server != "rest" {
@@ -376,6 +385,10 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 }
 
 // generateOrmCode generates the ORM code based on the specified ORM type.
+//
+// Go 源码数据源(ent://<dir>、gorm://<dir>)有特殊语义:
+//   - ent:// 的 schema 本身就是输入,跳过导入(运行时代码由 gow ent 生成);
+//   - gorm:// 经 sqlorm 路由到 DAO 回转生成,只补缺失模型、不覆盖用户模型。
 func (g *Generator) generateOrmCode(
 	ctx context.Context,
 	opts GeneratorOptions,
@@ -386,7 +399,10 @@ func (g *Generator) generateOrmCode(
 	log.Println("Generating ORM code...")
 
 	// 确保 DSN 有正确的 scheme 前缀
-	source := ensureDSNScheme(opts.Source, opts.Driver)
+	source, err := ensureDSNScheme(opts.Source, opts.Driver)
+	if err != nil {
+		return err
+	}
 
 	var schemaPath string
 	var daoPath string
@@ -396,6 +412,20 @@ func (g *Generator) generateOrmCode(
 	case "gorm":
 		schemaPath = path.Join(serviceRootPath, "/data/gorm/models")
 		daoPath = path.Join(serviceRootPath, "/data/gorm/dao")
+	}
+
+	switch {
+	case strings.HasPrefix(source, "ent://"):
+		if opts.OrmType != "ent" {
+			return fmt.Errorf("sqlkratos: ent:// source requires --orm ent, got %q", opts.OrmType)
+		}
+		log.Println("Source is an ent schema dir; schema import skipped. Run `gow ent <service>` to (re)generate ent runtime code.")
+		return nil
+
+	case strings.HasPrefix(source, "gorm://"):
+		if opts.OrmType != "gorm" {
+			return fmt.Errorf("sqlkratos: gorm:// source requires --orm gorm, got %q", opts.OrmType)
+		}
 	}
 
 	if err = sqlorm.Importer(

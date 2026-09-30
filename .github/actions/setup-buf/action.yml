@@ -1,0 +1,30 @@
+name: Setup buf
+description: >-
+  安装钉定版本的 buf 并自检。golden 回归(gowind 之外的 protoc-gen 插件)依赖 PATH 上的 buf:
+  goldentest.Run 找不到 buf 就 t.Skip,不装就等于门禁空转。
+
+inputs:
+  version:
+    description: buf 版本号(不带 v 前缀)
+    required: false
+    default: '1.66.0'
+
+runs:
+  using: composite
+  steps:
+    - name: Install buf ${{ inputs.version }}
+      shell: bash
+      env:
+        # 经 env 传入而非直接内插进脚本:内插等于把 workflow 里的实参当 shell 代码执行。
+        BUF_VERSION: ${{ inputs.version }}
+      run: |
+        # 发布产物文件名就是 "<uname -s>-<uname -m>"(Darwin-arm64 / Linux-x86_64),
+        # 直接拼即可,arch 无需再映射(macos 是 arm64、ubuntu 是 x86_64)。
+        dest="$RUNNER_TEMP/buf"
+        mkdir -p "$dest"
+        curl -fsSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-$(uname -s)-$(uname -m).tar.gz" \
+          | tar -xz -C "$dest" buf/bin/buf
+        chmod +x "$dest/buf/bin/buf"
+        echo "$dest/buf/bin" >> "$GITHUB_PATH"
+        # 按绝对路径自检:GITHUB_PATH 只对后续 step 生效,同一步里 buf 仍不在 PATH 上。
+        "$dest/buf/bin/buf" --version

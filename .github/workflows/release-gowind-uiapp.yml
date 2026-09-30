@@ -9,7 +9,47 @@ permissions:
   contents: write
 
 jobs:
+  # 与 release-gowind.yml 同理:原先三个 build 直接进 release,整条发布链没有测试。
+  # 前端必须先出产物——main.go 的 //go:embed all:frontend/dist 要求真实文件,而 dist 不入库。
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      GOWORK: off
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: gowind-uiapp/go.mod
+          cache-dependency-path: |
+            gowind/go.sum
+            gowind-uiapp/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gowind-uiapp/frontend/package-lock.json
+
+      - name: Build frontend assets
+        working-directory: gowind-uiapp/frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          npm ci
+          npx vite build
+
+      - name: Build, vet and test
+        working-directory: gowind-uiapp
+        run: go build ./... && go vet ./... && go test -count=1 ./...
+
   build-windows:
+    needs: test
     runs-on: windows-latest
 
     steps:
@@ -59,6 +99,7 @@ jobs:
           path: gowind-uiapp/build/bin/gowind-toolkit-windows-amd64.exe
 
   build-linux:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -105,6 +146,7 @@ jobs:
           path: gowind-uiapp/build/bin/gowind-toolkit-linux-amd64
 
   build-macos:
+    needs: test
     runs-on: macos-latest
 
     steps:

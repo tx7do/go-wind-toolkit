@@ -9,6 +9,39 @@ import (
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/generators"
 )
 
+// 全新服务同时请求 grpc 与 websocket:grpc 逐表注册 proto 服务,websocket 作为
+// 消息驱动传输仅产 server 骨架、不做逐表 proto 注册;二者都应无错误地落盘。
+func TestGenerateServerPackageCodeGrpcAndWebsocket(t *testing.T) {
+	root := t.TempDir()
+	serverDir := filepath.Join(root, "app", "user", "service", "internal", "server")
+	if err := os.MkdirAll(serverDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// 无既有装配文件 → useWiringDI 形态,但 server 文件不存在,走整体渲染。
+	wctx := newWiringContext(root, "user", "ent", true, true)
+
+	g := NewGenerator()
+	servicePackageMap := map[string]string{"user": "user"}
+	err := g.generateServerPackageCode(serverDir, "proj", "user", servicePackageMap, []string{"grpc", "websocket"}, "v1", []string{"user"}, wctx)
+	if err != nil {
+		t.Fatalf("generateServerPackageCode: %v", err)
+	}
+
+	grpcSrc := readNormalized(t, filepath.Join(serverDir, "grpc_server.go"))
+	if !strings.Contains(grpcSrc, "RegisterUserServiceServer") {
+		t.Fatalf("grpc_server.go missing per-table registration:\n%s", grpcSrc)
+	}
+
+	wsSrc := readNormalized(t, filepath.Join(serverDir, "websocket_server.go"))
+	if !strings.Contains(wsSrc, "func NewWebsocketServer(") {
+		t.Fatalf("websocket_server.go missing server constructor:\n%s", wsSrc)
+	}
+	if strings.Contains(wsSrc, "RegisterUserServiceServer") {
+		t.Fatal("websocket_server.go must not register proto services")
+	}
+}
+
 // 既有带锚点的 server 文件:只注入新模块形参/路由,不整体重渲——
 // 项目手工维护的中间件与路由内容必须原样保留;装配文件同步注入实参行;全程幂等。
 func TestGenerateServerPackageCodeInjectsIntoAnchoredFiles(t *testing.T) {

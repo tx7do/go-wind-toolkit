@@ -182,9 +182,9 @@ func RunAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	servicePath := filepath.Join(inspector.Root, "app", service, "service")
-	// `ent new` 在工作目录下创建 ent/schema/ 子目录,
-	// 因此工作目录取 internal/data,最终落点为 internal/data/ent/schema/。
-	target := filepath.Join(servicePath, "internal", "data")
+	// EntCmd.TargetDir 一律取 ent schema 目录本身;`ent new` 靠绝对 --target 定落点,
+	// 不再依赖工作目录恰好是 internal/data。
+	target := filepath.Join(servicePath, "internal", "data", "ent", "schema")
 
 	e := NewEntCmd(target)
 	if err = e.RunNew(cmd.Context(), names); err != nil {

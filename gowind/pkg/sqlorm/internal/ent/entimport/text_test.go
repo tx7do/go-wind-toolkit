@@ -154,6 +154,88 @@ COMMENT ON TABLE "public"."addresses" IS '地址表';
 	require.NoError(t, WriteSchema(mutations, WithSchemaPath(schemaDir)))
 }
 
+// TestInspectSchema_UnsignedColumns 锁住 unsigned 判定:
+// 曾经是一份「整文件子串搜索」的复制实现,列名 id 会命中 uid bigint unsigned
+// 与另一张表里的同名同型列,把有符号列解析成无符号,负值语义随之全错。
+// 现在两腿共用 schemasource.ColumnIsUnsigned,判定必须按表体 + 词边界 + 类型锚定。
+func TestInspectSchema_UnsignedColumns(t *testing.T) {
+	sql := `
+CREATE TABLE users (
+  id bigint(20) NOT NULL AUTO_INCREMENT,
+  uid bigint(20) unsigned NOT NULL,
+  login_count int(10) unsigned zerofill NOT NULL,
+  score int(11) NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_uid (uid)
+) ENGINE=InnoDB;
+
+CREATE TABLE archives (
+  id int(11) NOT NULL,
+  score int(11) unsigned NOT NULL
+) ENGINE=InnoDB;
+`
+
+	text, err := NewText(&ImportOptions{schemaPath: sql})
+	require.NoError(t, err)
+
+	var s schema.Schema
+	_, err = text.InspectSchema(context.Background(), sql, &schema.InspectOptions{}, &s)
+	require.NoError(t, err)
+	require.Len(t, s.Tables, 2)
+
+	for _, tt := range []struct {
+		table, column string
+		wantUnsigned  bool
+	}{
+		{table: "users", column: "id", wantUnsigned: false},
+		{table: "users", column: "uid", wantUnsigned: true},
+		{table: "users", column: "login_count", wantUnsigned: true},
+		{table: "users", column: "score", wantUnsigned: false},
+		{table: "archives", column: "id", wantUnsigned: false},
+		{table: "archives", column: "score", wantUnsigned: true},
+	} {
+		intType, raw := integerColumnType(t, &s, tt.table, tt.column)
+		assert.Equalf(t, tt.wantUnsigned, intType.Unsigned, "%s.%s (Raw=%q) 的 unsigned 判定错了", tt.table, tt.column, raw)
+	}
+}
+
+func integerColumnType(t *testing.T, s *schema.Schema, table, column string) (*schema.IntegerType, string) {
+	t.Helper()
+
+	for _, tb := range s.Tables {
+		if tb.Name != table {
+			continue
+		}
+		for _, c := range tb.Columns {
+			if c.Name != column {
+				continue
+			}
+			intType, ok := c.Type.Type.(*schema.IntegerType)
+			require.Truef(t, ok, "%s.%s 应解析为整型,实际 %T", table, column, c.Type.Type)
+			return intType, c.Type.Raw
+		}
+		t.Fatalf("列 %s.%s 没有解析出来,表内列: %v", table, column, columnNames(tb))
+	}
+	t.Fatalf("表 %s 没有解析出来,实际表: %v", table, tableNames(s))
+	return nil, ""
+}
+
+func columnNames(tb *schema.Table) []string {
+	names := make([]string, 0, len(tb.Columns))
+	for _, c := range tb.Columns {
+		names = append(names, c.Name)
+	}
+	return names
+}
+
+func tableNames(s *schema.Schema) []string {
+	names := make([]string, 0, len(s.Tables))
+	for _, tb := range s.Tables {
+		names = append(names, tb.Name)
+	}
+	return names
+}
+
 func tableComment(table *schema.Table) string {
 	for _, attr := range table.Attrs {
 		if c, ok := attr.(*schema.Comment); ok {

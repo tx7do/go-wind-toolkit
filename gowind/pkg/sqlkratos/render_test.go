@@ -108,6 +108,32 @@ func TestWriteServerPackageCode_UnsupportedType(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported service type")
 }
 
+func TestWriteServerPackageCode_Websocket(t *testing.T) {
+	g := NewGenerator()
+	tmpDir := t.TempDir()
+	outputPath := filepath.Join(tmpDir, "app", "user", "service", "internal", "server")
+	err := os.MkdirAll(outputPath, 0o755)
+	assert.Nil(t, err)
+
+	// websocket 不承载逐表 proto 服务:即便传入 services 映射,产物只应含消息驱动 server。
+	services := map[string]string{"user": "user", "role": "user"}
+	err = g.WriteServerPackageCode(outputPath, "github.com/example/myproject", "websocket", "user", services)
+	assert.Nil(t, err)
+
+	wsFile := filepath.Join(outputPath, "websocket_server.go")
+	assert.FileExists(t, wsFile)
+
+	data, err := os.ReadFile(wsFile)
+	assert.Nil(t, err)
+	content := string(data)
+	assert.Contains(t, content, "func NewWebsocketServer(")
+	assert.Contains(t, content, "func NewWebsocketMiddleware(")
+	assert.Contains(t, content, "transport/websocket")
+	assert.Contains(t, content, "cfg.Server.Websocket")
+	// 不应出现逐表 proto 注册。
+	assert.NotContains(t, content, "RegisterUserServiceServer")
+}
+
 // ==============================
 // WriteDataPackageCode
 // ==============================

@@ -173,6 +173,69 @@ func TestFreshWiringMatchesBuilderLines_BffForm(t *testing.T) {
 	}
 }
 
+// WebSocket 传输脚手架:生成消息驱动的 server 骨架,wiring 构造 wsServer 且不落入 TODO 占位分支。
+func TestFreshWiringWebsocketForm(t *testing.T) {
+	out := t.TempDir()
+	gen := NewGoGenerator()
+
+	serverOut := filepath.Join(out, "server")
+	if err := os.MkdirAll(serverOut, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gen.GenerateWebsocketServer(context.Background(), code_generator.Options{
+		OutDir: serverOut,
+		Module: "example.com/demo",
+		Vars:   map[string]any{"Service": "chat"},
+	}); err != nil {
+		t.Fatalf("GenerateWebsocketServer: %v", err)
+	}
+
+	serverSrc := readTestFile(t, filepath.Join(serverOut, "websocket_server.go"))
+	for _, mustHave := range []string{
+		"func NewWebsocketServer(",
+		"func NewWebsocketMiddleware(",
+		"github.com/tx7do/kratos-transport/transport/websocket",
+		"cfg.Server.Websocket",
+		AnchorRoute,
+	} {
+		if !strings.Contains(serverSrc, mustHave) {
+			t.Fatalf("websocket_server.go missing %q:\n%s", mustHave, serverSrc)
+		}
+	}
+
+	blocks := BuildWiringBlocks([]string{"websocket"}, false, "", nil, nil, nil)
+	mainOut := filepath.Join(out, "main")
+	if err := os.MkdirAll(mainOut, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gen.GenerateWiring(context.Background(), code_generator.Options{
+		OutDir: mainOut,
+		Module: "example.com/demo",
+		Vars:   map[string]any{"Service": "chat"},
+	}, blocks); err != nil {
+		t.Fatalf("GenerateWiring: %v", err)
+	}
+
+	wiringSrc := readTestFile(t, filepath.Join(mainOut, "wiring.go"))
+	for _, mustHave := range []string{
+		"wsMiddlewares := server.NewWebsocketMiddleware(ctx)",
+		"wsServer, err := server.NewWebsocketServer(ctx, wsMiddlewares)",
+		"wsServer,",
+		"return newApp(",
+	} {
+		if !strings.Contains(wiringSrc, mustHave) {
+			t.Fatalf("websocket wiring missing %q:\n%s", mustHave, wiringSrc)
+		}
+	}
+	// 关键不变量:websocket 不再落入未实现占位分支。
+	if strings.Contains(wiringSrc, "TODO: 传输层") {
+		t.Fatalf("websocket wiring must not emit unimplemented-transport placeholder:\n%s", wiringSrc)
+	}
+	if !blocks.ImportServer {
+		t.Fatal("websocket blocks must request the server import")
+	}
+}
+
 // 全新空脚手架(无模块、无客户端):分节只有锚点,文件可读且结构完整。
 func TestFreshWiringEmptyScaffold(t *testing.T) {
 	blocks := BuildWiringBlocks([]string{"grpc"}, false, "", nil, nil, nil)

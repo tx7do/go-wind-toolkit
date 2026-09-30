@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -89,12 +90,37 @@ vue-vben 的国际化产物是合并式片段: 目标 locales/langs/{lang}/page.
 	},
 }
 
+var frontendParseCmd = &cobra.Command{
+	Use:   "parse",
+	Short: "解析 OpenAPI 规范,列出可生成的服务(tag)——等价 GUI 的服务预览",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		openapiRef := flagString(cmd, "openapi", "")
+		if openapiRef == "" {
+			checkErr(fmt.Errorf("必须指定 --openapi（OpenAPI YAML 文件路径或 http(s) URL）"))
+		}
+		spec, err := loadOpenAPISpec(openapiRef)
+		if err != nil {
+			return err
+		}
+		emit(frontendgen.ExtractServices(spec))
+		return nil
+	},
+}
+
+// openAPISpecClient 带超时的拉取客户端:http.Get 用的是无超时的 DefaultClient,
+// 一个只接受连接不回数据的地址能把 CLI 永久挂住。
+var openAPISpecClient = &http.Client{Timeout: 30 * time.Second}
+
+// maxOpenAPISpecBytes 响应正文上限:OpenAPI 文档正常在几十到几百 KB,
+// 不设上限就等于让远端决定 CLI 的内存占用。
+const maxOpenAPISpecBytes = 10 << 20
+
 // loadOpenAPISpec 加载 OpenAPI 规格（本地文件或 URL）
 func loadOpenAPISpec(ref string) (*frontendgen.Spec, error) {
 	var data []byte
 
 	if strings.HasPrefix(strings.ToLower(ref), "http://") || strings.HasPrefix(strings.ToLower(ref), "https://") {
-		resp, err := http.Get(ref)
+		resp, err := openAPISpecClient.Get(ref)
 		if err != nil {
 			return nil, fmt.Errorf("拉取 OpenAPI 失败: %w", err)
 		}
@@ -102,9 +128,13 @@ func loadOpenAPISpec(ref string) (*frontendgen.Spec, error) {
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("拉取 OpenAPI 失败: HTTP %d", resp.StatusCode)
 		}
-		data, err = io.ReadAll(resp.Body)
+		// 多读 1 字节用来分辨"正好等于上限"和"被截断"。
+		data, err = io.ReadAll(io.LimitReader(resp.Body, maxOpenAPISpecBytes+1))
 		if err != nil {
 			return nil, fmt.Errorf("读取 OpenAPI 响应失败: %w", err)
+		}
+		if len(data) > maxOpenAPISpecBytes {
+			return nil, fmt.Errorf("OpenAPI 文档超过 %d MiB 上限,拒绝读入内存", maxOpenAPISpecBytes>>20)
 		}
 	} else {
 		var err error
@@ -171,5 +201,7 @@ func init() {
 	frontendGenCmd.Flags().Bool("dry-run", false, "只输出文件清单，不写盘")
 	frontendGenCmd.Flags().Bool("stdout", false, "不写盘，输出全部文件内容 JSON")
 
-	frontendCmd.AddCommand(frontendGenCmd)
+	frontendParseCmd.Flags().String("openapi", "", "OpenAPI 3.0 YAML 文件路径或 http(s) URL（必填）")
+
+	frontendCmd.AddCommand(frontendGenCmd, frontendParseCmd)
 }

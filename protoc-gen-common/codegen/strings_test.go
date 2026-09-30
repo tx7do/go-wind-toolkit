@@ -1,7 +1,9 @@
 package codegen
 
 import (
+	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -57,6 +59,61 @@ func TestLocaleCompare(t *testing.T) {
 		if got := LocaleCompare(tt.a, tt.b); got != tt.want {
 			t.Errorf("LocaleCompare(%q, %q) = %v; want %v", tt.a, tt.b, got, tt.want)
 		}
+	}
+}
+
+// proto 的 LeadingComments 里段落之间是一个空串元素。两侧生成器原先直接 continue
+// 掉它,段落分隔就此丢失(生成的 dart/TS 文档把两段并成一段);而更早的基线又写成
+// "/// " 带尾随空格。目标形态:空行保留成裸标记,且任何一行都不带尾随空格。
+func TestCommentLines(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		in     string
+		marker string
+		want   []string
+	}{
+		{
+			name:   "interior blank line keeps the paragraph break",
+			in:     "Get a single log entry.\n\nUnary request/response.\n",
+			marker: "//",
+			want:   []string{"// Get a single log entry.", "//", "// Unary request/response."},
+		},
+		{
+			name:   "trailing blank line from protoc is dropped",
+			in:     "Only one paragraph.\n",
+			marker: "///",
+			want:   []string{"/// Only one paragraph."},
+		},
+		{
+			name:   "leading blank lines are dropped",
+			in:     "\nText.\n",
+			marker: "//",
+			want:   []string{"// Text."},
+		},
+		{
+			name:   "whitespace-only line counts as blank",
+			in:     "A.\n \nB.\n",
+			marker: "//",
+			want:   []string{"// A.", "//", "// B."},
+		},
+		{
+			name:   "all blank yields no lines",
+			in:     "\n\n",
+			marker: "//",
+			want:   []string{},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CommentLines(strings.Split(tt.in, "\n"), tt.marker)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CommentLines(%q, %q) = %q; want %q", tt.in, tt.marker, got, tt.want)
+			}
+			for _, line := range got {
+				if strings.TrimRight(line, " ") != line {
+					t.Errorf("CommentLines emitted a trailing-space line: %q", line)
+				}
+			}
+		})
 	}
 }
 

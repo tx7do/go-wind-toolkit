@@ -29,7 +29,12 @@ jobs:
         working-directory: protoc-gen-go-redact
         env:
           GOWORK: off
-        run: go test ./...
+        # 说明:integration_test.go / external_template_test.go 在 PATH 缺 protoc 时自行
+        # t.Skip(runner 上没有 protoc),所以这两条在发布链上是跳过的——本 job 的有效性
+        # 来自其余单测。不在此处按"有 SKIP 即红"收口,否则 apt 装的 protoc 版本一漂移就会
+        # 把发布无故拦红;要让这两条入闸,请像 test.yml 钉 buf 那样先钉 protoc 版本。
+        # -count=1 与 test.yml 同一口径,堵跨 run 的测试结果缓存。
+        run: go build ./... && go vet ./... && go test -count=1 ./...
 
   build:
     needs: test

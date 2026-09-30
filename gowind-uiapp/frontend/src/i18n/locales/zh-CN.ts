@@ -1,6 +1,14 @@
 export default {
   app: {
     title: 'GoWind Toolkit',
+    selectModuleTitle: '选择要打开的 Go 模块',
+    selectModuleHint: '该目录下未发现 go.mod，但找到以下子模块，请选择一个打开：',
+    confirm: '打开',
+    cancel: '取消',
+    noProject: '未打开项目',
+    openProject: '打开已有项目',
+    projectInvalid: '所选目录不是一个有效的 Go 项目，未找到 go.mod 文件',
+    projectOpenFailed: '无法打开项目，请确认目录正确',
   },
   // Tab 标签
   tabs: {
@@ -41,7 +49,6 @@ export default {
       clickToOpen: '点击打开项目目录',
       selectGoProject: '选择 Go 微服务项目的根目录',
       identifying: '正在识别项目...',
-      ready: '项目已就绪',
       switchProject: '切换项目',
       failed: '项目识别失败',
       hintGoMod: '请确保目录下包含 go.mod 文件',
@@ -59,6 +66,17 @@ export default {
       file: '本地文件',
       remote: '远程地址',
       editor: 'SQL 编辑器',
+      // Go 源码 schema（ent:// / gorm://）
+      goSchema: 'Go 源码 Schema',
+      goSchemaHint: '无需连接数据库，直接解析 Go 源码中的模型定义：ent:// 指向 ent 的 schema 目录，gorm:// 指向包含 GORM model 结构体的目录。',
+      goScheme: '数据源',
+      schemaDir: '模型目录',
+      entDirPlaceholder: '如 /path/to/project/ent/schema',
+      gormDirPlaceholder: '如 /path/to/project/internal/data',
+      selectDir: '选择目录',
+      goSchemaDirRequired: '请先选择模型目录',
+      goSchemaImportSuccess: 'Go 源码模型导入成功',
+      goSchemaImportFailed: 'Go 源码导入失败：{msg}',
       // 数据库
       dbType: '数据库类型',
       dsn: '数据源名称 (DSN)',
@@ -134,7 +152,10 @@ export default {
       ormType: 'ORM 类型',
       bffServiceName: 'BFF 服务名',
       bffServiceNamePlaceholder: '如 admin',
+      servers: '传输层',
+      ormLockedTip: '数据源为 {scheme} Go 源码，ORM 已锁定为与之配对的类型。',
       atLeastOne: '请至少选择一种生成目标',
+      atLeastOneTransport: 'gRPC 服务请至少选择一种传输层',
       // 概览
       summary: '生成概览',
       project: '项目',
@@ -353,7 +374,10 @@ export default {
     },
     create: {
       btn: '新建后端项目',
+      btnSwitch: '新建并切换项目',
       title: '创建新后端项目',
+      switchTitle: '新建项目将离开当前项目',
+      switchContent: '新建完成后会切换到新项目，当前项目已导入但未生成的表配置与数据库连接会被清空。',
       name: '项目名称',
       namePlaceholder: '例如: my-project',
       nameRequired: '请输入项目名称',

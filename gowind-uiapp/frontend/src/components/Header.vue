@@ -1,15 +1,25 @@
 <script setup lang="ts">
 import {ref, reactive} from 'vue'
-import {message} from 'ant-design-vue'
+import {message, Modal} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
   PlusOutlined,
   GlobalOutlined,
-  FolderOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons-vue'
-import {SelectFolder, OpenProject, CreateProject} from '../../wailsjs/go/main/App'
+import {CreateProject, SelectFolder} from '../../wailsjs/go/main/App'
+import {useProject} from '../stores/project'
 
 const {t} = useI18n()
+
+const {
+  projectInfo,
+  projectError,
+  projectLoading,
+  hasProject,
+  openProject,
+  selectAndOpenProject,
+} = useProject()
 
 const emit = defineEmits<{
   (e: 'switchLocale'): void
@@ -34,13 +44,28 @@ async function handleSelectParentDir() {
   } catch (e) { /* ignore */ }
 }
 
-function openCreateModal() {
+function showCreateModal() {
   createForm.name = ''
   createForm.module = ''
   createForm.repoUrl = ''
   createForm.branch = ''
   createForm.parentDir = ''
   createVisible.value = true
+}
+
+// 已打开项目时新建等于换项目：先讲清楚旧项目的表配置/DSN 会被丢弃。
+function openCreateModal() {
+  if (!hasProject.value) {
+    showCreateModal()
+    return
+  }
+  Modal.confirm({
+    title: t('devTools.create.switchTitle'),
+    content: t('devTools.create.switchContent'),
+    okText: t('common.confirm'),
+    cancelText: t('common.cancel'),
+    onOk: showCreateModal,
+  })
 }
 
 async function handleCreateProject() {
@@ -68,8 +93,8 @@ async function handleCreateProject() {
         message.error(t('devTools.create.failed'))
         return
       }
-      await OpenProject(result.dir)
-      emit('projectOpened')
+      const opened = await openProject(result.dir)
+      if (opened) emit('projectOpened')
     } else {
       message.error(result.error || t('devTools.create.failed'))
     }
@@ -85,9 +110,24 @@ async function handleCreateProject() {
   <div class="header">
     <div class="header-left">
       <span class="app-title">{{ t('app.title') }}</span>
+      <a-divider type="vertical" class="project-divider"/>
+      <template v-if="hasProject">
+        <span class="project-name" :title="projectInfo?.ModPath">{{ projectInfo?.ModPath }}</span>
+        <a-tag color="green">{{ t('backend.project.services', {count: projectInfo?.Services?.length ?? 0}) }}</a-tag>
+        <a-tag v-if="projectInfo?.HasApi" color="blue">{{ t('backend.project.apiDefined') }}</a-tag>
+        <span class="project-switch" @click="selectAndOpenProject">{{ t('backend.project.switchProject') }}</span>
+      </template>
+      <template v-else>
+        <a-button size="small" type="primary" :loading="projectLoading" @click="selectAndOpenProject">
+          <FolderOpenOutlined style="margin-right: 4px"/> {{ t('app.openProject') }}
+        </a-button>
+        <span class="project-error" :title="projectError">{{ projectError || t('app.noProject') }}</span>
+      </template>
     </div>
     <div class="header-right">
-      <a-button size="small" type="primary" ghost @click="openCreateModal"><PlusOutlined style="margin-right: 4px"/> {{ t('devTools.create.btn') }}</a-button>
+      <a-button size="small" :type="hasProject ? 'default' : 'primary'" :ghost="!hasProject" @click="openCreateModal">
+        <PlusOutlined style="margin-right: 4px"/> {{ hasProject ? t('devTools.create.btnSwitch') : t('devTools.create.btn') }}
+      </a-button>
       <span class="lang-switch" @click="emit('switchLocale')"><GlobalOutlined style="margin-right: 4px"/> {{ t('header.switchLang') }}</span>
     </div>
   </div>
@@ -159,6 +199,40 @@ async function handleCreateProject() {
   font-size: 15px;
   font-weight: 600;
   color: #262626;
+}
+
+.project-divider {
+  margin: 0 4px;
+  border-color: #e0e0e0;
+}
+
+.project-name {
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: #262626;
+}
+
+.project-switch {
+  font-size: 12px;
+  color: #1890ff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.project-switch:hover {
+  text-decoration: underline;
+}
+
+.project-error {
+  max-width: 30vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #ff4d4f;
 }
 
 .lang-switch {

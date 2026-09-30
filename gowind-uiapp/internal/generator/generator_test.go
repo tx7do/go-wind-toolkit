@@ -156,6 +156,7 @@ func TestGenerator_GenerateGrpcCode_NoOptions(t *testing.T) {
 		"per-table",
 		"/tmp",
 		"test",
+		[]string{"grpc"},
 	)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "没有可用的表选项")

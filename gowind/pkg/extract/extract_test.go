@@ -222,3 +222,78 @@ func TestRemoveProvider_FileNotExist(t *testing.T) {
 	err := e.removeProvider("/nonexistent/wire_set.go", "data.NewRoleRepo")
 	assert.Nil(t, err) // should not error on non-existent file
 }
+
+// ==============================
+// importsInternalData / targetWiringContextFor
+// ==============================
+
+func TestImportsInternalData(t *testing.T) {
+	tests := []struct {
+		name  string
+		src   string
+		wants bool
+	}{
+		{"真实 import 路径", "package service\n\nimport (\n\t\"github.com/example/myproject/app/admin/service/internal/data\"\n)\n", true},
+		{"data 子包", "import \"mod/app/admin/service/internal/data/ent\"\n", true},
+		{"BFF 型:只引服务客户端", "import (\n\tuserV1 \"github.com/example/myproject/app/user/service/api/v1\"\n)\n", false},
+		{"注释里提到 internal/data 而非 import", "// 本文件不使用 internal/data\nvar x = 1\n", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.wants, importsInternalData(tt.src))
+		})
+	}
+}
+
+func newExtractorAt(t *testing.T, root string) *Extractor {
+	t.Helper()
+	return NewExtractor(Options{
+		RootPath:      root,
+		ModulePath:    "github.com/example/myproject",
+		ProjectName:   "myproject",
+		SourceService: "admin",
+		TargetService: "user",
+		OrmType:       "ent",
+	})
+}
+
+// writeTargetServiceFile 在目标服务的 internal/service 下落地一个模型服务文件。
+func writeTargetServiceFile(t *testing.T, root, model, content string) {
+	t.Helper()
+	dir := filepath.Join(root, "app", "user", "service", "internal", "service")
+	assert.Nil(t, os.MkdirAll(dir, 0o755))
+	assert.Nil(t, os.WriteFile(filepath.Join(dir, model+"_service.go"), []byte(content), 0o644))
+}
+
+func TestTargetWiringContextFor_RepoStyleServiceUsesRepo(t *testing.T) {
+	root := t.TempDir()
+	writeTargetServiceFile(t, root, "role", `package service
+
+import (
+	"github.com/example/myproject/app/user/service/internal/data"
+)
+
+var _ = data.RoleRepo(nil)
+`)
+
+	assert.False(t, newExtractorAt(t, root).targetWiringContextFor("Role").useClient)
+}
+
+func TestTargetWiringContextFor_BffStyleServiceUsesClient(t *testing.T) {
+	root := t.TempDir()
+	writeTargetServiceFile(t, root, "role", `package service
+
+import (
+	roleV1 "github.com/example/myproject/app/role/service/api/v1"
+)
+
+var _ = roleV1.RoleService{}
+`)
+
+	assert.True(t, newExtractorAt(t, root).targetWiringContextFor("Role").useClient)
+}
+
+func TestTargetWiringContextFor_MissingServiceFileDefaultsToClient(t *testing.T) {
+	assert.True(t, newExtractorAt(t, t.TempDir()).targetWiringContextFor("Role").useClient)
+}

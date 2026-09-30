@@ -21,6 +21,10 @@ func Importer(
 		return entimport.Importer(ctx, dsn, schemaPath, includeTables, excludeTables)
 
 	case OrmTypeGorm:
+		// gorm://<dir> 数据源:从用户已有的 gorm model 源码回转生成 DAO。
+		if dsn != nil && strings.HasPrefix(*dsn, "gorm://") {
+			return gorm.ImporterFromGoSchema(ctx, *dsn, schemaPath, daoPath, includeTables)
+		}
 		return gorm.Importer(ctx, drv, dsn, schemaPath, daoPath, includeTables, excludeTables)
 
 	default:

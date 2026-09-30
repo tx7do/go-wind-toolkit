@@ -10,8 +10,8 @@ import { useVbenForm } from '#/adapter/form';
 import {
   useCreateRole,
   useUpdateRole,
+  statusList,
 } from '#/api';
-import { statusList } from '#/api';
 const { mutateAsync: createRole } = useCreateRole();
 const { mutateAsync: updateRole } = useUpdateRole();
 

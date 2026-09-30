@@ -70,6 +70,10 @@ func buildMySQLDSN(cfg DBConfig) (string, error) {
 }
 
 // PostgreSQL DSN: postgres://user:pass@host:port/db?sslmode=disable
+//
+// 用户名/口令/库名一律交给 url.URL 编码。手写 url.QueryEscape 是错的:它按
+// application/x-www-form-urlencoded 把空格编成 "+",而 userinfo 与 path 里的 "+"
+// 是字面量,含空格的口令会被原样送给服务端。
 func buildPostgresDSN(cfg DBConfig) (string, error) {
 	if cfg.Username == "" {
 		return "", fmt.Errorf("PostgreSQL 用户名不能为空")
@@ -87,27 +91,10 @@ func buildPostgresDSN(cfg DBConfig) (string, error) {
 	if cfg.SSL {
 		sslMode = "require"
 	}
-
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&timezone=Asia/Shanghai",
-		url.QueryEscape(cfg.Username),
-		url.QueryEscape(cfg.Password), // URL 编码避免特殊字符问题
-		host,
-		port,
-		cfg.Database,
-		sslMode,
-	), nil
-}
-
-// SQLite DSN
-func buildSQLiteDSN(cfg DBConfig) (string, error) {
-	if cfg.DBPath == "" {
-		return "", fmt.Errorf("SQLite 数据库路径不能为空")
-	}
-	// 支持内存数据库
-	if cfg.DBPath == ":memory:" {
-		return "file::memory:?cache=shared", nil
-	}
-	return fmt.Sprintf("file:%s?cache=shared&mode=rwc&_fk=1", cfg.DBPath), nil
+	return buildURLDSN("postgres", cfg, host, port, url.Values{
+		"sslmode":  {sslMode},
+		"timezone": {"Asia/Shanghai"},
+	})
 }
 
 // Oracle DSN
@@ -128,11 +115,36 @@ func buildOracleDSN(cfg DBConfig) (string, error) {
 		serviceName = "ORCL"
 	}
 
-	return fmt.Sprintf("oracle://%s:%s@%s:%d/%s",
-		url.QueryEscape(cfg.Username),
-		url.QueryEscape(cfg.Password),
-		host,
-		port,
-		serviceName,
-	), nil
+	cfg.Database = serviceName
+	return buildURLDSN("oracle", cfg, host, port, nil)
+}
+
+// buildURLDSN 用 net/url 而不是字符串拼接生成 `<scheme>://user:pass@host:port/db?params`:
+// userinfo、path、query 各自的合法字符集不同,自己拼迟早漏掉一个。
+func buildURLDSN(scheme string, cfg DBConfig, host string, port int, params url.Values) (string, error) {
+	u := &url.URL{
+		Scheme: scheme,
+		User:   url.UserPassword(cfg.Username, cfg.Password),
+		Host:   fmt.Sprintf("%s:%d", host, port),
+	}
+	if cfg.Database != "" {
+		u.Path = "/" + cfg.Database
+	}
+	if len(params) > 0 {
+		// Values.Encode 按键排序,同一份配置每次得到同一个 DSN。
+		u.RawQuery = params.Encode()
+	}
+	return u.String(), nil
+}
+
+// SQLite DSN
+func buildSQLiteDSN(cfg DBConfig) (string, error) {
+	if cfg.DBPath == "" {
+		return "", fmt.Errorf("SQLite 数据库路径不能为空")
+	}
+	// 支持内存数据库
+	if cfg.DBPath == ":memory:" {
+		return "file::memory:?cache=shared", nil
+	}
+	return fmt.Sprintf("file:%s?cache=shared&mode=rwc&_fk=1", cfg.DBPath), nil
 }

@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import {ref, reactive, onUnmounted} from 'vue'
+import {ref, reactive, watch, onUnmounted} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
   FolderOpenOutlined,
   CloseCircleOutlined,
-  CodeOutlined,
   AppstoreOutlined,
-  ApiOutlined,
   InboxOutlined,
   DatabaseOutlined,
   CloudDownloadOutlined,
@@ -20,24 +18,26 @@ import {
   TableOutlined,
   RocketOutlined,
   RightOutlined,
+  CodeOutlined,
 } from '@ant-design/icons-vue'
 
 import {
   EditGeneratorOption,
   GetGeneratorOptions,
-  GetProjectInfo,
   SetGeneratorOption,
-  OpenProject,
-  SelectFolder,
   GenerateGrpcCode,
   GenerateRestCode,
   ImportSqlTables,
   ImportDatabaseTables,
+  ImportGoSchemaTables,
+  GetDBConfig,
   TestDatabaseConnection,
+  SelectFolder,
   SetDBConfig,
 } from "../../../wailsjs/go/main/App";
-import {generator, detect} from "../../../wailsjs/go/models";
+import {generator} from "../../../wailsjs/go/models";
 import {EventsOn, EventsOff} from "../../../wailsjs/runtime";
+import {useProject} from "../../stores/project";
 
 import DatabaseImporterModal from "./DatabaseImporterModal.vue";
 import SqlImporterModal from "./SqlImporterModal.vue";
@@ -47,44 +47,21 @@ const {t} = useI18n()
 // ==================== 步骤控制 ====================
 const currentStep = ref(0)
 
-// ==================== 项目信息 ====================
-const projectInfo = ref<detect.ProjectInfo>()
-const projectError = ref('')
-const projectLoading = ref(false)
-
-async function handleOpenProject() {
-  try {
-    const path = await SelectFolder();
-    if (!path) return
-
-    projectLoading.value = true
-    projectError.value = ''
-
-    try {
-      const pi = await OpenProject(path);
-      if (!pi || !pi.ModPath) {
-        projectError.value = t('backend.project.noProject')
-        projectInfo.value = undefined
-        return
-      }
-      projectInfo.value = pi;
-      await refreshServiceOptions();
-      await refreshTableData();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      projectError.value = msg || t('backend.project.openFailed')
-      projectInfo.value = undefined
-    }
-  } catch (err) {
-    console.error('选择文件夹出错：', err);
-  } finally {
-    projectLoading.value = false
-  }
-}
+// ==================== 项目信息（全局唯一真值，见 stores/project.ts） ====================
+const {
+  projectInfo,
+  projectError,
+  projectLoading,
+  selectAndOpenProject,
+} = useProject()
 
 // ==================== Schema 导入方式 ====================
-type ImportSource = 'database' | 'file' | 'remote' | 'editor'
+type ImportSource = 'database' | 'file' | 'remote' | 'editor' | 'go-schema'
 const importSource = ref<ImportSource>('database')
+
+// ent:// 与 gorm:// 数据源只在 ORM 匹配时才成立，故导入成功后锁定步骤 2 的 ORM。
+// 真值在后端 dbConfig.dsn 里（refreshTableData 时反查），避免五个导入入口各自维护副本。
+const schemaOrmLock = ref<'' | 'ent' | 'gorm'>('')
 
 const openDatabaseImporter = ref(false)
 const openSqlImporter = ref(false)
@@ -162,6 +139,40 @@ async function handleDatabaseImport() {
   }
 }
 
+// Go 源码 schema（ent:// / gorm://）：不连库，直接解析源码目录下的模型定义。
+const goSchemaForm = reactive({
+  scheme: 'ent',
+  dir: '',
+})
+const goSchemaLoading = ref(false)
+
+async function handleSelectSchemaDir() {
+  const dir = await SelectFolder()
+  if (dir) goSchemaForm.dir = dir
+}
+
+async function handleGoSchemaImport() {
+  if (!goSchemaForm.dir) {
+    message.error(t('backend.import.goSchemaDirRequired'))
+    return
+  }
+  goSchemaLoading.value = true
+  try {
+    const res = await ImportGoSchemaTables(`${goSchemaForm.scheme}://${goSchemaForm.dir}`, goSchemaForm.scheme)
+    if (res !== '') {
+      message.error(t('backend.import.goSchemaImportFailed', {msg: res}))
+      return
+    }
+    await refreshTableData()
+    message.success(t('backend.import.goSchemaImportSuccess'))
+  } catch (e) {
+    console.error('Go 源码 schema 导入失败:', e)
+    message.error(t('backend.import.goSchemaImportFailed', {msg: String(e)}))
+  } finally {
+    goSchemaLoading.value = false
+  }
+}
+
 // 本地文件
 const selectedFileName = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -204,18 +215,31 @@ async function handleExcludeChange(row: generator.Option) {
 }
 
 async function refreshServiceOptions() {
-  const pi = await GetProjectInfo();
-  if (pi && pi.Services) {
-    serviceOptions.length = 0;
-    pi.Services.forEach(service => {
-      serviceOptions.push({label: service, value: service});
-    });
-  }
+  serviceOptions.length = 0;
+  (projectInfo.value?.Services ?? []).forEach(service => {
+    serviceOptions.push({label: service, value: service});
+  });
 }
 
 async function refreshTableData() {
   const opts = await GetGeneratorOptions();
   tableData.value = opts || [];
+  await refreshSchemaOrmLock();
+}
+
+// 数据源一旦是 Go 源码 scheme，就把 ORM 锁定为对应值并同步回表单：
+// 生成阶段 sqlkratos 会强制校验配对，UI 提前锁住才不会让用户在第三步点生成才失败。
+async function refreshSchemaOrmLock() {
+  let lock: '' | 'ent' | 'gorm' = ''
+  try {
+    const cfg = await GetDBConfig()
+    const dsn = cfg?.dsn ?? ''
+    if (dsn.startsWith('ent://')) lock = 'ent'
+    else if (dsn.startsWith('gorm://')) lock = 'gorm'
+  } catch (e) {
+    console.error('读取数据源配置失败:', e)
+  }
+  schemaOrmLock.value = lock
 }
 
 // ==================== 导入操作 ====================
@@ -376,12 +400,24 @@ const generateConfig = reactive({
   generateBff: true,
   ormType: 'ent',
   bffServiceName: 'admin',
+  grpcServers: ['grpc'] as string[],
 })
+
+const transportOptions = [
+  {value: 'grpc', label: 'gRPC'},
+  {value: 'rest', label: 'REST'},
+  {value: 'websocket', label: 'WebSocket'},
+]
 
 const ormTypes = [
   {value: 'ent', label: 'Ent'},
   {value: 'gorm', label: 'GORM'},
 ]
+
+// 导入 Go 源码 schema 后 ORM 只能跟随数据源，否则生成阶段必然报错。
+watch(schemaOrmLock, (v) => {
+  if (v) generateConfig.ormType = v
+})
 
 const excludedCount = ref(0)
 const excludeAll = ref(false)
@@ -427,11 +463,15 @@ async function handleGenerate() {
     message.warning(t('backend.generate.atLeastOne'))
     return
   }
+  if (generateConfig.generateGrpc && generateConfig.grpcServers.length === 0) {
+    message.warning(t('backend.generate.atLeastOneTransport'))
+    return
+  }
 
   confirmLoading.value = true
   try {
     if (generateConfig.generateGrpc) {
-      const res = await GenerateGrpcCode(generateConfig.ormType, protoPackageStrategy.value);
+      const res = await GenerateGrpcCode(generateConfig.ormType, protoPackageStrategy.value, generateConfig.grpcServers);
       if (res !== '') {
         message.error(t('backend.generate.grpcFailed', {msg: res}));
         return;
@@ -479,12 +519,22 @@ function handleNextFromTableConfig() {
 }
 
 // ==================== 事件监听 ====================
-EventsOn('project-opened', () => {
+// 项目由全局 store 持有：顶栏、模块选择器、其它页面切换项目都只走这一个 watch。
+// immediate 覆盖「项目已在本页挂载前打开」的情况（tab 面板是懒挂载的）。
+watch(projectInfo, async (pi, prev) => {
   refreshServiceOptions();
-  GetProjectInfo().then(pi => {
-    if (pi) projectInfo.value = pi;
-  });
-})
+  await refreshTableData();
+  updateTableStats();
+  // 换项目必须回到第一步并清掉上一个项目的 DSN/SQL：后端此时已 CleanOptions，
+  // 留着旧表单只会让用户拿 A 项目的配置去生成 B 项目。
+  if (!pi || pi.ModPath !== prev?.ModPath) {
+    currentStep.value = 0;
+    dbFormData.dsn = '';
+    goSchemaForm.dir = '';
+    sqlContent.value = '';
+    selectedFileName.value = '';
+  }
+}, {immediate: true});
 
 EventsOn('table-imported', () => {
   refreshTableData().then(() => {
@@ -496,7 +546,6 @@ EventsOn('table-imported', () => {
 })
 
 onUnmounted(() => {
-  EventsOff('project-opened')
   EventsOff('table-imported')
 })
 </script>
@@ -513,7 +562,7 @@ onUnmounted(() => {
     <!-- ====== 步骤 0: 导入 Schema ====== -->
     <div v-if="currentStep === 0" class="step-content">
       <!-- 打开项目 - 空状态 -->
-      <div v-if="!projectInfo && !projectError" class="project-empty-card" @click="handleOpenProject">
+      <div v-if="!projectInfo && !projectError" class="project-empty-card" @click="selectAndOpenProject">
         <div class="project-empty-icon">
           <FolderOpenOutlined style="font-size: 40px; color: #1890ff"/>
         </div>
@@ -538,35 +587,17 @@ onUnmounted(() => {
           <div class="project-error-msg">{{ projectError }}</div>
           <div class="project-error-hint">{{ t('backend.project.hintGoMod') }}</div>
         </div>
-        <a-button size="small" type="primary" @click="handleOpenProject">{{ t('backend.project.retry') }}</a-button>
+        <a-button size="small" type="primary" @click="selectAndOpenProject">{{ t('backend.project.retry') }}</a-button>
       </div>
 
-      <!-- 项目已打开 -->
-      <div v-if="projectInfo" class="project-opened-card">
-        <div class="project-opened-left">
-          <div class="project-opened-indicator">
-            <span class="project-opened-dot"></span>
-            <span class="project-opened-label">{{ t('backend.project.ready') }}</span>
-          </div>
-          <div class="project-opened-name">{{ projectInfo.ModPath }}</div>
-          <div class="project-opened-meta">
-            <span class="meta-item">
-              <CodeOutlined style="font-size: 14px"/>
-              Go {{ projectInfo.GoVersion }}
-            </span>
-            <span class="meta-divider">|</span>
-            <span class="meta-item">
-              <AppstoreOutlined style="font-size: 14px"/>
-              {{ t('backend.project.services', {count: projectInfo.Services?.length ?? 0}) }}
-            </span>
-            <span class="meta-divider">|</span>
-            <span class="meta-item">
-              <ApiOutlined style="font-size: 14px"/>
-              {{ projectInfo.HasApi ? t('backend.project.apiDefined') : t('backend.project.apiNotDefined') }}
-            </span>
-          </div>
-        </div>
-        <span class="switch-project-link" @click="handleOpenProject">{{ t('backend.project.switchProject') }}</span>
+      <!-- 项目已打开：精简为一条内联提示，详细信息见顶栏 -->
+      <div v-if="projectInfo" class="project-inline">
+        <span class="project-opened-dot"></span>
+        <span class="project-inline-name">{{ projectInfo.ModPath }}</span>
+        <span class="project-inline-meta">
+          Go {{ projectInfo.GoVersion }} · {{ t('backend.project.services', {count: projectInfo.Services?.length ?? 0}) }}
+        </span>
+        <span class="switch-project-link" @click="selectAndOpenProject">{{ t('backend.project.switchProject') }}</span>
       </div>
 
       <!-- 导入方式 -->
@@ -576,6 +607,7 @@ onUnmounted(() => {
           <a-radio-button value="file"><FileTextOutlined style="margin-right: 4px"/> {{ t('backend.import.file') }}</a-radio-button>
           <a-radio-button value="remote"><CloudDownloadOutlined style="margin-right: 4px"/> {{ t('backend.import.remote') }}</a-radio-button>
           <a-radio-button value="editor"><EditOutlined style="margin-right: 4px"/> {{ t('backend.import.editor') }}</a-radio-button>
+          <a-radio-button value="go-schema"><CodeOutlined style="margin-right: 4px"/> {{ t('backend.import.goSchema') }}</a-radio-button>
         </a-radio-group>
 
         <!-- 数据库导入 -->
@@ -675,6 +707,41 @@ onUnmounted(() => {
             <a-button type="default" @click="handleOpenSqlEditor">
               <EditOutlined style="margin-right: 4px"/> {{ t('backend.import.openAdvancedEditor') }}
             </a-button>
+          </div>
+        </div>
+
+        <!-- Go 源码 schema：不连库，直接解析 ent schema / gorm model 目录 -->
+        <div v-if="importSource === 'go-schema'">
+          <a-alert :message="t('backend.import.goSchemaHint')" type="info" show-icon style="margin-bottom: 12px"/>
+          <div style="display: flex; gap: 16px; margin-bottom: 12px">
+            <div>
+              <div style="color: #666; font-size: 12px; margin-bottom: 4px">{{ t('backend.import.goScheme') }}</div>
+              <a-select v-model:value="goSchemaForm.scheme" style="width: 110px">
+                <a-select-option value="ent">ent://</a-select-option>
+                <a-select-option value="gorm">gorm://</a-select-option>
+              </a-select>
+            </div>
+            <div style="flex: 1">
+              <div style="color: #666; font-size: 12px; margin-bottom: 4px">{{ t('backend.import.schemaDir') }}</div>
+              <a-input-group compact>
+                <a-input
+                  v-model:value="goSchemaForm.dir"
+                  :placeholder="goSchemaForm.scheme === 'ent' ? t('backend.import.entDirPlaceholder') : t('backend.import.gormDirPlaceholder')"
+                  style="width: calc(100% - 96px)"
+                />
+                <a-button style="width: 96px" @click="handleSelectSchemaDir">
+                  <FolderOpenOutlined style="margin-right: 4px"/> {{ t('backend.import.selectDir') }}
+                </a-button>
+              </a-input-group>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <a-button type="primary" :loading="goSchemaLoading" :disabled="!goSchemaForm.dir" @click="handleGoSchemaImport">
+              <ImportOutlined style="margin-right: 4px"/> {{ t('backend.import.importTables') }}
+            </a-button>
+            <span v-if="goSchemaForm.dir" style="color: #999; font-size: 12px; word-break: break-all">
+              {{ goSchemaForm.scheme }}://{{ goSchemaForm.dir }}
+            </span>
           </div>
         </div>
 
@@ -830,11 +897,19 @@ onUnmounted(() => {
             <div v-if="generateConfig.generateGrpc" class="target-body">
               <a-form layout="inline">
                 <a-form-item :label="t('backend.generate.ormType')">
-                  <a-select v-model:value="generateConfig.ormType" style="width: 120px">
-                    <a-select-option v-for="item in ormTypes" :key="item.value" :value="item.value">
-                      {{ item.label }}
-                    </a-select-option>
-                  </a-select>
+                  <a-tooltip :title="schemaOrmLock ? t('backend.generate.ormLockedTip', {scheme: `${schemaOrmLock}://`}) : ''">
+                    <a-select v-model:value="generateConfig.ormType" style="width: 120px" :disabled="!!schemaOrmLock">
+                      <a-select-option v-for="item in ormTypes" :key="item.value" :value="item.value">
+                        {{ item.label }}
+                      </a-select-option>
+                    </a-select>
+                  </a-tooltip>
+                  <a-tag v-if="schemaOrmLock" color="purple" style="margin-left: 8px">{{ schemaOrmLock }}://</a-tag>
+                </a-form-item>
+                <a-form-item :label="t('backend.generate.servers')">
+                  <a-checkbox-group v-model:value="generateConfig.grpcServers">
+                    <a-checkbox v-for="opt in transportOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</a-checkbox>
+                  </a-checkbox-group>
                 </a-form-item>
               </a-form>
             </div>
@@ -941,31 +1016,37 @@ onUnmounted(() => {
   color: #8c8c8c;
 }
 
-/* 项目已打开 - 成功卡片 */
-.project-opened-card {
+/* 项目已打开 - 内联提示条 */
+.project-inline {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #f6ffed 0%, #e8f5e9 100%);
+  gap: 10px;
+  background: #f6ffed;
   border: 1px solid #b7eb8f;
-  border-radius: 10px;
-  padding: 16px 20px;
+  border-radius: 8px;
+  padding: 8px 14px;
   margin-bottom: 16px;
 }
 
-.project-opened-left {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.project-inline-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-family: 'Consolas', 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.project-opened-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.project-inline-meta {
+  color: #595959;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-left: auto;
 }
 
 .project-opened-dot {
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -977,37 +1058,6 @@ onUnmounted(() => {
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.2); }
   50% { box-shadow: 0 0 0 6px rgba(82, 196, 26, 0.1); }
-}
-
-.project-opened-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #389e0d;
-}
-
-.project-opened-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a1a1a;
-  font-family: 'Consolas', 'Courier New', monospace;
-}
-
-.project-opened-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #595959;
-  font-size: 12px;
-}
-
-.meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.meta-divider {
-  color: #d9d9d9;
 }
 
 .switch-project-link {

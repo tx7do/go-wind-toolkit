@@ -25,11 +25,31 @@ jobs:
           go-version-file: protoc-gen-dart-http/go.mod
           cache-dependency-path: protoc-gen-dart-http/go.sum
 
+      - name: Setup buf
+        uses: ./.github/actions/setup-buf
+
+      # 本模块只有 TestGoldenExamples 一个用例,而 goldentest.Run 找不到 buf 就自行 t.Skip:
+      # 不装 buf、又不显式要求它 PASS,这个 job 会恒绿,等于发布没有门禁。
+      # -count=1 不是性能选项:golden 测试二进制并不链接生成器代码(生成器是运行时才
+      # go build 出来的),只改生成器时哈希不变,Go 会把缓存里的旧 PASS 直接端上来。
       - name: Test
         working-directory: protoc-gen-dart-http
+        shell: bash
         env:
           GOWORK: off
-        run: go test ./...
+        run: |
+          set -uo pipefail
+          log="$RUNNER_TEMP/dart-http-test.log"
+          go test -count=1 -v ./... 2>&1 | tee "$log"
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::go test 失败(rc=$rc)"
+            exit "$rc"
+          fi
+          if ! grep -q -- '--- PASS: TestGoldenExamples' "$log"; then
+            echo '::error::TestGoldenExamples 未 PASS:被跳过(buf 不在 PATH)或基线漂移,门禁已失效'
+            exit 1
+          fi
 
   build:
     needs: test

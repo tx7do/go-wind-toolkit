@@ -232,13 +232,20 @@ type targetContext struct {
 	useClient    bool
 }
 
+// importsInternalData 判定服务文件是否引用了本服务的 internal/data 包(含子包 internal/data/ent、
+// internal/data/dao)。引用形如 "mod/app/x/service/internal/data"——引号只可能落在路径两端,
+// 因此判据必须是尾引号或中段斜杠边界;拿 `"/internal/data"` 当子串永远命中不了。
+func importsInternalData(src string) bool {
+	return strings.Contains(src, `/internal/data"`) || strings.Contains(src, `/internal/data/`)
+}
+
 func (e *Extractor) targetWiringContextFor(model string) targetContext {
 	var tctx targetContext
 
 	serviceFile := filepath.Join(e.targetServicePath(), "internal", "service", stringcase.SnakeCase(model)+"_service.go")
 	tctx.useClient = true
 	if raw, err := os.ReadFile(serviceFile); err == nil {
-		tctx.useClient = !strings.Contains(string(raw), `"/internal/data"`)
+		tctx.useClient = !importsInternalData(string(raw))
 	}
 
 	pref := ""

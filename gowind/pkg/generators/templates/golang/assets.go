@@ -3,21 +3,22 @@ package golang
 import _ "embed"
 
 var TemplateMap = map[string][]byte{
-	"main.tpl":         MainTemplate,
-	"wiring.tpl":       WiringTemplate,
-	"wire.tpl":         WireTemplate,
-	"wire_set.tpl":     WireSetTemplate,
-	"grpc_server.tpl":  GrpcServerTemplate,
-	"rest_server.tpl":  RestServerTemplate,
-	"ent_client.tpl":   EntClientTemplate,
-	"gorm_client.tpl":  GormClientTemplate,
-	"gorm_init.tpl":    GormInitTemplate,
-	"redis_client.tpl": RedisClientTemplate,
-	"grpc_client.tpl":  GrpcClientTemplate,
-	"ent_repo.tpl":     EntRepoTemplate,
-	"gorm_repo.tpl":    GormRepoTemplate,
-	"service.tpl":      ServiceTemplate,
-	"assets.tpl":       AssetsTemplate,
+	"main.tpl":             MainTemplate,
+	"wiring.tpl":           WiringTemplate,
+	"wire.tpl":             WireTemplate,
+	"wire_set.tpl":         WireSetTemplate,
+	"grpc_server.tpl":      GrpcServerTemplate,
+	"rest_server.tpl":      RestServerTemplate,
+	"websocket_server.tpl": WebsocketServerTemplate,
+	"ent_client.tpl":       EntClientTemplate,
+	"gorm_client.tpl":      GormClientTemplate,
+	"gorm_init.tpl":        GormInitTemplate,
+	"redis_client.tpl":     RedisClientTemplate,
+	"grpc_client.tpl":      GrpcClientTemplate,
+	"ent_repo.tpl":         EntRepoTemplate,
+	"gorm_repo.tpl":        GormRepoTemplate,
+	"service.tpl":          ServiceTemplate,
+	"assets.tpl":           AssetsTemplate,
 }
 
 //go:embed main.tpl
@@ -37,6 +38,9 @@ var GrpcServerTemplate []byte
 
 //go:embed rest_server.tpl
 var RestServerTemplate []byte
+
+//go:embed websocket_server.tpl
+var WebsocketServerTemplate []byte
 
 //go:embed ent_client.tpl
 var EntClientTemplate []byte

@@ -3,8 +3,46 @@ package detect
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
+
+// TestProjectDetector_Detect_PathSeparator 回归:Detect 不能把正斜杠无条件替换成
+// 反斜杠。macOS/Linux 上反斜杠是合法文件名字符,一旦被注入 Root,后端代码生成会
+// 把产物写进错误的相对目录。
+func TestProjectDetector_Detect_PathSeparator(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("获取工作目录失败: %v", err)
+	}
+	projectRoot := wd
+	for {
+		if _, err = os.Stat(filepath.Join(projectRoot, "go.mod")); err == nil {
+			break
+		}
+		parent := filepath.Dir(projectRoot)
+		if parent == projectRoot {
+			t.Fatal("未找到 go.mod 文件")
+		}
+		projectRoot = parent
+	}
+
+	// 用正斜杠形式传入,模拟前端/GUI 传来的路径。
+	forward := filepath.ToSlash(projectRoot)
+	info, err := NewProjectDetector().Detect(forward)
+	if err != nil {
+		t.Fatalf("检测项目失败: %v", err)
+	}
+
+	want := filepath.Clean(projectRoot)
+	if info.Root != want {
+		t.Fatalf("Root 未按平台归一化: got %q, want %q", info.Root, want)
+	}
+	if runtime.GOOS != "windows" && strings.Contains(info.Root, `\`) {
+		t.Fatalf("非 Windows 平台的 Root 不应含反斜杠, got %q", info.Root)
+	}
+}
 
 func TestProjectDetector_Detect(t *testing.T) {
 	// 获取当前工作目录作为测试项目路径

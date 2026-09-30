@@ -2,6 +2,7 @@ package ai
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -82,8 +83,12 @@ func TestChatNonStreamStillWorks(t *testing.T) {
 
 func TestConfigPersistRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("AppData", dir)   // windows
-	t.Setenv("XDG_CONFIG_HOME", dir) // linux/darwin
+	// os.UserConfigDir 各平台取值不同:Windows=%AppData%,Linux=$XDG_CONFIG_HOME
+	// (未设时回落 $HOME/.config),macOS=$HOME/Library/Application Support 且忽略 XDG。
+	// 三者指向同一临时目录,才能在所有平台把配置隔离到测试沙箱。
+	t.Setenv("AppData", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
 
 	saved := &Config{Provider: "deepseek", BaseURL: "https://api.deepseek.com/v1", APIKey: "sk-x", AzureAPIVersion: "2024-02-01", Model: "deepseek-chat", Temperature: 0.3, MaxTokens: 2048}
 	if err := SaveConfig(saved); err != nil {
@@ -104,8 +109,11 @@ func TestConfigPersistRoundTrip(t *testing.T) {
 
 func TestLoadConfigFallsBackToDefault(t *testing.T) {
 	dir := t.TempDir()
+	// 见 TestConfigPersistRoundTrip:三个平台的 UserConfigDir 取值都要隔离,
+	// macOS 走 $HOME 而非 XDG_CONFIG_HOME。
 	t.Setenv("AppData", dir)
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
 
 	cfg := LoadConfig()
 	def := DefaultConfig()
@@ -366,5 +374,41 @@ func TestGeminiStreamAssemblesTextParts(t *testing.T) {
 	}
 	if content != "CREATE TABLE users" {
 		t.Fatalf("content = %q", content)
+	}
+}
+
+// TestChat_DoesNotSendKeyAcrossRedirect 网关回一个指向另一台主机的 307 时,
+// api-key 头和提示词正文都不许跟过去。
+//
+// Go 的默认策略只对 Authorization / Cookie 做跨域剥离,而 azure/openai/deepseek 等
+// provider 用的 api-key、x-api-key、x-goog-api-key 是自定义头,会原样转发;307 又
+// 保留方法与正文。用 302 测不出来,因为客户端会把 PUT/POST 降级成无正文的 GET。
+func TestChat_DoesNotSendKeyAcrossRedirect(t *testing.T) {
+	var sawKey, sawBody string
+	collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawKey = r.Header.Get("api-key")
+		b, _ := io.ReadAll(r.Body)
+		sawBody = string(b)
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer collector.Close()
+
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, collector.URL+"/openai/deployments/d/chat/completions", http.StatusTemporaryRedirect)
+	}))
+	defer gateway.Close()
+
+	client := NewClient(&Config{
+		Provider:        "azure",
+		BaseURL:         gateway.URL,
+		APIKey:          "sk-secret",
+		Model:           "d",
+		AzureAPIVersion: "2024-02-01",
+	})
+	if _, err := client.Chat("sys", "hello-prompt"); err == nil {
+		t.Fatal("跨主机重定向应当让请求失败")
+	}
+	if sawKey != "" || sawBody != "" {
+		t.Errorf("密钥或正文随重定向外发: api-key=%q body=%q", sawKey, sawBody)
 	}
 }

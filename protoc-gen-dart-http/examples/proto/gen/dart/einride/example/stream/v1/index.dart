@@ -685,7 +685,7 @@ class ChatMessage {
 }
 
 /// This API demonstrates streaming RPC patterns with HTTP annotations.
-/// 
+///
 /// - Unary RPCs use the standard ClientTransport (package:http / dio).
 /// - Server-streaming RPCs are mapped to SSE (Server-Sent Events).
 /// - Bidirectional streaming RPCs are mapped to WebSocket.
@@ -695,7 +695,7 @@ class StreamServiceClient {
   StreamServiceClient(this._transport);
 
   /// Get a single log entry.
-  /// 
+  ///
   /// Unary request/response — uses ClientTransport.
   Future<LogEntry> getLog(GetLogRequest request, {Map<String, String>? headers}) async {
     if (request.name == null) {
@@ -710,7 +710,7 @@ class StreamServiceClient {
   }
 
   /// List log entries.
-  /// 
+  ///
   /// Unary request/response with pagination — uses ClientTransport.
   Future<ListLogsResponse> listLogs(ListLogsRequest request, {Map<String, String>? headers}) async {
     final path = '/v1/logs';
@@ -733,7 +733,7 @@ class StreamServiceClient {
   }
 
   /// Tail log entries in real time.
-  /// 
+  ///
   /// Server-streaming RPC → generated as SSE (Server-Sent Events).
   /// The client subscribes to a stream of log entries pushed by the server.
   Stream<LogEntry> tailLogs(TailLogsRequest request, {Map<String, String>? headers}) {
@@ -757,7 +757,7 @@ class StreamServiceClient {
   }
 
   /// Realtime bidirectional chat.
-  /// 
+  ///
   /// Bidirectional streaming RPC → generated as WebSocket.
   /// Both client and server can send messages independently.
   TypedDuplexConnection<ChatMessage, ChatMessage> chat({Map<String, String>? headers}) {

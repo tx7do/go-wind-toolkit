@@ -37,10 +37,9 @@ func (pd *ProjectDetector) Detect(projectPath string) (*ProjectInfo, error) {
 		return r < 32 && r != '\t'
 	})
 
-	// 将正斜杠转换为反斜杠（Windows 兼容）
-	projectPath = strings.ReplaceAll(projectPath, "/", "\\")
-
-	// 使用 filepath.Clean 进一步规范化路径
+	// filepath.Clean 按当前平台归一化分隔符:Windows 上会把 / 转为 \,
+	// Unix 上保留 /。不能在此无条件替换为反斜杠,否则 macOS/Linux 上
+	// 反斜杠会被当作合法文件名字符,导致生成/探测落到错误的相对目录。
 	projectPath = filepath.Clean(projectPath)
 
 	var err error

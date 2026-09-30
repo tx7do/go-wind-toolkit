@@ -78,8 +78,8 @@ export function GenerateFrontendCode(arg1, arg2) {
   return window['go']['main']['App']['GenerateFrontendCode'](arg1, arg2);
 }
 
-export function GenerateGrpcCode(arg1, arg2) {
-  return window['go']['main']['App']['GenerateGrpcCode'](arg1, arg2);
+export function GenerateGrpcCode(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GenerateGrpcCode'](arg1, arg2, arg3);
 }
 
 export function GenerateRestCode(arg1, arg2) {
@@ -128,6 +128,10 @@ export function GetTableColumns(arg1, arg2) {
 
 export function ImportDatabaseTables(arg1) {
   return window['go']['main']['App']['ImportDatabaseTables'](arg1);
+}
+
+export function ImportGoSchemaTables(arg1, arg2) {
+  return window['go']['main']['App']['ImportGoSchemaTables'](arg1, arg2);
 }
 
 export function ImportSqlTables(arg1) {

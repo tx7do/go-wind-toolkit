@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import {ref, computed} from 'vue'
 import Index from "./components/index.vue";
+import ModulePicker from "./components/ModulePicker.vue";
 import i18n from "./i18n";
 
 const currentLocale = computed(() => i18n.global.locale.value)
@@ -41,6 +42,7 @@ function switchLocale() {
     }"
   >
     <Index @switch-locale="switchLocale"/>
+    <ModulePicker/>
   </a-config-provider>
 </template>
 

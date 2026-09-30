@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, reactive, computed, onMounted, onUnmounted} from 'vue'
+import {ref, reactive, computed, onMounted, onUnmounted, watch} from 'vue'
 import {message, Modal} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
@@ -24,12 +24,10 @@ import {
   AIGenerateBackendCode,
   AIFindOpenAPIFiles,
   AIReviewCodeStream,
-  OpenProject,
-  SelectFolder,
-  GetProjectInfo,
 } from '../../../wailsjs/go/main/App'
 import {EventsOn, EventsOff} from '../../../wailsjs/runtime'
 import type {ai} from '../../../wailsjs/go/models'
+import {useProject} from '../../stores/project'
 
 import MonacoEditor from '../backend/MonacoEditor.vue'
 
@@ -50,30 +48,8 @@ const steps = computed(() => [
   {title: t('ai.steps.review')},
 ])
 
-// ==================== 项目信息 ====================
-const projectInfo = ref<any>()
-const projectLoading = ref(false)
-
-async function handleOpenProject() {
-  try {
-    const path = await SelectFolder()
-    if (!path) return
-
-    projectLoading.value = true
-    const pi = await OpenProject(path)
-    if (!pi || !pi.ModPath) {
-      message.error(t('ai.project.noProject'))
-      projectInfo.value = undefined
-      return
-    }
-    projectInfo.value = pi
-    message.success(t('ai.project.ready'))
-  } catch (err) {
-    message.error(t('ai.project.openFailed'))
-  } finally {
-    projectLoading.value = false
-  }
-}
+// ==================== 项目信息（全局唯一真值，见 stores/project.ts） ====================
+const {projectInfo, hasProject, projectLoading, projectError, selectAndOpenProject} = useProject()
 
 // ==================== Step 1: AI 配置 ====================
 interface AIConfigData {
@@ -349,21 +325,32 @@ onUnmounted(() => {
   EventsOff('ai:stream')
 })
 
+// 换项目后必须丢掉上一个项目的产物:第 5 步 AIGenerateBackendCode 直接写当前
+// projectInfo 指向的目录,残留的 DDL/划分结果会落到新项目里。
+// 生成中/审查中的标志一并清掉,否则在途的 ai:stream 分块会继续往已重置的正文里追加。
+watch(projectInfo, (pi, prev) => {
+  if (pi?.ModPath === prev?.ModPath) return
+  currentStep.value = 0
+  ddlContent.value = ''
+  ddlGenerating.value = false
+  partitions.value = []
+  openapiFiles.value = []
+  reviewResult.value = ''
+  reviewLoading.value = false
+})
+
 // 初始化
 loadAIConfig()
 </script>
 
 <template>
   <div class="ai-assistant-page">
-    <!-- 项目选择 -->
-    <div class="project-bar">
-      <a-button type="primary" :loading="projectLoading" @click="handleOpenProject">
-        <FolderOpenOutlined style="margin-right: 4px"/> {{ projectInfo ? t('ai.project.switchProject') : t('ai.project.selectProject') }}
+    <!-- 未打开项目时给出入口；已打开项目由顶栏全局展示，本页不重复 -->
+    <div v-if="!hasProject" class="project-bar">
+      <a-button type="primary" :loading="projectLoading" @click="selectAndOpenProject">
+        <FolderOpenOutlined style="margin-right: 4px"/> {{ t('ai.project.selectProject') }}
       </a-button>
-      <span v-if="projectInfo" class="project-info">
-        {{ projectInfo.ModPath }} ({{ projectInfo.Services?.length || 0 }} {{ t('ai.project.services') }})
-      </span>
-      <span v-else class="project-info project-info--empty">{{ t('ai.project.noProjectOpen') }}</span>
+      <span class="project-info project-info--empty">{{ projectError || t('ai.project.noProjectOpen') }}</span>
     </div>
 
     <!-- 步骤条 -->

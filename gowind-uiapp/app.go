@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -15,8 +16,10 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlkratos"
 )
 
 // App struct
@@ -26,7 +29,7 @@ type App struct {
 	// stateMu 保护 projectInfo/dbConfig:Wails 绑定调用各自在独立
 	// goroutine 中执行,并发读写存在数据竞争。指针只在锁内整体替换,
 	// 指向的结构体发布后不再修改。
-	stateMu    sync.Mutex
+	stateMu     sync.Mutex
 	projectInfo *detect.ProjectInfo
 	dbConfig    *database.DBConfig
 
@@ -88,8 +91,21 @@ func (l *wailsLogger) Errorf(format string, args ...any) {
 	runtime.LogErrorf(l.app.ctx, format, args...)
 }
 
-// OpenProject 打开指定路径的项目，并返回项目的信息。
-func (a *App) OpenProject(projectPath string) *detect.ProjectInfo {
+// OpenProjectResult 描述一次 OpenProject 调用的结果。
+// Status 取值：
+//   - "opened"  已直接打开，Project 为项目信息；
+//   - "choose"  所选目录无自身 go.mod 但发现多个子模块，需用户从 Candidates 中选择
+//     （前端全局选择器据 project-modules-found 事件弹框，调用方此时不应报错也不清空当前项目）；
+//   - "invalid" 既非模块根、也无子模块、且不属于任何上级模块。
+type OpenProjectResult struct {
+	Status     string                   `json:"Status"`
+	Project    *detect.ProjectInfo      `json:"Project,omitempty"`
+	Candidates []detect.ModuleCandidate `json:"Candidates,omitempty"`
+}
+
+// OpenProject 打开指定路径的项目。目录自身是模块根则直接打开；
+// 否则向下发现候选子模块交给前端选择；再否则回退向上探测所属父模块。
+func (a *App) OpenProject(projectPath string) *OpenProjectResult {
 	// 清理路径：去除前后空格、换行符、控制字符等
 	projectPath = strings.TrimSpace(projectPath)
 	projectPath = strings.ReplaceAll(projectPath, "\r\n", "")
@@ -99,19 +115,31 @@ func (a *App) OpenProject(projectPath string) *detect.ProjectInfo {
 		return r < 32 && r != '\t' // 保留制表符
 	})
 
-	var err error
-	var pi *detect.ProjectInfo
-	pi, err = a.projectDetector.Detect(projectPath)
-	if err != nil {
-		runtime.LogErrorf(a.ctx, "项目检测失败：%v (路径：%q)", err, projectPath)
-		return nil
+	if !detect.HasGoMod(projectPath) {
+		if candidates, err := detect.FindModulesUnder(projectPath, detect.DefaultModuleSearchDepth); err == nil && len(candidates) > 0 {
+			runtime.EventsEmit(a.ctx, "project-modules-found", candidates)
+			return &OpenProjectResult{Status: "choose", Candidates: candidates}
+		}
+	}
+
+	pi, err := a.projectDetector.Detect(projectPath)
+	if err != nil || pi == nil || pi.ModPath == "" {
+		if err != nil {
+			runtime.LogErrorf(a.ctx, "项目检测失败：%v (路径：%q)", err, projectPath)
+		}
+		return &OpenProjectResult{Status: "invalid"}
+	}
+	// 切换模块时丢弃上一个项目的表配置与 DSN，否则生成器会把 A 项目的表写进 B 项目。
+	// 前端不靠事件感知（避免先清空再赋值的闪烁），而是比较 projectInfo.ModPath 自行复位。
+	if prev := a.getProjectInfo(); prev == nil || prev.ModPath != pi.ModPath {
+		a.setDBConfig(nil)
+		a.generator.CleanOptions()
 	}
 	a.setProjectInfo(pi)
-
 	runtime.EventsEmit(a.ctx, "project-opened", pi)
-
-	return pi
+	return &OpenProjectResult{Status: "opened", Project: pi}
 }
+
 
 // GetProjectInfo 返回当前打开的项目的信息。
 func (a *App) GetProjectInfo() *detect.ProjectInfo {
@@ -240,6 +268,85 @@ func (a *App) ImportDatabaseTables(cfg database.DBConfig) string {
 	return ""
 }
 
+// ImportGoSchemaTables 从 Go 源码数据源导入表清单：ent://<ent schema 目录> 或
+// gorm://<gorm model 目录>。与 ImportDatabaseTables 的区别是不连库——表结构由
+// go/ast 解析源码得到；scheme 与 ORM 必须配对，否则 sqlkratos 会拖到生成阶段才报错。
+func (a *App) ImportGoSchemaTables(source string, ormType string) string {
+	source = strings.TrimSpace(source)
+	ormType = strings.TrimSpace(ormType)
+
+	var scheme string
+	switch {
+	case strings.HasPrefix(source, "ent://"):
+		scheme = "ent"
+	case strings.HasPrefix(source, "gorm://"):
+		scheme = "gorm"
+	default:
+		return "Go 源码数据源需写成 ent://<schema 目录> 或 gorm://<model 目录>"
+	}
+	if scheme != ormType {
+		return fmt.Sprintf("%s:// 数据源只能搭配 %s ORM（当前为 %q）", scheme, scheme, ormType)
+	}
+
+	dir := strings.TrimPrefix(source, scheme+"://")
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return fmt.Sprintf("目录不存在：%s", dir)
+	}
+
+	names, err := planGoSchemaTables(a.ctx, source, ormType)
+	if err != nil {
+		return fmt.Sprintf("解析 Go 源码失败：%v", err)
+	}
+	if len(names) == 0 {
+		return "该目录下没有解析到任何模型"
+	}
+
+	// Driver 留空无妨：source 自带 scheme，ensureDSNScheme 会原样透传给 sqlkratos。
+	a.setDBConfig(&database.DBConfig{UseDSN: true, DSN: source})
+
+	a.generator.CleanOptions()
+	for _, name := range names {
+		a.generator.AddOption(&generator.Option{TableName: name})
+	}
+
+	runtime.EventsEmit(a.ctx, "table-imported")
+
+	return ""
+}
+
+// planGoSchemaTables 只读解析 Go 源码数据源将被处理的表名。
+// Servers 必须非空（generateProtobufCode 只在 grpc/rest 分支执行转换），且转换会把
+// proto 写到 OutputPath 下，故指向临时目录保证零副作用。
+func planGoSchemaTables(ctx context.Context, source string, ormType string) ([]string, error) {
+	tmp, err := os.MkdirTemp("", "gowind-schema-preview")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmp)
+
+	tables, err := sqlkratos.PlanTables(ctx, sqlkratos.GeneratorOptions{
+		Source:               source,
+		OrmType:              ormType,
+		OutputPath:           tmp,
+		ModuleName:           "preview",
+		SourceModuleName:     "preview",
+		ModuleVersion:        "v1",
+		ProjectName:          "preview",
+		ServiceName:          "preview",
+		Servers:              []string{"grpc"},
+		ProtoPackageStrategy: "per-table",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(tables))
+	for _, t := range tables {
+		names = append(names, t.Name)
+	}
+	return names, nil
+}
+
 // SetDBConfig 设置数据库连接配置
 func (a *App) SetDBConfig(cfg database.DBConfig) {
 	a.setDBConfig(&cfg)
@@ -259,7 +366,7 @@ func (a *App) CleanConfig() {
 }
 
 // GenerateGrpcCode 生成代码
-func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) string {
+func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string, servers []string) string {
 	if ormType == "" {
 		runtime.LogErrorf(a.ctx, "ORM 类型不能为空")
 		return "ORM 类型不能为空"
@@ -281,7 +388,7 @@ func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) stri
 		protoPackageStrategy = "per-table"
 	}
 
-	runtime.LogDebugf(a.ctx, "生成代码，ORM 类型: %v，Proto 包策略: %v", ormType, protoPackageStrategy)
+	runtime.LogDebugf(a.ctx, "生成代码，ORM 类型: %v，Proto 包策略: %v，传输层: %v", ormType, protoPackageStrategy, servers)
 
 	if err := a.generator.GenerateGrpcCode(
 		a.ctx,
@@ -290,6 +397,7 @@ func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) stri
 		protoPackageStrategy,
 		pi.Root,
 		pi.ModPath,
+		servers,
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "生成代码失败: %v", err)
 		return fmt.Sprintf("生成代码失败: %v", err)
@@ -302,9 +410,10 @@ func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) stri
 
 // GenerateRestCode 生成代码
 func (a *App) GenerateRestCode(serviceName string, protoPackageStrategy string) string {
-	if len(serviceName) == 0 {
-		runtime.LogErrorf(a.ctx, "服务名称不能为空")
-		return "服务名称不能为空"
+	// serviceName 会进 GeneratorOptions.ServiceName,而生成器拿它拼输出目录。
+	if err := svcname.Validate(serviceName); err != nil {
+		runtime.LogErrorf(a.ctx, "服务名称无效: %v", err)
+		return err.Error()
 	}
 
 	pi := a.getProjectInfo()
@@ -567,6 +676,7 @@ func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.
 		"per-table", // AI 辅助生成默认使用每表独立包
 		pi.Root,
 		pi.ModPath,
+		[]string{"grpc"},
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "AI 辅助生成后端代码失败: %v", err)
 		return fmt.Sprintf("生成后端代码失败: %v", err)

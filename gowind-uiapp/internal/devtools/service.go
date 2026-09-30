@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/service"
 )
 
@@ -164,6 +165,12 @@ func RunBufGenerate(projectRoot string) *CommandResult {
 
 // RunEntGenerate 运行 ent generate
 func RunEntGenerate(projectRoot, serviceName string) *CommandResult {
+	// servicePath 既当 go 的工作目录,又作为参数传给 ent;逃出 app/ 就等于在别处
+	// 生成并覆盖 ent 代码。
+	if err := svcname.Validate(serviceName); err != nil {
+		return &CommandResult{Success: false, Error: err.Error()}
+	}
+
 	servicePath := filepath.Join(projectRoot, "app", serviceName, "service")
 	schemaDir := filepath.Join(servicePath, "internal", "data", "ent", "schema")
 
@@ -215,6 +222,11 @@ func RunEntGenerateAll(projectRoot string) *CommandResult {
 
 // RunWire 运行 wire 生成
 func RunWire(projectRoot, serviceName string) *CommandResult {
+	// wire 会在它的工作目录里改写 wire_gen.go,目录必须由这个校验决定。
+	if err := svcname.Validate(serviceName); err != nil {
+		return &CommandResult{Success: false, Error: err.Error()}
+	}
+
 	serverPath := filepath.Join(projectRoot, "app", serviceName, "service", "cmd", "server")
 	if _, err := os.Stat(serverPath); err != nil {
 		return &CommandResult{Success: false, Error: fmt.Sprintf("服务 %s 的 cmd/server 目录不存在", serviceName)}
@@ -341,8 +353,10 @@ func CreateProject(ctx context.Context, opts CreateProjectOptions) *CommandResul
 
 // AddService 向已有项目添加新服务
 func AddService(projectRoot string, opts AddServiceOptions) *CommandResult {
-	if opts.ServiceName == "" {
-		return &CommandResult{Success: false, Error: "服务名称不能为空"}
+	// 这是唯一一个"写"汇点:ServiceName 会带着 OutputPath 一路进到生成器去建目录、
+	// 落文件,`../../x` 就是往项目外写。上面的 os.Stat 只挡"目录已存在",挡不住逃逸。
+	if err := svcname.Validate(opts.ServiceName); err != nil {
+		return &CommandResult{Success: false, Error: err.Error()}
 	}
 
 	servicePath := filepath.Join(projectRoot, "app", opts.ServiceName, "service")

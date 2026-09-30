@@ -2,6 +2,8 @@ package sqlkratos
 
 type (
 	GeneratorOptions struct {
+		// Driver 仅在 Source 不带 scheme 时用于补全前缀，取值 mysql / postgres / postgresql；
+		// Source 自带 scheme（mysql://、postgres://、ent://、gorm://）或是 DDL 文本时留空即可。
 		Driver string
 		Source string // Data Source name (DSN), e.g., "mysql://user:pass@tcp(localhost:3306)/dbname"
 

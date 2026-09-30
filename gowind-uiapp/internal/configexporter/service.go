@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +17,9 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/redirect"
+	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
 )
 
 // ConfigType 远程配置中心类型
@@ -138,6 +142,13 @@ func ExportAll(rc *RemoteConfig, projectRoot string) error {
 
 // ExportOne 导出单个服务的配置到远程配置中心
 func ExportOne(rc *RemoteConfig, projectRoot string, serviceName string) error {
+	// serviceName 也是前端传进来的。它可以逃到 app/ 之外,把项目外的任意
+	// .yaml/.json/.txt 读出来发到远端配置中心——这条路径上是"读+外发",
+	// 比写更难察觉。ExportAll 用磁盘目录名枚举,不经过这里。
+	if err := svcname.Validate(serviceName); err != nil {
+		return err
+	}
+
 	// 使用内建实现直接通过 HTTP API 写入配置中心
 	return exportDirect(rc, projectRoot, serviceName)
 }
@@ -212,16 +223,69 @@ func getConfigFileList(folder string) []string {
 
 // httpClient 带超时的共享 HTTP 客户端:配置中心不可达或挂起时请求会在
 // 限时内失败,而不是永久占住 Wails 绑定 goroutine。
-var httpClient = &http.Client{Timeout: 30 * time.Second}
+//
+// 重定向策略见 redirect.SameOrigin:这些请求的正文就是服务配置本身,还可能挂着
+// Nacos 的 accessToken,不能跟着一个 3xx 送给别的主机。
+var httpClient = &http.Client{
+	Timeout:       30 * time.Second,
+	CheckRedirect: redirect.SameOrigin,
+}
+
+// endpointScheme 拆出 endpoint 的协议与 "host[:port][/前缀]"。
+//
+// 不带协议时按 http 处理,与这几个客户端历史上的行为一致。但显式写了 https://
+// 就必须真的用 https:旧实现把前缀盲剔掉再硬拼 http://,于是一个只监听 TLS 的
+// 配置中心完全连不上(实测:明文请求打到 TLS 端口拿 400),用户也没有别的开关
+// 能要求加密。http/https 之外的协议直接拒绝——把它们当主机名拼进 URL 只会得到
+// "http://gopher://x/..." 这种谁也发不到的地址。
+func endpointScheme(endpoint string) (scheme, hostPort string, err error) {
+	if i := strings.Index(endpoint, "://"); i >= 0 {
+		s := strings.ToLower(endpoint[:i])
+		if s != "http" && s != "https" {
+			return "", "", fmt.Errorf("不支持的 endpoint 协议 %q(只支持 http/https)", s)
+		}
+		return s, endpoint[i+3:], nil
+	}
+	return "http", endpoint, nil
+}
+
+// requireTLSForCredentials 拒绝在非回环主机上用明文通道送凭据。
+//
+// 只拦"带凭据 + 明文 + 远端"这一组合:本地 httptest/端口转发场景保持不变,
+// 否则每台开发机都得先自签证书才能试配置中心。
+func requireTLSForCredentials(scheme, hostPort, what string) error {
+	if scheme == "https" || isLoopback(hostPort) {
+		return nil
+	}
+	return fmt.Errorf("%s 需要用户名口令,但 endpoint %q 走的是明文 http:请改用 https://,或通过本地端口转发", what, hostPort)
+}
+
+// isLoopback 判断 "host[:port]" 是否是机器自己。
+func isLoopback(hostPort string) bool {
+	host := hostPort
+	if h, _, splitErr := net.SplitHostPort(hostPort); splitErr == nil {
+		host = h
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
 
 // writeConsul 写入配置到 Consul
 func writeConsul(endpoint, project, app, content string) error {
+	scheme, hostPort, err := endpointScheme(endpoint)
+	if err != nil {
+		return fmt.Errorf("Consul endpoint 无效: %w", err)
+	}
+
 	// key 分段转义、保留 "/" 分隔符,与 etcd 路径形成的键形态一致;
 	// 整段 PathEscape 会把 "/" 编成 %2F,读侧按斜杠路径无法取回。
 	key := strings.Join([]string{
 		url.PathEscape(project), url.PathEscape(app), "service", "config",
 	}, "/")
-	consulURL := fmt.Sprintf("http://%s/v1/kv/%s", endpoint, key)
+	consulURL := fmt.Sprintf("%s://%s/v1/kv/%s", scheme, strings.TrimSuffix(hostPort, "/"), key)
 
 	req, err := http.NewRequest("PUT", consulURL, strings.NewReader(content))
 	if err != nil {
@@ -246,7 +310,10 @@ func writeConsul(endpoint, project, app, content string) error {
 // rc.Username/rc.Password 提供 gRPC 认证;rc.*Pem 提供自定义 CA 与客户端
 // 证书(见 buildTLSConfig)。
 func writeEtcd(rc *RemoteConfig, app, content string) error {
-	endpoints := normalizeEtcdEndpoints(rc.Endpoint)
+	endpoints, secure, err := normalizeEtcdEndpoints(rc.Endpoint)
+	if err != nil {
+		return fmt.Errorf("Etcd endpoint 无效: %w", err)
+	}
 	if len(endpoints) == 0 {
 		return fmt.Errorf("Etcd endpoint 为空")
 	}
@@ -255,17 +322,26 @@ func writeEtcd(rc *RemoteConfig, app, content string) error {
 	if err != nil {
 		return fmt.Errorf("Etcd TLS 配置无效: %w", err)
 	}
+	if secure && tlsCfg == nil {
+		// 写了 https:// 却没给 CA:用系统根证书池,而不是退回明文。
+		tlsCfg = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
 
 	cfg := clientv3.Config{
 		Endpoints:   endpoints,
 		DialTimeout: 5 * time.Second,
+		TLS:         tlsCfg,
 	}
 	if rc.Username != "" {
 		cfg.Username = rc.Username
 		cfg.Password = rc.Password
-	}
-	if tlsCfg != nil {
-		cfg.TLS = tlsCfg
+		if tlsCfg == nil {
+			for _, ep := range endpoints {
+				if err := requireTLSForCredentials("http", ep, "Etcd 认证"); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	cli, err := clientv3.New(cfg)
@@ -298,7 +374,7 @@ func buildTLSConfig(ca, cert, key string) (*tls.Config, error) {
 		return nil, fmt.Errorf("客户端证书与私钥必须成对提供")
 	}
 
-	cfg := &tls.Config{}
+	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
 	if ca != "" {
 		pool := x509.NewCertPool()
 		if !pool.AppendCertsFromPEM([]byte(ca)) {
@@ -316,20 +392,37 @@ func buildTLSConfig(ca, cert, key string) (*tls.Config, error) {
 	return cfg, nil
 }
 
-// normalizeEtcdEndpoints 归一化 endpoint 为 etcd 要求的 "host:port" 列表:
-// 支持逗号分隔多节点,容忍 http(s):// 前缀与尾部斜杠。
-func normalizeEtcdEndpoints(endpoint string) []string {
-	var out []string
+// normalizeEtcdEndpoints 归一化 endpoint 为 etcd 要求的 "host:port" 列表,并报告
+// 这批节点是否要求 TLS:支持逗号分隔多节点,容忍 http(s):// 前缀与尾部斜杠。
+//
+// 混用 http 与 https 会拒绝:clientv3 只有一份 tls.Config,一次连接里两种期望
+// 没法同时满足,静默按明文连过去等于替用户挑了协议。
+func normalizeEtcdEndpoints(endpoint string) (hostPorts []string, secure bool, err error) {
+	var sawPlain, sawTLS bool
 	for _, part := range strings.Split(endpoint, ",") {
 		part = strings.TrimSpace(part)
-		part = strings.TrimPrefix(part, "http://")
-		part = strings.TrimPrefix(part, "https://")
-		part = strings.TrimSuffix(part, "/")
-		if part != "" {
-			out = append(out, part)
+		if part == "" {
+			continue
 		}
+		scheme, hostPort, e := endpointScheme(part)
+		if e != nil {
+			return nil, false, e
+		}
+		hostPort = strings.TrimSuffix(hostPort, "/")
+		if hostPort == "" {
+			continue
+		}
+		if scheme == "https" {
+			sawTLS = true
+		} else {
+			sawPlain = true
+		}
+		hostPorts = append(hostPorts, hostPort)
 	}
-	return out
+	if sawPlain && sawTLS {
+		return nil, false, fmt.Errorf("Etcd endpoint 不能混用 http 与 https: %q", endpoint)
+	}
+	return hostPorts, sawTLS, nil
 }
 
 // writeNacos 写入配置到 Nacos。
@@ -349,13 +442,18 @@ func writeNacos(rc *RemoteConfig, app, content string) error {
 		namespaceId = "public"
 	}
 
-	scheme := "http"
-	if ep := rc.Endpoint; strings.HasPrefix(ep, "https://") {
-		scheme = "https"
+	scheme, hostPort, err := endpointScheme(rc.Endpoint)
+	if err != nil {
+		return err
+	}
+	if rc.Username != "" && rc.Password != "" {
+		if err := requireTLSForCredentials(scheme, hostPort, "Nacos"); err != nil {
+			return err
+		}
 	}
 
 	dataId := fmt.Sprintf("%s-%s-service-%s.yaml", rc.ProjectName, app, env)
-	nacosURL := fmt.Sprintf("%s://%s/nacos/v1/cs/configs", scheme, strings.TrimPrefix(strings.TrimPrefix(rc.Endpoint, "https://"), "http://"))
+	nacosURL := fmt.Sprintf("%s://%s/nacos/v1/cs/configs", scheme, strings.TrimSuffix(hostPort, "/"))
 
 	form := url.Values{}
 	form.Set("dataId", dataId)
@@ -390,11 +488,15 @@ func writeNacos(rc *RemoteConfig, app, content string) error {
 
 // nacosLogin 走 Nacos 登录接口换取 accessToken。
 func nacosLogin(endpoint, username, password string) (string, error) {
-	scheme := "http"
-	if strings.HasPrefix(endpoint, "https://") {
-		scheme = "https"
+	scheme, hostPort, err := endpointScheme(endpoint)
+	if err != nil {
+		return "", err
 	}
-	loginURL := fmt.Sprintf("%s://%s/nacos/v1/auth/login", scheme, strings.TrimPrefix(strings.TrimPrefix(endpoint, "https://"), "http://"))
+	// 这个函数是口令真正出门的地方,所以这里再判一次,不依赖调用方已经判过。
+	if err := requireTLSForCredentials(scheme, hostPort, "Nacos 登录"); err != nil {
+		return "", err
+	}
+	loginURL := fmt.Sprintf("%s://%s/nacos/v1/auth/login", scheme, strings.TrimSuffix(hostPort, "/"))
 
 	resp, err := httpClient.PostForm(loginURL, url.Values{
 		"username": {username},

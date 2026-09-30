@@ -24,9 +24,9 @@ func (noopLogger) Errorf(string, ...any) {}
 type Generator struct {
 	// mu 保护 options/logger/skipPostProcess:Wails 绑定调用各自在独立
 	// goroutine 中执行,前端并发触发选项读写时存在数据竞争。
-	mu             sync.Mutex
-	options        GeneratorOptions
-	logger         Logger
+	mu      sync.Mutex
+	options GeneratorOptions
+	logger  Logger
 	// skipPostProcess 跳过生成后的 tidy/buf/ent/wire 后处理链
 	skipPostProcess bool
 }
@@ -169,7 +169,13 @@ func (g *Generator) GenerateGrpcCode(
 	protoPackageStrategy string,
 	rootPath string,
 	projectName string,
+	servers []string,
 ) error {
+	// 传输层可选;缺省与旧行为一致仅 gRPC,额外 websocket 作为消息驱动传输注入。
+	if len(servers) == 0 {
+		servers = []string{"grpc"}
+	}
+
 	opts := g.GetValidateOptions()
 	if len(opts) == 0 {
 		g.logger.Errorf("没有可用的表选项进行代码生成")
@@ -217,7 +223,7 @@ func (g *Generator) GenerateGrpcCode(
 		options.GenerateConfig = true
 		options.GenerateMakefile = true
 
-		options.Servers = []string{"grpc"}
+		options.Servers = servers
 
 		options.ProjectName = projectName
 		options.ServiceName = serviceName

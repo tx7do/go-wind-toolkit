@@ -4,11 +4,18 @@ import (
 	"github.com/tx7do/go-utils/stringcase"
 )
 
-// ProtoField 字段数据
+// ProtoField 字段数据。
+//
+// Null 由 sqlproto 如实填入,但没有任何模板读它:"NOT NULL 列也生成 optional"看着像
+// 漏了空值信息,实际是必需的——生成的更新路径对每一列都调用 SetNillableXxx(req.Data.Xxx)
+// (见 DataField.EntSetNillableFunc 与 ent_repo.tpl 的 Update 段),而标量字段只有带
+// presence(即 proto3 的 optional)时才是指针,去掉 optional 生成物直接编译不过。
+// 列的空值语义真正生效的地方在 Go/ent 侧(DataField.Null → Set 还是 SetNillable)
+// 与 ent schema 侧(import.go 的 desc.Optional),不在 proto 里。
 type ProtoField struct {
 	Name    string // 字段名
 	Type    string // 字段类型
-	Null    bool   // 是否允许为 NULL
+	Null    bool   // 列是否允许 NULL;模板不读它,见上面的说明
 	Comment string // 字段注释
 	Number  int    // 字段编号
 }

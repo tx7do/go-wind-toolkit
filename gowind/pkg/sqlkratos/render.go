@@ -248,6 +248,19 @@ func (g *Generator) WriteServerPackageCode(
 			return err
 		}
 
+	case "websocket":
+		// websocket 为消息驱动传输,不承载逐表 proto 服务,仅需服务名。
+		o := code_generator.Options{
+			OutDir: outputPath,
+			Module: projectName,
+			Vars: map[string]any{
+				"Service": serviceName,
+			},
+		}
+		if _, err := g.goGenerator.GenerateWebsocketServer(context.Background(), o); err != nil {
+			return err
+		}
+
 	default:
 		return errors.New("sqlproto: unsupported service type: " + serviceType)
 	}

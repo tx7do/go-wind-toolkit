@@ -76,9 +76,6 @@
 import { computed, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
 
-import {
-  ,
-} from "@/api/composables";
 import { $t } from "@/core/i18n";
 import { DRAWER_WIDTH } from "@/constants";
 
@@ -93,6 +90,14 @@ const submitLoading = ref(false);
 const isCreate = ref(true);
 const currentId = ref<number>();
 const formRef = ref();
+
+// 请求方法 选项(取自 OpenAPI enum)
+const requestMethodList = [
+  { label: "GET", value: "GET" },
+  { label: "POST", value: "POST" },
+  { label: "PUT", value: "PUT" },
+  { label: "DELETE", value: "DELETE" },
+];
 
 // 表单数据
 const formData = reactive({

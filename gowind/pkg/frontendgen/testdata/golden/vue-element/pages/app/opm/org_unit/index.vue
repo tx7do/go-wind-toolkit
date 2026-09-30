@@ -12,14 +12,12 @@
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
-import { ElTag } from "element-plus";
 
 import ProPage from "@/components/Pro/ProPage/index.vue";
 import type { ProPageConfig } from "@/components/Pro/ProPage/types";
 import OrgUnitDrawer from "./org-unit-drawer.vue";
 
 import {
-  enableBoolToName,
   fetchListOrgUnits,
   useDeleteOrgUnit,
 } from "@/api/composables";

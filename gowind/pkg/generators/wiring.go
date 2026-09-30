@@ -154,7 +154,7 @@ func BuildWiringBlocks(
 	hasTemplatedServer := false
 	for _, s := range servers {
 		switch strings.TrimSpace(strings.ToLower(s)) {
-		case "grpc", "rest":
+		case "grpc", "rest", "websocket":
 			hasTemplatedServer = true
 		}
 	}
@@ -261,6 +261,12 @@ func BuildWiringBlocks(
 			transport.WriteString("\t)\n")
 			transport.WriteString("\tif err != nil {\n\t\trollback()\n\t\treturn nil, nil, err\n\t}\n")
 			newAppArgs += "\tgrpcServer,\n"
+		case "websocket":
+			// WebSocket 以消息类型驱动,不登记 proto 服务;serviceModels 在此不产生注册行。
+			transport.WriteString("\n\twsMiddlewares := server.NewWebsocketMiddleware(ctx)\n")
+			transport.WriteString("\n\twsServer, err := server.NewWebsocketServer(ctx, wsMiddlewares)\n")
+			transport.WriteString("\tif err != nil {\n\t\trollback()\n\t\treturn nil, nil, err\n\t}\n")
+			newAppArgs += "\twsServer,\n"
 		default:
 			transport.WriteString(fmt.Sprintf(
 				"\n\t// TODO: 传输层 %s 未提供生成模板,请在此构造实例并接入 newApp。\n", kind))

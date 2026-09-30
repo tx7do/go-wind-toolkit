@@ -136,13 +136,8 @@ func buildDSN(cfg DBConfig) (string, error) {
 			cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database, sslMode), nil
 
 	case DbTypePostgreSQL:
-		// postgres://user:pass@host:port/db?sslmode=disable
-		sslMode := "disable"
-		if cfg.SSL {
-			sslMode = "require"
-		}
-		return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&timezone=Asia/Shanghai",
-			cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database, sslMode), nil
+		// 与生成路径共用同一个构造器:转义只有一份实现才不会两边分叉。
+		return buildPostgresDSN(cfg)
 
 	case DbTypeSQLite:
 		if cfg.DBPath == "" {
@@ -161,12 +156,8 @@ func buildDSN(cfg DBConfig) (string, error) {
 
 	case DbTypeOracle:
 		// oracle://user:pass@host:port/service_name
-		serviceName := cfg.Database
-		if serviceName == "" {
-			serviceName = "ORCL"
-		}
-		return fmt.Sprintf("oracle://%s:%s@%s:%d/%s",
-			cfg.Username, cfg.Password, cfg.Host, cfg.Port, serviceName), nil
+		// 同 PostgreSQL:转义只留一份实现,避免两条路径对含特殊字符的口令给出不同结果。
+		return buildOracleDSN(cfg)
 
 	default:
 		return "", fmt.Errorf("unsupported database type: %s", cfg.Type)

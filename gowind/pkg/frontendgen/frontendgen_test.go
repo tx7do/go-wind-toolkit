@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -297,5 +298,176 @@ func TestOrderedMapRendering(t *testing.T) {
 }`
 	if m.String() != want {
 		t.Errorf("渲染不一致:\ngot:\n%s\nwant:\n%s", m.String(), want)
+	}
+}
+
+// 生成产物里对枚举选项常量的引用形态:JSX 的 options={<ident>(…)}、
+// Vue 模板的 v-for="item in <ident>"。
+var (
+	reOptionsRef = regexp.MustCompile(`options[=:]\s*\{?\s*([A-Za-z_$][\w$]*)\s*[(,}]`)
+	reVueForRef  = regexp.MustCompile(`v-for="[^"]*\bin\s+([A-Za-z_$][\w$]*)`)
+
+	reImportBraces = regexp.MustCompile(`(?s)import\s+(?:type\s+)?\{([^}]*)\}`)
+	reDeclStmt     = regexp.MustCompile(`(?:export\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)`)
+	reAnyIdent     = regexp.MustCompile(`[A-Za-z_$][\w$]*`)
+)
+
+// fileDeclaredIdents 一个文件里可用(已声明或已导入)的标识符集合
+func fileDeclaredIdents(src string) map[string]bool {
+	declared := map[string]bool{}
+	for _, group := range reImportBraces.FindAllStringSubmatch(src, -1) {
+		for _, id := range reAnyIdent.FindAllString(group[1], -1) {
+			declared[id] = true
+		}
+	}
+	for _, group := range reDeclStmt.FindAllStringSubmatch(src, -1) {
+		declared[group[1]] = true
+	}
+	return declared
+}
+
+// TestGeneratedEnumSymbolsAreDeclared 三框架产物中,options / v-for 引用到的枚举常量
+// 必须在同一文件里被声明或导入。此前非 status 枚举(requestMethod)只写了引用没写声明,
+// 抽屉一渲染就 ReferenceError,而逐字比对的黄金样本把这份坏产物当成了正确基线。
+func TestGeneratedEnumSymbolsAreDeclared(t *testing.T) {
+	refs := 0
+	eachGeneratedFile(t, func(fw Framework, f GeneratedFile) {
+		if !isSourceFile(f.Path) {
+			return
+		}
+		declared := fileDeclaredIdents(f.Content)
+		refsInFile := append(
+			reOptionsRef.FindAllStringSubmatch(f.Content, -1),
+			reVueForRef.FindAllStringSubmatch(f.Content, -1)...,
+		)
+		for _, group := range refsInFile {
+			id := group[1]
+			refs++
+			if !declared[id] {
+				t.Errorf("%s/%s 引用了未声明的标识符 %q", fw, f.Path, id)
+			}
+		}
+	})
+
+	// 夹具必须真的覆盖到这些腿,否则本用例退化成空跑
+	if refs < 3 {
+		t.Errorf("仅检查到 %d 处枚举选项引用,夹具可能已不再覆盖 select/v-for 腿", refs)
+	}
+}
+
+// TestEnumSymbolNamingIsShared 模板引用与声明必须取自同一个命名函数,
+// 否则「引用了没人声明的常量」这类缺陷会再次出现。
+func TestEnumSymbolNamingIsShared(t *testing.T) {
+	field := &ParsedField{Name: "requestMethod", IsEnum: true, EnumValues: []string{"GET", "POST", "PUT", "DELETE"}}
+
+	if got, want := elementEnumListVar(field), "requestMethodList"; got != want {
+		t.Errorf("elementEnumListVar = %q, 期望 %q", got, want)
+	}
+	if got, want := reactEnumOptionsFn(field), "getRequestMethodOptions"; got != want {
+		t.Errorf("reactEnumOptionsFn = %q, 期望 %q", got, want)
+	}
+
+	// element 抽屉:模板里的 v-for 与脚本里的 const 声明必须同名
+	drawer := elementDrawerCode(mustServiceOf(t, "ApiAuditLogService"))
+	for _, want := range []string{`v-for="item in requestMethodList"`, "const requestMethodList = ["} {
+		if !strings.Contains(drawer, want) {
+			t.Errorf("抽屉产物缺少 %q", want)
+		}
+	}
+}
+
+// TestElementStatusEnumGate 只有 status 枚举才走 statusToColor/statusToName 标签渲染:
+// 判据放宽到任意枚举,列表页会引用一个只为 status 导入的符号,且把 GET/POST 译成「启用/禁用」。
+func TestElementStatusEnumGate(t *testing.T) {
+	status := &ParsedField{Name: "status", IsEnum: true, EnumValues: []string{"ON", "OFF"}}
+	method := &ParsedField{Name: "requestMethod", IsEnum: true, EnumValues: []string{"GET", "POST", "PUT", "DELETE"}}
+
+	if !isElementStatusEnum(status) {
+		t.Error("status 枚举应走标签渲染")
+	}
+	if isElementStatusEnum(method) {
+		t.Error("非 status 枚举不应套用 statusToName/statusToColor")
+	}
+
+	// 列表页:没有 status 枚举时不得出现 statusToName 引用
+	page := elementPageCode(mustServiceOf(t, "ApiAuditLogService"), "admin", "log/api_audit_log")
+	if strings.Contains(page, "statusToName(") {
+		t.Errorf("api-audit-log 列表页仍在渲染 requestMethod 的状态文案:\n%s", truncate(page))
+	}
+	if strings.Contains(page, "statusList") {
+		t.Error("列表页导入了未被使用的 statusList")
+	}
+}
+
+func mustServiceOf(t *testing.T, tag string) *ParsedService {
+	t.Helper()
+	for _, s := range ExtractServices(loadTestSpec(t)) {
+		if s.TagName == tag {
+			return s
+		}
+	}
+	t.Fatalf("测试规格里没有 %s 服务", tag)
+	return nil
+}
+
+// isSourceFile 产物里需要做静态体检的代码文件（json/scss 等不在其列）
+func isSourceFile(path string) bool {
+	return strings.HasSuffix(path, ".vue") || strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx")
+}
+
+// eachGeneratedFile 用与黄金样本完全相同的选项跑三框架,逐个产物回调
+func eachGeneratedFile(t *testing.T, fn func(fw Framework, f GeneratedFile)) {
+	t.Helper()
+	spec := loadTestSpec(t)
+	for _, fw := range []Framework{FrameworkVueVben, FrameworkVueElement, FrameworkReactAntd} {
+		opts := goldenOptions(fw)
+		opts.Spec = spec
+		files, err := Generate(opts)
+		if err != nil {
+			t.Fatalf("%s 生成失败: %v", fw, err)
+		}
+		for _, f := range files {
+			fn(fw, f)
+		}
+	}
+}
+
+var (
+	reBracedImport = regexp.MustCompile(`(?s)import\s+(?:type\s+)?\{([^}]*)\}`)
+	reSpecifier    = regexp.MustCompile(`^(?:type\s+)?[A-Za-z_$][\w$]*(?:\s+as\s+[A-Za-z_$][\w$]*)?$`)
+)
+
+// TestGeneratedImportsAreWellFormed 生成的 import 花括号必须非空、且每项都是合法标识符。
+// 两条曾同时踩中过:只读服务(仅 List/Get)留下 `import {\n  ,\n}` 的空壳,
+// 复合组件被写成 `import { ProFormRadio.Group }`——两种都是一行都过不了解析的语法错误,
+// 而逐字比对的黄金样本对此毫无反应。
+func TestGeneratedImportsAreWellFormed(t *testing.T) {
+	checked := 0
+	eachGeneratedFile(t, func(fw Framework, f GeneratedFile) {
+		if !isSourceFile(f.Path) {
+			return
+		}
+		for _, group := range reBracedImport.FindAllStringSubmatch(f.Content, -1) {
+			checked++
+			valid := 0
+			for _, spec := range strings.Split(group[1], ",") {
+				spec = strings.TrimSpace(spec)
+				if spec == "" {
+					continue // 生成风格里的尾随逗号
+				}
+				if !reSpecifier.MatchString(spec) {
+					t.Errorf("%s/%s: 非法的 import 项 %q", fw, f.Path, spec)
+				}
+				valid++
+			}
+			if valid == 0 {
+				t.Errorf("%s/%s: import 花括号里没有任何标识符", fw, f.Path)
+			}
+		}
+	})
+
+	// 夹具必须真的覆盖到 import 语句,否则本用例退化成空跑
+	if checked < 20 {
+		t.Errorf("仅检查到 %d 条 import,夹具覆盖面可能已缩小", checked)
 	}
 }

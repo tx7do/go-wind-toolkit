@@ -50,7 +50,9 @@ go-wind-toolkit/
 
 ### 后端代码生成
 
-通过向导式界面完成从数据库 Schema 到完整微服务代码的全流程生成。支持直连数据库（MySQL、PostgreSQL、SQLite、Oracle）、SQL 文件、远程 URL、在线编辑器四种方式导入 Schema；为每张表分配所属微服务、配置 Proto 包策略（每表独立包 / 按服务分包 / 自定义包名）；选择 ORM 类型（Ent / GORM），一键生成 gRPC 或 REST 服务代码，自动完成后处理（`go mod tidy` → `buf generate` → `ent generate` → `wire generate`）。
+通过向导式界面完成从数据库 Schema 到完整微服务代码的全流程生成。支持直连数据库（MySQL、PostgreSQL）、SQL 文件、远程 URL、在线编辑器四种方式导入 Schema；为每张表分配所属微服务、配置 Proto 包策略（每表独立包 / 按服务分包 / 自定义包名）；选择 ORM 类型（Ent / GORM），一键生成 gRPC 或 REST 服务代码，自动完成后处理（`go mod tidy` → `buf generate` → `ent generate` → `wire generate`）。
+
+> 数据源支持 MySQL / PostgreSQL 连接串、DDL 文本（SQL 文件 / 远程 URL / 在线编辑器）与 `ent://<目录>` / `gorm://<目录>` Go 源码目录。SQLite、Oracle 连接不能作为生成数据源——SQLite 可先用 `sqlite3 <文件> .schema` 导出 DDL，再走「SQL 文件」导入。
 
 ### 前端代码生成
 

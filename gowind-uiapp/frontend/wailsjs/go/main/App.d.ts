@@ -46,7 +46,7 @@ export function ExportOneServiceConfig(arg1:configexporter.RemoteConfig,arg2:str
 
 export function GenerateFrontendCode(arg1:string,arg2:main.FrontendGenParams):Promise<main.FrontendWriteResult>;
 
-export function GenerateGrpcCode(arg1:string,arg2:string):Promise<string>;
+export function GenerateGrpcCode(arg1:string,arg2:string,arg3:Array<string>):Promise<string>;
 
 export function GenerateRestCode(arg1:string,arg2:string):Promise<string>;
 
@@ -72,9 +72,11 @@ export function GetTableColumns(arg1:database.DBConfig,arg2:string):Promise<Arra
 
 export function ImportDatabaseTables(arg1:database.DBConfig):Promise<string>;
 
+export function ImportGoSchemaTables(arg1:string,arg2:string):Promise<string>;
+
 export function ImportSqlTables(arg1:string):Promise<string>;
 
-export function OpenProject(arg1:string):Promise<detect.ProjectInfo>;
+export function OpenProject(arg1:string):Promise<main.OpenProjectResult>;
 
 export function ParseFrontendServices(arg1:string):Promise<main.FrontendServicesResult>;
 

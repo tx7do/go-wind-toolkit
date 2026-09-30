@@ -33,17 +33,17 @@ func NewText(i *ImportOptions) (*Text, error) {
 	}, nil
 }
 
-func (t *Text) toColumnType(col ddlparser.ColumnDef, sqlContent string) (*schema.ColumnType, error) {
+func (t *Text) toColumnType(tableName string, col ddlparser.ColumnDef, sqlContent string) (*schema.ColumnType, error) {
 	parsedType, err := schemasource.ParseType(col.Type)
 	if err != nil {
 		return nil, err
 	}
 
-	// ddl_parser 不将 unsigned 纳入 col.Type（如 INT UNSIGNED 只返回 "int"），
-	// 需要从原始 SQL 中检测列是否含 unsigned，并重新解析。
+	// ddl_parser 不把 unsigned 带进 col.Type(如 INT UNSIGNED 只返回 "int"),
+	// 需要从原始 SQL 中检测该列是否声明为 unsigned,再按无符号重新解析。
 	if intType, ok := parsedType.(*schema.IntegerType); ok && !intType.Unsigned {
-		if isColumnUnsigned(col.Name, col.Type, sqlContent) {
-				unsignedType, uErr := schemasource.ParseType(col.Type + " unsigned")
+		if schemasource.ColumnIsUnsigned(tableName, col.Name, col.Type, sqlContent) {
+			unsignedType, uErr := schemasource.ParseType(col.Type + " unsigned")
 			if uErr == nil {
 				if uIntType, ok := unsignedType.(*schema.IntegerType); ok && uIntType.Unsigned {
 					parsedType = uIntType
@@ -57,35 +57,6 @@ func (t *Text) toColumnType(col ddlparser.ColumnDef, sqlContent string) (*schema
 		Raw:  col.Type,
 		Null: col.Nullable,
 	}, nil
-}
-
-// isColumnUnsigned 检测原始 SQL 中指定列是否包含 UNSIGNED 关键字
-func isColumnUnsigned(colName, colType, sqlContent string) bool {
-	// 在 SQL 内容中查找列名，检测该行是否含 unsigned
-	sqlLower := strings.ToLower(sqlContent)
-	colNameLower := strings.ToLower(colName)
-
-	// 查找列名出现的位置
-	idx := 0
-	for {
-		pos := strings.Index(sqlLower[idx:], colNameLower)
-		if pos == -1 {
-			break
-		}
-		absPos := idx + pos
-		// 从列名开始找到下一个逗号或行尾，作为该列的定义范围
-		endPos := len(sqlLower)
-		if comma := strings.Index(sqlLower[absPos:], ","); comma != -1 {
-			endPos = absPos + comma
-		}
-		colDef := sqlLower[absPos:endPos]
-		// 检查该列定义中是否包含 unsigned
-		if strings.Contains(colDef, " unsigned") {
-			return true
-		}
-		idx = absPos + len(colNameLower)
-	}
-	return false
 }
 
 func (t *Text) InspectSchema(ctx context.Context, sqlContent string, opts *schema.InspectOptions, s *schema.Schema) (*schema.Schema, error) {
@@ -148,7 +119,7 @@ func (t *Text) InspectSchema(ctx context.Context, sqlContent string, opts *schem
 		for _, col := range tbl.Columns {
 			log.Printf("列名: %v, 类型: %v, NULL: %v\n", col.Name, col.Type, col.Nullable)
 
-			colType, err := t.toColumnType(col, sqlContent)
+			colType, err := t.toColumnType(name, col, sqlContent)
 			if err != nil {
 				log.Printf("解析失败: %v\n", err)
 				continue

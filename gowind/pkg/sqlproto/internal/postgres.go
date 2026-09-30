@@ -7,6 +7,8 @@ import (
 	"ariga.io/atlas/sql/schema"
 
 	_ "github.com/lib/pq"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 // PostgreSQL到Protobuf的类型映射
@@ -136,21 +138,17 @@ func (p *Postgres) SchemaTables(ctx context.Context) ([]*TableData, error) {
 }
 
 func PostgresFieldType(sqlType string) (f string) {
-	sqlType = strings.ToUpper(sqlType)
-
-	// 去除类型声明中的括号部分，例如 "VARCHAR(255)" -> "VARCHAR"
-	baseType := strings.SplitN(sqlType, "(", 2)[0]
-	baseType = strings.TrimSpace(strings.ToUpper(baseType))
+	// Postgres 没有无符号整数,ParseSQLType 的 Base 即映射表键。
+	baseType := schemasource.ParseSQLType(sqlType).Base
 
 	// 查找映射
 	if protoType, exists := postgresqlTypeMapping[baseType]; exists {
 		return protoType
 	}
 
-	// 处理多词类型名，如 "TIMESTAMP WITHOUT TIME ZONE" -> "TIMESTAMP"
+	// 处理多词类型名,atlas 给出的是全称而映射表按简称登记:
+	// "TIMESTAMP WITHOUT TIME ZONE" -> "TIMESTAMP"
 	// "TIMESTAMP WITH TIME ZONE" -> "TIMESTAMPTZ"
-	// "CHARACTER VARYING" 已经在映射表中
-	firstWord := strings.SplitN(baseType, " ", 2)[0]
 	switch baseType {
 	case "TIMESTAMP WITHOUT TIME ZONE":
 		return postgresqlTypeMapping["TIMESTAMP"]
@@ -158,14 +156,10 @@ func PostgresFieldType(sqlType string) (f string) {
 		return postgresqlTypeMapping["TIMESTAMPTZ"]
 	case "TIME WITH TIME ZONE":
 		return postgresqlTypeMapping["TIMETZ"]
-	case "BIT VARYING":
-		return postgresqlTypeMapping["BIT VARYING"]
-	case "DOUBLE PRECISION":
-		return postgresqlTypeMapping["DOUBLE PRECISION"]
 	}
 
 	// 最后尝试只用第一个单词匹配
-	if firstWord != baseType {
+	if firstWord, _, found := strings.Cut(baseType, " "); found {
 		if protoType, exists := postgresqlTypeMapping[firstWord]; exists {
 			return protoType
 		}

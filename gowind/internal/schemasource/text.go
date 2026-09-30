@@ -8,22 +8,19 @@ import (
 	"ariga.io/atlas/sql/postgres"
 	"ariga.io/atlas/sql/schema"
 	"ariga.io/atlas/sql/sqlite"
-
-	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
 )
 
 // LoadSQLFromFile 从 schemaPath 载入 SQL 文本:若 schemaPath 指向普通文件
 // 则读其内容,否则视作内联 DDL 文本,剥掉 text:// 等 scheme 前缀后原样返回。
+// 调用方传的是 NormalizeDSN 之后的值（裸路径会变成 file://<路径>），所以必须先
+// 剥 scheme 再判文件，否则文件路径本身会被当成 SQL 文本喂给解析器。
 func LoadSQLFromFile(schemaPath string) string {
-	// 检查 schemaPath 是否为文件
-	if !pkg.IsFileExists(schemaPath) {
-		// 如果不是文件，去掉可能的 scheme 前缀（如 text://）后返回 SQL 文本内容。
-		return stripScheme(schemaPath)
-	}
+	text := stripScheme(schemaPath)
 
-	content, err := os.ReadFile(schemaPath)
+	content, err := os.ReadFile(text)
 	if err != nil {
-		return ""
+		// 不是文件，视作内联 DDL 文本。
+		return text
 	}
 
 	return string(content)

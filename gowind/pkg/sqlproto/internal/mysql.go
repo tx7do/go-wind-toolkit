@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"ariga.io/atlas/sql/schema"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 // MySQL到Protobuf的类型映射
@@ -118,22 +120,14 @@ func (m *MySQL) SchemaTables(ctx context.Context) ([]*TableData, error) {
 }
 
 func MySQLFieldType(sqlType string) (f string) {
-	sqlType = strings.ToUpper(strings.TrimSpace(sqlType))
+	ty := schemasource.ParseSQLType(sqlType)
 
-	// TINYINT(1) 在 MySQL 中是布尔语义（1=TRUE, 0=FALSE）
-	// 需要在去除括号之前检查，以区分 TINYINT(1) 和 TINYINT(n)
-	if sqlType == "TINYINT(1)" {
+	// TINYINT(1) 在 MySQL 中是布尔语义(1=TRUE, 0=FALSE)。
+	// 必须先摘 unsigned 再比精度:tinyint(1) unsigned 的取值范围是 0..255,不是布尔。
+	if ty.Base == "TINYINT" && !ty.Unsigned && strings.TrimSpace(ty.Args) == "1" {
 		return "bool"
 	}
 
-	// 去除类型声明中的括号部分，例如 "VARCHAR(255)" -> "VARCHAR"
-	baseType := strings.SplitN(sqlType, "(", 2)[0]
-	baseType = strings.TrimSpace(strings.ToUpper(baseType))
-
-	// 查找映射
-	if protoType, exists := mysqlTypeMapping[baseType]; exists {
-		return protoType
-	}
-
-	return ""
+	// Key 带 " UNSIGNED" 后缀,映射表里的 *_UNSIGNED 键因此可达。
+	return mysqlTypeMapping[ty.Key()]
 }
