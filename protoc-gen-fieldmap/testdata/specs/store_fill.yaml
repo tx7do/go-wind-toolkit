@@ -18,3 +18,9 @@ message:
     max_idle_connections: { target: MaxIdleConns, cast: int, guard: positive }
     dial_timeout_ms: { target: DialTimeout, cast: millis }
     replicas: { target: Replicas }
+    source: { skip: true }
+    tls: { skip: true }
+    sample_ratio: { skip: true }
+    log_level: { skip: true }
+    table_prefix: { skip: true }
+    credentials: { skip: true }

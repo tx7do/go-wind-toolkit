@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"go/format"
+	"os"
 	"sort"
 	"strings"
 
@@ -72,6 +73,7 @@ func generateSpec(plugin *protogen.Plugin, s *Spec) (*outputFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	warnUnmentionedFields(s, msg)
 
 	// 收集导入：conf 包（消息所在）自动声明；time 按需。
 	confPath := string(msg.GoIdent.GoImportPath)
@@ -337,6 +339,29 @@ func availableFieldNames(msg *protogen.Message) string {
 	}
 	sort.Strings(names)
 	return strings.Join(names, ", ")
+}
+
+// warnUnmentionedFields 落实"spec 完整字段清单"约定：proto 中存在但 spec
+// 未提及（既无映射也无 skip）的字段输出告警。上游给消息新增字段时，这是
+// 让 spec 静默落后的唯一缺口——硬错误只能兜住改名/删除方向。
+func warnUnmentionedFields(s *Spec, msg *protogen.Message) {
+	mentioned := make(map[string]bool, len(s.Message.Fields))
+	for key := range s.Message.Fields {
+		mentioned[key] = true
+	}
+	var unmentioned []string
+	for _, f := range msg.Fields {
+		name := string(f.Desc.Name())
+		if !mentioned[name] && !mentioned[f.Desc.JSONName()] {
+			unmentioned = append(unmentioned, name)
+		}
+	}
+	if len(unmentioned) > 0 {
+		sort.Strings(unmentioned)
+		fmt.Fprintf(os.Stderr,
+			"protoc-gen-fieldmap: warning: %s: proto fields not mentioned in spec (add mapping or skip: true): %s\n",
+			s.Source(), strings.Join(unmentioned, ", "))
+	}
 }
 
 // camelTarget proto snake 字段名 → Go 导出字段名（struct 风格的缺省目标）。

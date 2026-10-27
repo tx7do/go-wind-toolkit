@@ -16,3 +16,12 @@ message:
     max_idle_connections: { target: MaxIdleConns, cast: int }
     conn_max_lifetime_seconds: { target: ConnMaxLifetime, cast: seconds }
     dial_timeout_ms: { target: DialTimeout, cast: millis }
+    migrate: { skip: true }
+    replicas: { skip: true }
+    tls: { skip: true }
+    labels: { skip: true }
+    sample_ratio: { skip: true }
+    log_level: { skip: true }
+    table_prefix: { skip: true }
+    credentials: { skip: true }
+    verbose: { skip: true }
