@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package example.v1;
+
+option go_package = "example.com/gen/example/v1;examplev1";
+
+// TLS 传输安全配置。
+message TLS {
+  // 证书路径。
+  string cert_file = 1;
+  // 私钥路径。
+  string key_file = 2;
+}
+
+// LogLevel 日志级别。
+enum LogLevel {
+  // 未指定。
+  LEVEL_UNSPECIFIED = 0;
+  // 调试。
+  DEBUG = 1;
+  // 信息。
+  INFO = 2;
+}

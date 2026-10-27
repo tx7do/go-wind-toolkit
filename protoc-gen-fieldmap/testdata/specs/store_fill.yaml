@@ -1,0 +1,20 @@
+# 填充式（fill 风格）：向既有配置对象逐字段覆盖，含 bool zero 卫语句。
+output:
+  file: store/fill_mapping.gen.go
+  package: store
+imports:
+  up: example.com/upstream/option
+message:
+  proto: example/v1/store.proto
+  type: Store.SQL
+  func: FillSQLOptions
+  style: fill
+  target_type: up.Options
+  target_param: dst
+  fields:
+    driver: { target: Driver }
+    migrate: { target: Migrate }
+    verbose: { target: Verbose, guard: zero }
+    max_idle_connections: { target: MaxIdleConns, cast: int, guard: positive }
+    dial_timeout_ms: { target: DialTimeout, cast: millis }
+    replicas: { target: Replicas }

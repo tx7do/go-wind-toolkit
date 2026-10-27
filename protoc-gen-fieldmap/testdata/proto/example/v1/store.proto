@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package example.v1;
+
+option go_package = "example.com/gen/example/v1;examplev1";
+
+import "example/v1/common.proto";
+
+// Store 配置：生成器测试语料。
+message Store {
+  // SQL 数据库配置。
+  message SQL {
+    // 驱动名。
+    string driver = 1;
+    // 数据源 DSN。
+    string source = 2;
+    // 自动迁移。
+    bool migrate = 3;
+    // 最大空闲连接。
+    uint32 max_idle_connections = 4;
+    // 连接最大生命周期（秒）。
+    int32 conn_max_lifetime_seconds = 5;
+    // 备用节点。
+    repeated string replicas = 6;
+    // TLS 配置（演示 skip）。
+    example.v1.TLS tls = 7;
+    // 标签。
+    map<string, string> labels = 8;
+    // 拨号超时（毫秒）。
+    int32 dial_timeout_ms = 9;
+    // 采样率。
+    double sample_ratio = 10;
+    // 日志级别。
+    LogLevel log_level = 11;
+    // 可选的表前缀（proto3 optional）。
+    optional string table_prefix = 12;
+    // 凭证（bytes，演示 len 卫语句）。
+    bytes credentials = 13;
+    // 冗余日志开关（bool，演示 zero 卫语句）。
+    bool verbose = 14;
+  }
+
+  // SQL 配置项。
+  SQL sql = 1;
+}

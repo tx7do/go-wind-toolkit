@@ -1,0 +1,28 @@
+# 追加式（option 风格）：覆盖全部字段类别与 guard/cast 组合。
+output:
+  file: store/option_mapping.gen.go
+  package: store
+imports:
+  up: example.com/upstream/option
+message:
+  proto: example/v1/store.proto
+  type: Store.SQL
+  func: MapSQLOptions
+  style: option
+  target_type: up.Option
+  target_qualifier: up
+  fields:
+    driver: { target: WithDriverName }
+    source: { target: WithDSN }
+    migrate: { target: WithEnableMigrate }
+    max_idle_connections: { target: WithMaxIdleConns, cast: int }
+    conn_max_lifetime_seconds: { target: WithConnMaxLifetime, cast: seconds }
+    replicas: { target: WithReplicas, spread: true }
+    tls: { skip: true }
+    labels: { target: WithLabels }
+    dial_timeout_ms: { target: WithDialTimeout, cast: millis }
+    sample_ratio: { target: WithSampleRatio }
+    log_level: { target: WithLogLevel, cast: int }
+    table_prefix: { target: WithTablePrefix }
+    credentials: { target: WithCredentials }
+    verbose: { target: WithVerbose, guard: zero }

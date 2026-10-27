@@ -1,0 +1,18 @@
+# 构造式（struct 风格）：含缺省目标（驼峰化）与 cast。
+output:
+  file: store/struct_mapping.gen.go
+  package: store
+imports:
+  up: example.com/upstream/option
+message:
+  proto: example/v1/store.proto
+  type: Store.SQL
+  func: NewSQLOptions
+  style: struct
+  target_type: up.Options
+  fields:
+    driver: { target: Driver }
+    source: {}
+    max_idle_connections: { target: MaxIdleConns, cast: int }
+    conn_max_lifetime_seconds: { target: ConnMaxLifetime, cast: seconds }
+    dial_timeout_ms: { target: DialTimeout, cast: millis }
