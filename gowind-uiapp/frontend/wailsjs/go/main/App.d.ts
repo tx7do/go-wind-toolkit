@@ -8,6 +8,10 @@ import {main} from '../models';
 import {database} from '../models';
 import {detect} from '../models';
 
+export function AIApplyBackendCode(arg1:string):Promise<string>;
+
+export function AIDiscardBackendPlan(arg1:string):Promise<void>;
+
 export function AIFindOpenAPIFiles():Promise<ai.OpenAPIResult>;
 
 export function AIGenerateBackendCode(arg1:string,arg2:string,arg3:Array<ai.MicroservicePartition>):Promise<string>;
@@ -17,6 +21,10 @@ export function AIGenerateDDL(arg1:string):Promise<ai.StepResult>;
 export function AIGenerateDDLStream(arg1:string):Promise<ai.StepResult>;
 
 export function AIPartitionMicroservices(arg1:string):Promise<ai.PartitionResult>;
+
+export function AIPlanBackendCode(arg1:string,arg2:string,arg3:Array<ai.MicroservicePartition>):Promise<ai.BackendPlanResult>;
+
+export function AIReadBackendPlanFile(arg1:string,arg2:string):Promise<ai.StepResult>;
 
 export function AIReviewCode(arg1:Record<string, string>):Promise<ai.StepResult>;
 

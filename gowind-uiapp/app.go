@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -36,6 +37,21 @@ type App struct {
 	projectDetector *detect.ProjectDetector
 	generator       *generator.Generator
 	aiService       *ai.Service
+
+	// backendPlan 当前待确认的后端生成计划(单份;新预览覆盖旧预览)。
+	// planMu 串行化预览/应用/丢弃:预览含一次完整生成,耗时秒级。
+	planMu      sync.Mutex
+	backendPlan *backendPlanState
+}
+
+// backendPlanState 一份待确认的后端生成计划:完整生成树在临时目录里,
+// Apply 时原样拷贝进项目。
+type backendPlanState struct {
+	id       string
+	dir      string
+	services []string // 参与后处理链的服务名(去重,按划分顺序)
+	modPath  string   // 创建计划时的项目 ModPath,Apply 时校验未切换
+	ormType  string
 }
 
 func (a *App) setProjectInfo(pi *detect.ProjectInfo) {
@@ -139,7 +155,6 @@ func (a *App) OpenProject(projectPath string) *OpenProjectResult {
 	runtime.EventsEmit(a.ctx, "project-opened", pi)
 	return &OpenProjectResult{Status: "opened", Project: pi}
 }
-
 
 // GetProjectInfo 返回当前打开的项目的信息。
 func (a *App) GetProjectInfo() *detect.ProjectInfo {
@@ -659,7 +674,8 @@ func (a *App) AIValidateDDL(ddl string) *ai.DDLValidateResult {
 	return &ai.DDLValidateResult{Success: true, Tables: tables}
 }
 
-// AIGenerateBackendCode AI 辅助生成后端代码
+// AIGenerateBackendCode AI 辅助生成后端代码(直连旧路径,保留给 CLI/兼容;
+// GUI 走 AIPlanBackendCode → AIApplyBackendCode 的预览确认流)
 func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.MicroservicePartition) string {
 	pi := a.getProjectInfo()
 	if pi == nil {
@@ -672,25 +688,7 @@ func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.
 		return "DDL 不能为空"
 	}
 
-	// 设置数据库配置，使用 SQL 内容作为数据源
-	a.setDBConfig(&database.DBConfig{
-		Type:       "mysql",
-		UseDSN:     false,
-		SQLContent: ddl,
-	})
-	dbCfg := a.getDBConfig()
-
-	// 清空并设置生成器选项
-	a.generator.CleanOptions()
-	for _, p := range partitions {
-		for _, tableName := range p.Tables {
-			opt := &generator.Option{
-				TableName: tableName,
-				Service:   p.ServiceName,
-			}
-			a.generator.AddOption(opt)
-		}
-	}
+	dbCfg := a.assembleBackendOptions(ddl, partitions)
 
 	// 生成 gRPC 代码
 	if err := a.generator.GenerateGrpcCode(
@@ -708,6 +706,225 @@ func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.
 
 	runtime.EventsEmit(a.ctx, "ai-backend-generated")
 	return ""
+}
+
+// ==================== AI 后端生成 Plan/确认 ====================
+
+// assembleBackendOptions 装配 DDL 数据源与生成器选项(AI 直连路径与 Plan 路径共用)。
+func (a *App) assembleBackendOptions(ddl string, partitions []ai.MicroservicePartition) *database.DBConfig {
+	a.setDBConfig(&database.DBConfig{
+		Type:       "mysql",
+		UseDSN:     false,
+		SQLContent: ddl,
+	})
+	a.generator.CleanOptions()
+	for _, p := range partitions {
+		for _, tableName := range p.Tables {
+			a.generator.AddOption(&generator.Option{
+				TableName: tableName,
+				Service:   p.ServiceName,
+			})
+		}
+	}
+	return a.getDBConfig()
+}
+
+// backendPostProcessSteps 确认写入后将执行的后处理步骤说明。
+func backendPostProcessSteps(ormType string, services []string) []string {
+	steps := []string{"go mod tidy", "buf generate"}
+	if ormType == "ent" {
+		for _, svc := range services {
+			steps = append(steps, "ent generate ("+svc+")")
+		}
+	}
+	for _, svc := range services {
+		steps = append(steps, "wire ("+svc+")")
+	}
+	return steps
+}
+
+// clearBackendPlanLocked 清理当前计划(须持 planMu)。
+func (a *App) clearBackendPlanLocked() {
+	if a.backendPlan != nil {
+		os.RemoveAll(a.backendPlan.dir)
+		a.backendPlan = nil
+	}
+}
+
+// AIPlanBackendCode 预演后端生成:完整生成树落在临时目录(跳过后处理链),
+// 返回相对项目根的文件清单与新增/覆盖标注,供前端确认后再真正写入。
+// 同一时刻只保留一份计划;再次预览会丢弃上一份。
+func (a *App) AIPlanBackendCode(ddl string, ormType string, partitions []ai.MicroservicePartition) *ai.BackendPlanResult {
+	pi := a.getProjectInfo()
+	if pi == nil {
+		return &ai.BackendPlanResult{Success: false, Error: "未打开项目"}
+	}
+	if ddl == "" {
+		return &ai.BackendPlanResult{Success: false, Error: "DDL 不能为空"}
+	}
+	if len(partitions) == 0 {
+		return &ai.BackendPlanResult{Success: false, Error: "请先完成微服务划分"}
+	}
+
+	// 服务名统一把关:编辑划分可能引入怪名,预览(将来还要落盘)前先拒收。
+	services := make([]string, 0, len(partitions))
+	seen := map[string]bool{}
+	for _, p := range partitions {
+		if err := svcname.Validate(p.ServiceName); err != nil {
+			return &ai.BackendPlanResult{Success: false, Error: fmt.Sprintf("服务名非法: %v", err)}
+		}
+		if !seen[p.ServiceName] {
+			seen[p.ServiceName] = true
+			services = append(services, p.ServiceName)
+		}
+	}
+
+	a.planMu.Lock()
+	defer a.planMu.Unlock()
+	a.clearBackendPlanLocked()
+
+	tmpDir, err := os.MkdirTemp("", "gowind-backend-plan")
+	if err != nil {
+		return &ai.BackendPlanResult{Success: false, Error: fmt.Sprintf("创建预览目录失败: %v", err)}
+	}
+
+	dbCfg := a.assembleBackendOptions(ddl, partitions)
+	// entimport 要求 schema 目录处于 Go 模块内;预览目录是空的,补一个与真实
+	// 项目同 module path 的最小 go.mod。生成完成后必须立即删除——它若留在
+	// 树里,Apply 拷贝时会把用户真实的 go.mod 覆盖掉。
+	stubGoMod := filepath.Join(tmpDir, "go.mod")
+	if err := os.WriteFile(stubGoMod, []byte("module "+pi.ModPath+"\n"), 0o644); err != nil {
+		os.RemoveAll(tmpDir)
+		return &ai.BackendPlanResult{Success: false, Error: fmt.Sprintf("初始化预览目录失败: %v", err)}
+	}
+	// 预览阶段只跑 sqlkratos 生成(纯模板渲染,不依赖外部工具);
+	// 后处理链需要真实项目的 go.mod/buf.yaml 模板,留到 Apply 在项目根执行。
+	a.generator.SetSkipPostProcess(true)
+	genErr := a.generator.GenerateGrpcCode(a.ctx, *dbCfg, ormType, "per-table", tmpDir, pi.ModPath, []string{"grpc"})
+	a.generator.SetSkipPostProcess(false)
+	os.Remove(stubGoMod)
+	if genErr != nil {
+		os.RemoveAll(tmpDir)
+		if a.ctx != nil {
+			runtime.LogErrorf(a.ctx, "后端生成预览失败: %v", genErr)
+		}
+		return &ai.BackendPlanResult{Success: false, Error: fmt.Sprintf("生成预览失败: %v", genErr)}
+	}
+
+	files, werr := ai.WalkPlanFiles(tmpDir, pi.Root)
+	if werr != nil {
+		os.RemoveAll(tmpDir)
+		return &ai.BackendPlanResult{Success: false, Error: werr.Error()}
+	}
+
+	newCount, overwriteCount := 0, 0
+	for _, f := range files {
+		if f.IsNew {
+			newCount++
+		} else {
+			overwriteCount++
+		}
+	}
+
+	plan := &backendPlanState{
+		id:       ai.NewPlanID(),
+		dir:      tmpDir,
+		services: services,
+		modPath:  pi.ModPath,
+		ormType:  ormType,
+	}
+	a.backendPlan = plan
+
+	return &ai.BackendPlanResult{
+		Success:        true,
+		PlanID:         plan.id,
+		Files:          files,
+		NewCount:       newCount,
+		OverwriteCount: overwriteCount,
+		PostProcess:    backendPostProcessSteps(ormType, services),
+	}
+}
+
+// AIApplyBackendCode 把预览计划写入项目:逐字拷贝预览树(与所见清单严格一致),
+// 再按顺序执行后处理链(go mod tidy / buf generate / ent generate / wire)。
+// 返回空串表示成功,非空为错误信息。
+func (a *App) AIApplyBackendCode(planID string) string {
+	pi := a.getProjectInfo()
+	if pi == nil {
+		return "未打开项目"
+	}
+
+	a.planMu.Lock()
+	plan := a.backendPlan
+	a.planMu.Unlock()
+	if plan == nil || plan.id != planID {
+		return "生成计划不存在或已过期，请重新预览"
+	}
+	if plan.modPath != pi.ModPath {
+		a.AIDiscardBackendPlan(plan.id)
+		return "项目已切换，原计划已作废，请重新预览"
+	}
+
+	if err := ai.CopyTree(pi.Root, plan.dir); err != nil {
+		runtime.LogErrorf(a.ctx, "应用生成计划失败(拷贝阶段): %v", err)
+		a.AIDiscardBackendPlan(plan.id)
+		return fmt.Sprintf("写入文件失败: %v", err)
+	}
+
+	// 后处理链与 generator.GenerateGrpcCode 内联链一致,在真实项目根执行
+	// (Run* 返回 *CommandResult,以 Success 字段判定成败);失败不回滚已拷贝
+	// 文件,错误信息注明"文件已写入"以便用户定位。
+	if result := devtools.RunGoModTidy(pi.Root); !result.Success {
+		a.AIDiscardBackendPlan(plan.id)
+		return fmt.Sprintf("文件已写入，但 go mod tidy 失败: %s", result.Error)
+	}
+	if result := devtools.RunBufGenerate(pi.Root); !result.Success {
+		a.AIDiscardBackendPlan(plan.id)
+		return fmt.Sprintf("文件已写入，但 buf generate 失败: %s", result.Error)
+	}
+	if plan.ormType == "ent" {
+		for _, svc := range plan.services {
+			if result := devtools.RunEntGenerate(pi.Root, svc); !result.Success {
+				a.AIDiscardBackendPlan(plan.id)
+				return fmt.Sprintf("文件已写入，但 ent generate(%s) 失败: %s", svc, result.Error)
+			}
+		}
+	}
+	for _, svc := range plan.services {
+		if result := devtools.RunWire(pi.Root, svc); !result.Success {
+			a.AIDiscardBackendPlan(plan.id)
+			return fmt.Sprintf("文件已写入，但 wire(%s) 失败: %s", svc, result.Error)
+		}
+	}
+
+	a.AIDiscardBackendPlan(plan.id)
+	runtime.EventsEmit(a.ctx, "code-generated")
+	runtime.EventsEmit(a.ctx, "ai-backend-generated")
+	return ""
+}
+
+// AIDiscardBackendPlan 丢弃当前预览计划并清理临时目录(planID 传空串丢弃任意)。
+func (a *App) AIDiscardBackendPlan(planID string) {
+	a.planMu.Lock()
+	defer a.planMu.Unlock()
+	if a.backendPlan != nil && (planID == "" || a.backendPlan.id == planID) {
+		a.clearBackendPlanLocked()
+	}
+}
+
+// AIReadBackendPlanFile 读取预览树内单个文件内容,供前端 drawer 预览。
+func (a *App) AIReadBackendPlanFile(planID string, relPath string) *ai.StepResult {
+	a.planMu.Lock()
+	plan := a.backendPlan
+	a.planMu.Unlock()
+	if plan == nil || plan.id != planID {
+		return &ai.StepResult{Success: false, Error: "生成计划不存在或已过期"}
+	}
+	content, err := ai.ReadPlanFile(plan.dir, relPath)
+	if err != nil {
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+	return &ai.StepResult{Success: true, Content: content}
 }
 
 // AIFindOpenAPIFiles 在项目中查找 OpenAPI 文件

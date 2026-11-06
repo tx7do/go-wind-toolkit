@@ -117,11 +117,11 @@ func TestLoadReviewReport(t *testing.T) {
 	}
 
 	for _, bad := range []string{
-		"../ddl.sql",        // 路径成分
-		"sub/report.md",     // 路径成分
-		"ddl.sql",           // 非报告前缀
-		"review-x.txt",      // 非报告后缀
-		"",                  // 空
+		"../ddl.sql",    // 路径成分
+		"sub/report.md", // 路径成分
+		"ddl.sql",       // 非报告前缀
+		"review-x.txt",  // 非报告后缀
+		"",              // 空
 	} {
 		if _, err := LoadReviewReport(root, bad); err == nil {
 			t.Fatalf("非法报告名 %q 不应通过", bad)

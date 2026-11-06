@@ -75,6 +75,26 @@ type DDLValidateResult struct {
 	Error   string   `json:"error,omitempty"`
 }
 
+// BackendPlanFile 后端生成计划中的单个文件
+type BackendPlanFile struct {
+	Path  string `json:"path"` // 相对项目根,正斜杠
+	Size  int64  `json:"size"`
+	IsNew bool   `json:"isNew"` // true=新增,false=覆盖项目内已有文件
+}
+
+// BackendPlanResult 后端生成预览(Plan)结果:完整生成树落在服务端临时目录,
+// 用户确认后由 AIApplyBackendCode 原样拷贝进项目并执行后处理链。
+type BackendPlanResult struct {
+	Success        bool              `json:"success"`
+	PlanID         string            `json:"planId,omitempty"`
+	Files          []BackendPlanFile `json:"files,omitempty"`
+	NewCount       int               `json:"newCount"`
+	OverwriteCount int               `json:"overwriteCount"`
+	// PostProcess 确认写入后将执行的后处理步骤说明(预览阶段不执行)。
+	PostProcess []string `json:"postProcess,omitempty"`
+	Error       string   `json:"error,omitempty"`
+}
+
 // NewPartitionResult 创建成功的微服务划分结果
 func NewPartitionResult(partitions []MicroservicePartition) *PartitionResult {
 	return &PartitionResult{Success: true, Partitions: partitions}

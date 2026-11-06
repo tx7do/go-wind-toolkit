@@ -18,6 +18,7 @@ import {
 
 import {GenerateFrontendCode} from "../../../wailsjs/go/main/App";
 import {ParseFrontendServices} from "../../../wailsjs/go/main/App";
+import {detectLanguage} from "../../utils/language";
 import {PreviewFrontendCode} from "../../../wailsjs/go/main/App";
 import {SelectFolder} from "../../../wailsjs/go/main/App";
 import {frontendgen, type main} from "../../../wailsjs/go/models";
@@ -382,28 +383,8 @@ function getFileTypeColor(type: string) {
   return map[type] || 'default'
 }
 
-// 根据文件路径推断 Monaco 语言
-function detectLanguage(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase() || ''
-  const langMap: Record<string, string> = {
-    ts: 'typescript',
-    tsx: 'typescript',
-    js: 'javascript',
-    jsx: 'javascript',
-    vue: 'html',
-    html: 'html',
-    css: 'css',
-    scss: 'css',
-    less: 'css',
-    json: 'json',
-    yaml: 'yaml',
-    yml: 'yaml',
-    sql: 'sql',
-    md: 'markdown',
-    xml: 'xml',
-  }
-  return langMap[ext] || 'plaintext'
-}
+// 根据文件路径推断 Monaco 语言(实现抽到 src/utils/language.ts 共用)
+
 
 const previewLanguage = computed(() => {
   if (filteredFiles.value.length === 0) return 'plaintext'

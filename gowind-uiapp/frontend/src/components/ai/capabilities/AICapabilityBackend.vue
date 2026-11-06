@@ -1,17 +1,23 @@
 <script setup lang="ts">
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
-import {ThunderboltOutlined} from '@ant-design/icons-vue'
+import {EyeOutlined, CheckCircleOutlined, CloseCircleOutlined} from '@ant-design/icons-vue'
 import {useAI} from '../../../stores/ai'
 import {useProject} from '../../../stores/project'
+import {detectLanguage} from '../../../utils/language'
+import MonacoEditor from '../../backend/MonacoEditor.vue'
 
 const {t} = useI18n()
 const {projectInfo} = useProject()
 const {
-  ormType, backendGenerating, partitions, hasPartitions, generateBackend,
+  ormType, partitions, hasPartitions,
+  backendPlan, planningLoading, applyingLoading,
+  previewFile, previewContent, previewDrawerOpen,
+  planBackend, applyBackend, discardBackendPlan, openPlanFile,
 } = useAI()
 
-async function handleGenerate() {
+// 预览阶段:主按钮是"预览变更";预览就绪后进入确认面板
+async function handlePlan() {
   if (!projectInfo.value) {
     message.warning(t('ai.project.openFirst'))
     return
@@ -20,11 +26,29 @@ async function handleGenerate() {
     message.warning(t('ai.backend.noPartitions'))
     return
   }
-  const err = await generateBackend()
+  const result = await planBackend()
+  if (!result?.success) {
+    message.error(result?.error || t('ai.backend.planFailed'))
+  }
+}
+
+async function handleApply() {
+  const err = await applyBackend()
   if (err === '') {
-    message.success(t('ai.backend.generateSuccess'))
+    message.success(t('ai.backend.applySuccess'))
   } else {
-    message.error(t('ai.backend.generateFailed', {msg: err}))
+    message.error(err || t('ai.backend.applyFailed'))
+  }
+}
+
+async function handleDiscard() {
+  await discardBackendPlan()
+}
+
+async function handleOpenFile(path: string) {
+  const result = await openPlanFile(path)
+  if (!result?.success) {
+    message.error(result?.error || t('ai.backend.planExpired'))
   }
 }
 </script>
@@ -33,7 +57,7 @@ async function handleGenerate() {
   <a-card :title="t('ai.backend.title')" size="small">
     <a-form layout="vertical">
       <a-form-item :label="t('ai.backend.ormType')">
-        <a-radio-group v-model:value="ormType">
+        <a-radio-group v-model:value="ormType" :disabled="!!backendPlan">
           <a-radio-button value="ent">Ent</a-radio-button>
           <a-radio-button value="gorm">GORM</a-radio-button>
         </a-radio-group>
@@ -52,15 +76,75 @@ async function handleGenerate() {
       <a-button
           type="primary"
           size="large"
-          :loading="backendGenerating"
-          :disabled="!projectInfo || !hasPartitions"
-          @click="handleGenerate"
+          :loading="planningLoading"
+          :disabled="!projectInfo || !hasPartitions || !!backendPlan"
+          @click="handlePlan"
           block
       >
-        <ThunderboltOutlined style="margin-right: 4px"/> {{ t('ai.backend.generateBtn') }}
+        <EyeOutlined style="margin-right: 4px"/> {{ t('ai.backend.planBtn') }}
       </a-button>
       <p v-if="!projectInfo" class="warning-text">{{ t('ai.backend.noProject') }}</p>
     </a-form>
+
+    <!-- 确认面板:预览就绪后展示 -->
+    <div v-if="backendPlan" class="plan-panel">
+      <a-divider/>
+
+      <div class="plan-summary">
+        <a-tag color="green">{{ t('ai.backend.newFiles', {count: backendPlan.newCount || 0}) }}</a-tag>
+        <a-tag color="orange">{{ t('ai.backend.overwriteFiles', {count: backendPlan.overwriteCount || 0}) }}</a-tag>
+        <span class="plan-hint">{{ t('ai.backend.planHint') }}</span>
+      </div>
+
+      <a-collapse ghost size="small" class="plan-files">
+        <a-collapse-panel :header="`${t('ai.backend.fileList')} (${backendPlan.files?.length || 0})`">
+          <div class="plan-file-list">
+            <div
+                v-for="f in backendPlan.files"
+                :key="f.path"
+                class="plan-file-item"
+                @click="handleOpenFile(f.path)"
+            >
+              <a-tag :color="f.isNew ? 'green' : 'orange'" class="file-state-tag">
+                {{ f.isNew ? t('ai.backend.tagNew') : t('ai.backend.tagOverwrite') }}
+              </a-tag>
+              <span class="file-path">{{ f.path }}</span>
+            </div>
+          </div>
+        </a-collapse-panel>
+      </a-collapse>
+
+      <a-alert type="info" show-icon style="margin-top: 8px">
+        <template #message>{{ t('ai.backend.postProcessNote') }}</template>
+        <template #description>
+          <span class="postprocess-steps">{{ (backendPlan.postProcess || []).join(' → ') }}</span>
+        </template>
+      </a-alert>
+
+      <div class="plan-actions">
+        <a-button @click="handleDiscard" :disabled="applyingLoading">
+          <CloseCircleOutlined style="margin-right: 4px"/> {{ t('ai.backend.cancelPlan') }}
+        </a-button>
+        <a-button type="primary" danger :loading="applyingLoading" @click="handleApply">
+          <CheckCircleOutlined style="margin-right: 4px"/> {{ t('ai.backend.confirmWrite') }}
+        </a-button>
+      </div>
+    </div>
+
+    <!-- 单文件内容预览 -->
+    <a-drawer
+        v-model:open="previewDrawerOpen"
+        :title="previewFile"
+        width="640"
+        placement="right"
+    >
+      <MonacoEditor
+          :model-value="previewContent"
+          :language="detectLanguage(previewFile)"
+          :read-only="true"
+          height="100%"
+      />
+    </a-drawer>
   </a-card>
 </template>
 
@@ -105,5 +189,67 @@ async function handleGenerate() {
   color: #faad14;
   margin-top: 8px;
   text-align: center;
+}
+
+.plan-panel {
+  margin-top: 4px;
+}
+
+.plan-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-hint {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.plan-file-list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plan-file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.plan-file-item:hover {
+  background: #f5f5f5;
+}
+
+.file-state-tag {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.file-path {
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.postprocess-steps {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 </style>

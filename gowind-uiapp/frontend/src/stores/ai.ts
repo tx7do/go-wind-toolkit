@@ -2,8 +2,11 @@ import {ref, computed, watch} from 'vue'
 import {
   AIGenerateDDLStream,
   AIPartitionMicroservices,
-  AIGenerateBackendCode,
   AIValidateDDL,
+  AIPlanBackendCode,
+  AIApplyBackendCode,
+  AIDiscardBackendPlan,
+  AIReadBackendPlanFile,
   AIFindOpenAPIFiles,
   AIReviewScan,
   AIReviewProject,
@@ -40,7 +43,14 @@ const ddlTables = ref<string[]>([])
 let partitionsSnapshot: ai.MicroservicePartition[] | null = null
 
 const ormType = ref<'ent' | 'gorm'>('ent')
-const backendGenerating = ref(false)
+// 后端生成走预览确认两阶段:预览树在服务端临时目录,确认后原样拷贝进项目
+const backendPlan = ref<ai.BackendPlanResult | null>(null)
+const planningLoading = ref(false)
+const applyingLoading = ref(false)
+// drawer 单文件内容预览
+const previewFile = ref('')
+const previewContent = ref('')
+const previewDrawerOpen = ref(false)
 
 const openapiFiles = ref<string[]>([])
 const openapiMessage = ref('')
@@ -147,6 +157,16 @@ function resetForProject() {
   reviewResult.value = ''
   reviewViewName.value = ''
   reviewReports.value = []
+  // 未确认的后端生成计划随项目作废(服务端临时目录一并清理)
+  if (backendPlan.value) {
+    AIDiscardBackendPlan(backendPlan.value.planId || '').catch(() => {})
+  }
+  backendPlan.value = null
+  planningLoading.value = false
+  applyingLoading.value = false
+  previewFile.value = ''
+  previewContent.value = ''
+  previewDrawerOpen.value = false
 }
 
 // ==================== 各能力 action ====================
@@ -270,16 +290,62 @@ function removeService(idx: number) {
   partitions.value.splice(idx, 1)
 }
 
-// 返回空串表示成功,非空为错误信息(Go 侧约定)。
-async function generateBackend(): Promise<string> {
-  if (backendGenerating.value) return '生成进行中'
-  backendGenerating.value = true
+// ==================== 后端生成 Plan/确认 ====================
+
+// 预演生成:文件树落在服务端临时目录,不碰真实项目
+async function planBackend() {
+  if (planningLoading.value) return null
+  planningLoading.value = true
   try {
-    const err = await AIGenerateBackendCode(ddlContent.value, ormType.value, partitions.value)
-    return err || ''
+    const result = await AIPlanBackendCode(ddlContent.value, ormType.value, partitions.value)
+    if (result.success) {
+      backendPlan.value = result
+    }
+    return result
   } finally {
-    backendGenerating.value = false
+    planningLoading.value = false
   }
+}
+
+// 确认写入:拷贝预览树进项目并执行后处理链。返回空串表示成功。
+async function applyBackend(): Promise<string> {
+  const plan = backendPlan.value
+  if (!plan || applyingLoading.value) return '生成计划不存在，请重新预览'
+  applyingLoading.value = true
+  try {
+    const err = await AIApplyBackendCode(plan.planId || '')
+    if (err === '') {
+      backendPlan.value = null
+    }
+    return err
+  } finally {
+    applyingLoading.value = false
+  }
+}
+
+// 放弃预览:清理服务端临时目录
+async function discardBackendPlan() {
+  const plan = backendPlan.value
+  if (!plan) return
+  backendPlan.value = null
+  try {
+    await AIDiscardBackendPlan(plan.planId || '')
+  } catch (e) {
+    console.error('丢弃生成计划失败:', e)
+  }
+}
+
+// drawer 预览计划树内的单个文件
+async function openPlanFile(path: string) {
+  const plan = backendPlan.value
+  if (!plan) return null
+  const result = await AIReadBackendPlanFile(plan.planId || '', path)
+  if (result.success) {
+    previewFile.value = path
+    previewContent.value = result.content
+    previewDrawerOpen.value = true
+  }
+  return result
 }
 
 async function findOpenAPI() {
@@ -365,13 +431,15 @@ export function useAI() {
     requirements, ddlContent, ddlGenerating, ddlAttempt,
     partitions, partitionWarnings, partitionLoading, hasPartitions,
     editingPartitions, ddlTables, unassignedTables,
-    ormType, backendGenerating,
+    ormType, backendPlan, planningLoading, applyingLoading,
+    previewFile, previewContent, previewDrawerOpen,
     openapiFiles, openapiMessage, openapiLoading,
     reviewScanFiles, reviewScanWarnings, reviewScanLoading, reviewSelected,
     reviewLoading, reviewResult, reviewReports, reviewViewName,
     // 动作
     initAI, loadArtifacts, resetForProject,
-    generateDDL, saveArtifacts, partition, generateBackend, findOpenAPI,
+    generateDDL, saveArtifacts, partition, findOpenAPI,
+    planBackend, applyBackend, discardBackendPlan, openPlanFile,
     beginEditPartitions, cancelEditPartitions, savePartitions,
     removeTable, moveTable, assignTable, addService, removeService,
     scanForReview, runReview, viewReview,
