@@ -3,6 +3,7 @@ import {
   AIGenerateDDLStream,
   AIPartitionMicroservices,
   AIGenerateBackendCode,
+  AIValidateDDL,
   AIFindOpenAPIFiles,
   AIReviewScan,
   AIReviewProject,
@@ -32,6 +33,11 @@ const ddlAttempt = ref(1)
 const partitions = ref<ai.MicroservicePartition[]>([])
 const partitionWarnings = ref<string[]>([])
 const partitionLoading = ref(false)
+// 划分编辑态:ddlTables 是 DDL 全表清单(未分配池基准),进入编辑时快照
+// partitions,保存或放弃时二选一,避免半途编辑污染生成链的真值。
+const editingPartitions = ref(false)
+const ddlTables = ref<string[]>([])
+let partitionsSnapshot: ai.MicroservicePartition[] | null = null
 
 const ormType = ref<'ent' | 'gorm'>('ent')
 const backendGenerating = ref(false)
@@ -128,6 +134,9 @@ function resetForProject() {
   partitions.value = []
   partitionWarnings.value = []
   partitionLoading.value = false
+  editingPartitions.value = false
+  ddlTables.value = []
+  partitionsSnapshot = null
   openapiFiles.value = []
   openapiMessage.value = ''
   openapiLoading.value = false
@@ -178,11 +187,87 @@ async function partition() {
     if (result.success) {
       partitions.value = result.partitions || []
       partitionWarnings.value = result.warnings || []
+      ddlTables.value = result.availableTables || []
     }
     return result
   } finally {
     partitionLoading.value = false
   }
+}
+
+// ==================== 划分编辑 ====================
+const unassignedTables = computed(() => {
+  const assigned = new Set<string>()
+  for (const p of partitions.value) {
+    for (const t of p.tables) assigned.add(t)
+  }
+  return ddlTables.value.filter(t => !assigned.has(t))
+})
+
+// 进入编辑:快照当前划分 + 拉 DDL 表清单作未分配池基准
+async function beginEditPartitions(): Promise<string> {
+  if (editingPartitions.value) return ''
+  const result = await AIValidateDDL(ddlContent.value)
+  if (!result.success) return result.error || 'DDL 校验失败'
+  ddlTables.value = result.tables || []
+  partitionsSnapshot = JSON.parse(JSON.stringify(partitions.value))
+  editingPartitions.value = true
+  return ''
+}
+
+function cancelEditPartitions() {
+  if (partitionsSnapshot) {
+    partitions.value = partitionsSnapshot
+    partitionsSnapshot = null
+  }
+  editingPartitions.value = false
+}
+
+// 保存编辑:空名/重名校验后持久化 partitions.json,退出编辑态。
+// 返回空串表示成功,非空为错误信息(与后端错误串约定一致)。
+async function savePartitions(): Promise<string> {
+  const names = new Set<string>()
+  for (const p of partitions.value) {
+    const name = p.serviceName.trim()
+    if (!name) return '服务名不能为空'
+    if (names.has(name)) return `服务名重复: ${name}`
+    names.add(name)
+    p.serviceName = name
+  }
+  const result = await SaveAIArtifact('partitions', JSON.stringify(partitions.value, null, 2))
+  if (!result.success) return result.error || '保存失败'
+  partitionsSnapshot = null
+  editingPartitions.value = false
+  return ''
+}
+
+function removeTable(idx: number, table: string) {
+  const p = partitions.value[idx]
+  if (!p) return
+  p.tables = p.tables.filter(t => t !== table)
+}
+
+// 表在服务间移动:目标与源相同则忽略;空表服务由保存前的清洗兜底。
+function moveTable(table: string, fromIdx: number, toIdx: number) {
+  if (fromIdx === toIdx) return
+  removeTable(fromIdx, table)
+  const target = partitions.value[toIdx]
+  if (target && !target.tables.includes(table)) target.tables.push(table)
+}
+
+// 从未分配池把表分给指定服务
+function assignTable(table: string, idx: number) {
+  const target = partitions.value[idx]
+  if (target && !target.tables.includes(table)) target.tables.push(table)
+}
+
+function addService() {
+  partitions.value.push({serviceName: '', tables: [], description: ''} as ai.MicroservicePartition)
+}
+
+// 删除服务:其表退回未分配池(直接从 partitions 移除即可,unassignedTables 会算出来)
+function removeService(idx: number) {
+  partitions.value.splice(idx, 1)
 }
 
 // 返回空串表示成功,非空为错误信息(Go 侧约定)。
@@ -279,6 +364,7 @@ export function useAI() {
     mode,
     requirements, ddlContent, ddlGenerating, ddlAttempt,
     partitions, partitionWarnings, partitionLoading, hasPartitions,
+    editingPartitions, ddlTables, unassignedTables,
     ormType, backendGenerating,
     openapiFiles, openapiMessage, openapiLoading,
     reviewScanFiles, reviewScanWarnings, reviewScanLoading, reviewSelected,
@@ -286,6 +372,8 @@ export function useAI() {
     // 动作
     initAI, loadArtifacts, resetForProject,
     generateDDL, saveArtifacts, partition, generateBackend, findOpenAPI,
+    beginEditPartitions, cancelEditPartitions, savePartitions,
+    removeTable, moveTable, assignTable, addService, removeService,
     scanForReview, runReview, viewReview,
   }
 }

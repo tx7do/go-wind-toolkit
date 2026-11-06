@@ -133,19 +133,19 @@ const maxPartitionAttempts = 2
 
 // PartitionMicroservices 根据 DDL 建议微服务划分(内部带结构化校验与修复重试)。
 func (s *Service) PartitionMicroservices(ddl string) ([]MicroservicePartition, error) {
-	partitions, _, err := s.PartitionMicroservicesValidated(ddl)
+	partitions, _, _, err := s.PartitionMicroservicesValidated(ddl)
 	return partitions, err
 }
 
 // PartitionMicroservicesValidated PartitionMicroservices 的带校验版本:
-// - 先校验 DDL 本身可解析,拿到真实表清单;
+// - 先校验 DDL 本身可解析,拿到真实表清单(一并返回,供前端编辑划分的未分配池);
 // - LLM 返回的 JSON 解析失败、或清理后没有任何有效划分时,带问题反馈重试一次;
 // - 输出做内容清洗:serviceName 非法/为空、tables 为空的划分剔除,
 //   不在 DDL 中的幻觉表名剔除,跨服务重复表去重——全部记入 warnings 返回。
-func (s *Service) PartitionMicroservicesValidated(ddl string) ([]MicroservicePartition, []string, error) {
+func (s *Service) PartitionMicroservicesValidated(ddl string) ([]MicroservicePartition, []string, []string, error) {
 	ddlTables, err := ValidateDDL(ddl)
 	if err != nil {
-		return nil, nil, fmt.Errorf("DDL 无法解析，无法划分微服务: %w", err)
+		return nil, nil, nil, fmt.Errorf("DDL 无法解析，无法划分微服务: %w", err)
 	}
 
 	userPrompt := GetPartitionPrompt(ddl)
@@ -154,7 +154,7 @@ func (s *Service) PartitionMicroservicesValidated(ddl string) ([]MicroservicePar
 	for attempt := 1; attempt <= maxPartitionAttempts; attempt++ {
 		content, err := s.GetClient().Chat(partitionSystemPrompt, userPrompt)
 		if err != nil {
-			return nil, warnings, fmt.Errorf("AI 微服务划分失败: %w", err)
+			return nil, nil, ddlTables, fmt.Errorf("AI 微服务划分失败: %w", err)
 		}
 
 		cleaned := strings.TrimSpace(cleanMarkdownFence(content))
@@ -170,17 +170,17 @@ func (s *Service) PartitionMicroservicesValidated(ddl string) ([]MicroservicePar
 		}
 
 		if problem == "" {
-			return partitions, warnings, nil
+			return partitions, ddlTables, warnings, nil
 		}
 		if attempt == maxPartitionAttempts {
-			return nil, warnings, fmt.Errorf("划分结果连续 %d 次无效(%s)，最后响应: %s", maxPartitionAttempts, problem, cleaned)
+			return nil, ddlTables, warnings, fmt.Errorf("划分结果连续 %d 次无效(%s)，最后响应: %s", maxPartitionAttempts, problem, cleaned)
 		}
 		// 修复重试:把被否决的原始响应与问题一并带回。
 		userPrompt = GetPartitionFixPrompt(ddl, cleaned, problem)
 	}
 
 	// 不可达:maxPartitionAttempts >= 1,循环内必返回。
-	return nil, warnings, fmt.Errorf("微服务划分失败")
+	return nil, ddlTables, warnings, fmt.Errorf("微服务划分失败")
 }
 
 // parsePartitionsJSON 从清理后的 LLM 文本解析划分数组:

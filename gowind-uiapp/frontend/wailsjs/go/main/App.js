@@ -38,6 +38,10 @@ export function AIReviewScan() {
   return window['go']['main']['App']['AIReviewScan']();
 }
 
+export function AIValidateDDL(arg1) {
+  return window['go']['main']['App']['AIValidateDDL'](arg1);
+}
+
 export function AddService(arg1) {
   return window['go']['main']['App']['AddService'](arg1);
 }

@@ -26,6 +26,8 @@ export function AIReviewProject(arg1:Array<string>):Promise<ai.StepResult>;
 
 export function AIReviewScan():Promise<ai.ReviewScanResult>;
 
+export function AIValidateDDL(arg1:string):Promise<ai.DDLValidateResult>;
+
 export function AddService(arg1:devtools.AddServiceOptions):Promise<devtools.CommandResult>;
 
 export function CleanConfig():Promise<void>;

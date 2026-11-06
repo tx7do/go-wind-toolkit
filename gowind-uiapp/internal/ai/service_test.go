@@ -175,7 +175,7 @@ const partitionGood = `[
 func TestPartitionMicroservicesValidated_Sanitize(t *testing.T) {
 	svc, _ := newTestService(partitionBad)
 
-	partitions, warnings, err := svc.PartitionMicroservicesValidated(testDDL)
+	partitions, ddlTables, warnings, err := svc.PartitionMicroservicesValidated(testDDL)
 	if err != nil {
 		t.Fatalf("清洗后仍有有效划分,不应报错: %v", err)
 	}
@@ -189,6 +189,10 @@ func TestPartitionMicroservicesValidated_Sanitize(t *testing.T) {
 	if partitions[1].Tables[0] != "order" {
 		t.Fatalf("表名应回填 DDL 原拼写,得到 %q", partitions[1].Tables[0])
 	}
+	// DDL 全表清单应透传,供前端未分配池使用。
+	if strings.Join(ddlTables, ",") != "user,user_role,order" {
+		t.Fatalf("AvailableTables 应为 DDL 原始表清单,得到 %v", ddlTables)
+	}
 	joined := strings.Join(warnings, ";")
 	for _, want := range []string{"ghost_table", "服务名非法", "已归属服务"} {
 		if !strings.Contains(joined, want) {
@@ -200,7 +204,7 @@ func TestPartitionMicroservicesValidated_Sanitize(t *testing.T) {
 func TestPartitionMicroservicesValidated_ParseRetry(t *testing.T) {
 	svc, mock := newTestService("这不是 JSON。", partitionGood)
 
-	partitions, _, err := svc.PartitionMicroservicesValidated(testDDL)
+	partitions, _, _, err := svc.PartitionMicroservicesValidated(testDDL)
 	if err != nil {
 		t.Fatalf("重试后应成功: %v", err)
 	}
@@ -215,7 +219,7 @@ func TestPartitionMicroservicesValidated_ParseRetry(t *testing.T) {
 func TestPartitionMicroservicesValidated_TwiceInvalid(t *testing.T) {
 	svc, _ := newTestService("仍然不是 JSON。", "还是不是 JSON。")
 
-	if _, _, err := svc.PartitionMicroservicesValidated(testDDL); err == nil {
+	if _, _, _, err := svc.PartitionMicroservicesValidated(testDDL); err == nil {
 		t.Fatal("两次都无效时应返回错误")
 	}
 }
@@ -223,7 +227,7 @@ func TestPartitionMicroservicesValidated_TwiceInvalid(t *testing.T) {
 func TestPartitionMicroservicesValidated_InvalidDDL(t *testing.T) {
 	svc, _ := newTestService(partitionGood)
 
-	if _, _, err := svc.PartitionMicroservicesValidated("SELECT 1;"); err == nil {
+	if _, _, _, err := svc.PartitionMicroservicesValidated("SELECT 1;"); err == nil {
 		t.Fatal("DDL 本身不可解析时应直接报错")
 	}
 }

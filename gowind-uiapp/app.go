@@ -633,7 +633,7 @@ func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
 		return &ai.PartitionResult{Success: false, Error: "DDL 不能为空"}
 	}
 
-	partitions, warnings, err := a.aiService.PartitionMicroservicesValidated(ddl)
+	partitions, ddlTables, warnings, err := a.aiService.PartitionMicroservicesValidated(ddl)
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "AI 微服务划分失败: %v", err)
 		return &ai.PartitionResult{Success: false, Error: err.Error()}
@@ -646,7 +646,17 @@ func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
 		}
 	}
 
-	return &ai.PartitionResult{Success: true, Partitions: partitions, Warnings: warnings}
+	return &ai.PartitionResult{Success: true, Partitions: partitions, AvailableTables: ddlTables, Warnings: warnings}
+}
+
+// AIValidateDDL 校验 DDL 可解析并返回表名清单。
+// 前端编辑划分时进入编辑态用它取"未分配池"的基准清单,也可独立作校验用。
+func (a *App) AIValidateDDL(ddl string) *ai.DDLValidateResult {
+	tables, err := ai.ValidateDDL(ddl)
+	if err != nil {
+		return &ai.DDLValidateResult{Success: false, Error: err.Error()}
+	}
+	return &ai.DDLValidateResult{Success: true, Tables: tables}
 }
 
 // AIGenerateBackendCode AI 辅助生成后端代码

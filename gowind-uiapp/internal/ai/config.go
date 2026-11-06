@@ -60,9 +60,19 @@ func GetProviderPresets() []AIProviderPreset {
 type PartitionResult struct {
 	Success    bool                    `json:"success"`
 	Partitions []MicroservicePartition `json:"partitions"`
+	// AvailableTables DDL 解析出的全部表名(按出现顺序):前端编辑划分时的
+	// "未分配池"数据源,用于发现遗漏或手滑删掉的表。
+	AvailableTables []string `json:"availableTables,omitempty"`
 	// Warnings 内容清洗告警:幻觉表名剔除、跨服务去重、非法服务名剔除等。
 	Warnings []string `json:"warnings,omitempty"`
 	Error    string   `json:"error,omitempty"`
+}
+
+// DDLValidateResult DDL 校验结果
+type DDLValidateResult struct {
+	Success bool     `json:"success"`
+	Tables  []string `json:"tables,omitempty"`
+	Error   string   `json:"error,omitempty"`
 }
 
 // NewPartitionResult 创建成功的微服务划分结果
