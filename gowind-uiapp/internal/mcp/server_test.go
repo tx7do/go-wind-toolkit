@@ -216,7 +216,7 @@ func TestTool_PartitionMicroservices(t *testing.T) {
 	partitionJSON := `{"summary":"ok","issues":[]}` // 不会被用到
 	_ = partitionJSON
 	partitionResp := `[{"serviceName":"user","tables":["user"],"description":"用户"}]`
-	s := newTestServer(t, []string{partitionResp}, nil)
+	s := newTestServer(t, nil, []string{partitionResp}) // 划分已走流式端点
 
 	text, isErr := callTool(s, t, "partition_microservices", `{"ddl":`+quoteJSON(testDDLLocal)+`}`)
 	if isErr {
