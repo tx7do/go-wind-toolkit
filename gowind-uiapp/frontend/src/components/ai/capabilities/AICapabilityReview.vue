@@ -12,7 +12,7 @@ const {projectInfo} = useProject()
 const {
   reviewScanFiles, reviewScanWarnings, reviewScanLoading, reviewSelected,
   reviewLoading, reviewResult, reviewReports, reviewViewName,
-  scanForReview, runReview, viewReview,
+  scanForReview, runReview, viewReview, cancelTask,
 } = useAI()
 
 // 勾选项按路径展示,附文件大小
@@ -94,6 +94,9 @@ async function handleViewReport(file: any) {
           @click="handleReview"
       >
         <EyeOutlined style="margin-right: 4px"/> {{ t('ai.review.startBtn') }}
+      </a-button>
+      <a-button v-if="reviewLoading" danger style="margin-top: 12px; margin-left: 8px" @click="cancelTask('review')">
+        {{ t('ai.cancel') }}
       </a-button>
     </div>
 

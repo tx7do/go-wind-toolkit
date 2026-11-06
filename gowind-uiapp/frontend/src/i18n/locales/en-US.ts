@@ -416,6 +416,7 @@ export default {
       panelHint: 'Each capability runs independently; artifacts are saved to the project .gowind/ai/ directory',
       wizardHint: 'A fixed path from requirements to backend code; switch to the panel to rerun any single step',
     },
+    cancel: 'Cancel',
     wizard: {
       hint: 'Complete the chain step by step; artifacts are saved automatically and you can switch to the panel anytime',
       configHint: 'AI settings live in the capability panel',

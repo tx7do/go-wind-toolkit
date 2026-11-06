@@ -6,6 +6,10 @@ export function AIApplyBackendCode(arg1) {
   return window['go']['main']['App']['AIApplyBackendCode'](arg1);
 }
 
+export function AICancelTask(arg1) {
+  return window['go']['main']['App']['AICancelTask'](arg1);
+}
+
 export function AIDiscardBackendPlan(arg1) {
   return window['go']['main']['App']['AIDiscardBackendPlan'](arg1);
 }

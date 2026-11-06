@@ -443,6 +443,7 @@ export default {
       panelHint: '每个能力独立触发，产物自动保存到项目 .gowind/ai/ 目录',
       wizardHint: '从需求到后端代码的固定链路，随时可在面板中单独重跑某一步',
     },
+    cancel: '取消',
     wizard: {
       hint: '按链路逐步完成；产物自动落盘，可随时切到能力面板单独操作',
       configHint: 'AI 配置在能力面板中',

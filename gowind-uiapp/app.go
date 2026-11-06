@@ -582,6 +582,12 @@ func (a *App) GetAIProviderPresets() []ai.AIProviderPreset {
 	return ai.GetProviderPresets()
 }
 
+// AICancelTask 取消一个在途 AI 任务("ddl"/"partition"/"review")。
+// 在途调用自己的返回路径会以"已取消"失败收场,前端据此复位加载态。
+func (a *App) AICancelTask(task string) bool {
+	return a.aiService.CancelTask(task)
+}
+
 // TestAIConnection 测试 AI 连接
 func (a *App) TestAIConnection() *ai.StepResult {
 	result, err := a.aiService.TestConnection()

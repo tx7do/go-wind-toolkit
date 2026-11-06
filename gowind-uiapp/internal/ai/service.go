@@ -1,7 +1,9 @@
 package ai
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,20 +13,29 @@ import (
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
 )
 
+// 任务键:同一时刻 UI 对每种任务只跑一个,取消按任务粒度进行。
+const (
+	taskDDL       = "ddl"
+	taskPartition = "partition"
+	taskReview    = "review"
+)
+
 // chatClient 抽象对话能力:生产环境注入 *Client,测试注入 mock。
 type chatClient interface {
-	Chat(systemPrompt string, userMessage string) (string, error)
-	ChatStream(systemPrompt string, userMessage string, onDelta func(string)) (string, error)
-	TestConnection() (*StepResult, error)
+	Chat(ctx context.Context, systemPrompt string, userMessage string) (string, error)
+	ChatStream(ctx context.Context, systemPrompt string, userMessage string, onDelta func(string)) (string, error)
+	TestConnection(ctx context.Context) (*StepResult, error)
 }
 
 // Service AI 服务层
 type Service struct {
-	// mu 保护 config/client:Wails 绑定调用各自在独立 goroutine 中执行,
+	// mu 保护 config/client/cancels:Wails 绑定调用各自在独立 goroutine 中执行,
 	// "测试连接"与"生成/配置保存"并发时存在数据竞争。
 	mu     sync.Mutex
 	client chatClient
 	config *Config
+	// cancels 在途任务的可取消 ctx 注册表(taskCtx 注册,finishTask 清除)。
+	cancels map[string]context.CancelFunc
 }
 
 // NewService 创建 AI 服务,自动加载持久化配置(缺失时用默认值)。
@@ -72,9 +83,53 @@ func (s *Service) GetClient() chatClient {
 	return s.client
 }
 
-// TestConnection 测试 AI 连接
+// TestConnection 测试 AI 连接(不进取消注册表:轻量操作)
 func (s *Service) TestConnection() (*StepResult, error) {
-	return s.GetClient().TestConnection()
+	return s.GetClient().TestConnection(context.Background())
+}
+
+// taskCtx 注册一个可取消的任务 ctx 并返回。同名旧任务若仍在途,先取消
+// (僵尸兜底:正常路径 finishTask 会清,这里防的是异常退出漏清)。
+func (s *Service) taskCtx(task string) context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancels == nil {
+		s.cancels = make(map[string]context.CancelFunc)
+	}
+	if old := s.cancels[task]; old != nil {
+		old()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancels[task] = cancel
+	return ctx
+}
+
+// finishTask 任务结束后清除注册项(须与 taskCtx 配对)。
+func (s *Service) finishTask(task string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.cancels, task)
+}
+
+// CancelTask 取消指定在途任务。返回是否确实取消了正在运行的任务。
+func (s *Service) CancelTask(task string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cancel := s.cancels[task]
+	if cancel == nil {
+		return false
+	}
+	cancel()
+	return true
+}
+
+// friendlyError 取消归一:ctx 已取消(含传输层包着的 context.Canceled)
+// 统一报「已取消」,其余原样返回。
+func friendlyError(ctx context.Context, err error) string {
+	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
+		return "已取消"
+	}
+	return err.Error()
 }
 
 // maxDDLAttempts DDL 生成-校验循环的最大尝试次数:首次生成 + 至多两次修复重试。
@@ -98,19 +153,26 @@ func (s *Service) GenerateDDLStream(requirements string, onDelta func(string)) (
 // GenerateDDLValidated 生成 DDL 并做解析校验,失败则把解析错误带回给模型修复重试。
 // onDelta 的第一个参数是本次尝试的序号(从 1 开始):重试时流式消费方必须据此
 // 清空已累积的内容,否则两次尝试的文本会拼在一起。
-// 传输层错误不重试,立即返回;只有校验失败才触发修复重试。
+// 传输层错误不重试,立即返回;只有校验失败才触发修复重试;可经 CancelTask("ddl") 取消。
 func (s *Service) GenerateDDLValidated(requirements string, onDelta func(attempt int, delta string)) (*StepResult, error) {
+	ctx := s.taskCtx(taskDDL)
+	defer s.finishTask(taskDDL)
+
 	userPrompt := GetDDLPrompt(requirements)
 	var lastErr error
 
 	for attempt := 1; attempt <= maxDDLAttempts; attempt++ {
-		content, err := s.GetClient().ChatStream(ddlSystemPrompt, userPrompt, func(delta string) {
+		if err := ctx.Err(); err != nil {
+			return &StepResult{Success: false, Error: "已取消"}, err
+		}
+		content, err := s.GetClient().ChatStream(ctx, ddlSystemPrompt, userPrompt, func(delta string) {
 			if onDelta != nil {
 				onDelta(attempt, delta)
 			}
 		})
 		if err != nil {
-			return &StepResult{Success: false, Error: err.Error()}, err
+			msg := friendlyError(ctx, err)
+			return &StepResult{Success: false, Error: msg}, err
 		}
 
 		cleaned := cleanMarkdownFence(content)
@@ -142,7 +204,11 @@ func (s *Service) PartitionMicroservices(ddl string) ([]MicroservicePartition, e
 // - LLM 返回的 JSON 解析失败、或清理后没有任何有效划分时,带问题反馈重试一次;
 // - 输出做内容清洗:serviceName 非法/为空、tables 为空的划分剔除,
 //   不在 DDL 中的幻觉表名剔除,跨服务重复表去重——全部记入 warnings 返回。
+// 可经 CancelTask("partition") 取消。
 func (s *Service) PartitionMicroservicesValidated(ddl string) ([]MicroservicePartition, []string, []string, error) {
+	ctx := s.taskCtx(taskPartition)
+	defer s.finishTask(taskPartition)
+
 	ddlTables, err := ValidateDDL(ddl)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("DDL 无法解析，无法划分微服务: %w", err)
@@ -152,9 +218,12 @@ func (s *Service) PartitionMicroservicesValidated(ddl string) ([]MicroservicePar
 	var warnings []string
 
 	for attempt := 1; attempt <= maxPartitionAttempts; attempt++ {
-		content, err := s.GetClient().Chat(partitionSystemPrompt, userPrompt)
+		if err := ctx.Err(); err != nil {
+			return nil, nil, ddlTables, fmt.Errorf("已取消")
+		}
+		content, err := s.GetClient().Chat(ctx, partitionSystemPrompt, userPrompt)
 		if err != nil {
-			return nil, nil, ddlTables, fmt.Errorf("AI 微服务划分失败: %w", err)
+			return nil, nil, ddlTables, fmt.Errorf("AI 微服务划分失败: %s", friendlyError(ctx, err))
 		}
 
 		cleaned := strings.TrimSpace(cleanMarkdownFence(content))
@@ -251,23 +320,30 @@ func (s *Service) ReviewCode(fileContents map[string]string) (*StepResult, error
 		return &StepResult{Success: false, Error: "没有可审查的代码文件"}, nil
 	}
 
-	content, err := s.GetClient().Chat(reviewSystemPrompt, GetReviewPrompt(fileContents))
+	ctx := s.taskCtx(taskReview)
+	defer s.finishTask(taskReview)
+
+	content, err := s.GetClient().Chat(ctx, reviewSystemPrompt, GetReviewPrompt(fileContents))
 	if err != nil {
-		return &StepResult{Success: false, Error: err.Error()}, err
+		return &StepResult{Success: false, Error: friendlyError(ctx, err)}, err
 	}
 
 	return &StepResult{Success: true, Content: content}, nil
 }
 
 // ReviewCodeStream ReviewCode 的流式版本:onDelta 逐块接收增量审查意见。
+// 可经 CancelTask("review") 取消。
 func (s *Service) ReviewCodeStream(fileContents map[string]string, onDelta func(string)) (*StepResult, error) {
 	if len(fileContents) == 0 {
 		return &StepResult{Success: false, Error: "没有可审查的代码文件"}, nil
 	}
 
-	content, err := s.GetClient().ChatStream(reviewSystemPrompt, GetReviewPrompt(fileContents), onDelta)
+	ctx := s.taskCtx(taskReview)
+	defer s.finishTask(taskReview)
+
+	content, err := s.GetClient().ChatStream(ctx, reviewSystemPrompt, GetReviewPrompt(fileContents), onDelta)
 	if err != nil {
-		return &StepResult{Success: false, Error: err.Error()}, err
+		return &StepResult{Success: false, Error: friendlyError(ctx, err)}, err
 	}
 	return &StepResult{Success: true, Content: content}, nil
 }

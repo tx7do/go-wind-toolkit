@@ -82,13 +82,13 @@ func (c *Client) UpdateConfig(config *Config) {
 	c.config = config
 }
 
-// Chat 发送聊天请求，返回回复内容
-func (c *Client) Chat(systemPrompt string, userMessage string) (string, error) {
+// Chat 发送聊天请求，返回回复内容。ctx 取消即刻中断在途请求。
+func (c *Client) Chat(ctx context.Context, systemPrompt string, userMessage string) (string, error) {
 	if err := c.validate(); err != nil {
 		return "", err
 	}
 
-	body, err := c.postChat(context.Background(), systemPrompt, userMessage)
+	body, err := c.postChat(ctx, systemPrompt, userMessage)
 	if err != nil {
 		return "", err
 	}
@@ -115,13 +115,14 @@ type chatStreamResponse struct {
 
 // ChatStream 流式发送聊天请求,按 OpenAI 兼容的 SSE 协议接收增量回复。
 // 每收到一个增量块就调用一次 onDelta(可为 nil);返回完整内容。
-// 流式模式整体超时为 streamTimeout(长生成比普通请求更耗时)。
-func (c *Client) ChatStream(systemPrompt string, userMessage string, onDelta func(string)) (string, error) {
+// 流式模式整体超时为 streamTimeout(长生成比普通请求更耗时),叠加在
+// 传入 ctx 之上;ctx 取消即刻中断在途响应读取。
+func (c *Client) ChatStream(ctx context.Context, systemPrompt string, userMessage string, onDelta func(string)) (string, error) {
 	if err := c.validate(); err != nil {
 		return "", err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), streamTimeout)
+	ctx, cancel := context.WithTimeout(ctx, streamTimeout)
 	defer cancel()
 
 	resp, err := c.postChatStream(ctx, systemPrompt, userMessage)
@@ -515,8 +516,9 @@ func (c *Client) apiError(status int, body []byte) error {
 }
 
 // TestConnection 测试 AI 连接
-func (c *Client) TestConnection() (*StepResult, error) {
+func (c *Client) TestConnection(ctx context.Context) (*StepResult, error) {
 	content, err := c.Chat(
+		ctx,
 		"You are a helpful assistant. Reply with exactly: CONNECTION_OK",
 		"Hello, please respond with CONNECTION_OK to confirm the connection is working.",
 	)

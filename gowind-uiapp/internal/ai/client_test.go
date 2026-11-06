@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -39,7 +40,7 @@ func TestChatStreamParsesSSE(t *testing.T) {
 		APIKey:   "test-key",
 		Model:    "test-model",
 	})
-	content, err := client.ChatStream("sys", "user", func(d string) { deltas = append(deltas, d) })
+	content, err := client.ChatStream(context.Background(), "sys", "user", func(d string) { deltas = append(deltas, d) })
 	if err != nil {
 		t.Fatalf("ChatStream: %v", err)
 	}
@@ -59,7 +60,7 @@ func TestChatStreamReportsAPIError(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(&Config{Provider: "openai", BaseURL: srv.URL, APIKey: "bad", Model: "m"})
-	_, err := client.ChatStream("sys", "user", nil)
+	_, err := client.ChatStream(context.Background(), "sys", "user", nil)
 	if err == nil || !strings.Contains(err.Error(), "invalid api key") {
 		t.Fatalf("expected API error, got %v", err)
 	}
@@ -72,7 +73,7 @@ func TestChatNonStreamStillWorks(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(&Config{Provider: "openai", BaseURL: srv.URL, APIKey: "k", Model: "m"})
-	content, err := client.Chat("sys", "user")
+	content, err := client.Chat(context.Background(), "sys", "user")
 	if err != nil {
 		t.Fatalf("Chat: %v", err)
 	}
@@ -144,7 +145,7 @@ func TestAzureChatUsesDeploymentPathAndApiKey(t *testing.T) {
 		AzureAPIVersion: "2024-02-01",
 		Model:           "dep-x",
 	})
-	content, err := client.Chat("sys", "user")
+	content, err := client.Chat(context.Background(), "sys", "user")
 	if err != nil {
 		t.Fatalf("Chat: %v", err)
 	}
@@ -168,7 +169,7 @@ func TestAzureChatUsesDeploymentPathAndApiKey(t *testing.T) {
 
 func TestAzureRequiresApiVersion(t *testing.T) {
 	client := NewClient(&Config{Provider: "azure", BaseURL: "https://example.invalid", APIKey: "k", Model: "d"})
-	if _, err := client.Chat("sys", "user"); err == nil || !strings.Contains(err.Error(), "api-version") {
+	if _, err := client.Chat(context.Background(), "sys", "user"); err == nil || !strings.Contains(err.Error(), "api-version") {
 		t.Fatalf("expected api-version error, got %v", err)
 	}
 }
@@ -193,7 +194,7 @@ func TestAnthropicRequestShapeAndNonStream(t *testing.T) {
 		Temperature: 1.5, // 超出 Anthropic 上限,应被钳制到 1.0
 		MaxTokens:   4096,
 	})
-	content, err := client.Chat("sys-prompt", "user-msg")
+	content, err := client.Chat(context.Background(), "sys-prompt", "user-msg")
 	if err != nil {
 		t.Fatalf("Chat: %v", err)
 	}
@@ -264,7 +265,7 @@ func TestAnthropicStreamAssemblesTextDeltas(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(&Config{Provider: "anthropic", BaseURL: srv.URL, APIKey: "k", Model: "claude-x"})
-	content, err := client.ChatStream("sys", "user", nil)
+	content, err := client.ChatStream(context.Background(), "sys", "user", nil)
 	if err != nil {
 		t.Fatalf("ChatStream: %v", err)
 	}
@@ -295,7 +296,7 @@ func TestGeminiRequestShapeAndNonStream(t *testing.T) {
 		Temperature: 0.7,
 		MaxTokens:   4096,
 	})
-	content, err := client.Chat("sys-prompt", "user-msg")
+	content, err := client.Chat(context.Background(), "sys-prompt", "user-msg")
 	if err != nil {
 		t.Fatalf("Chat: %v", err)
 	}
@@ -365,7 +366,7 @@ func TestGeminiStreamAssemblesTextParts(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(&Config{Provider: "gemini", BaseURL: srv.URL, APIKey: "k", Model: "gemini-x"})
-	content, err := client.ChatStream("sys", "user", nil)
+	content, err := client.ChatStream(context.Background(), "sys", "user", nil)
 	if err != nil {
 		t.Fatalf("ChatStream: %v", err)
 	}
@@ -405,7 +406,7 @@ func TestChat_DoesNotSendKeyAcrossRedirect(t *testing.T) {
 		Model:           "d",
 		AzureAPIVersion: "2024-02-01",
 	})
-	if _, err := client.Chat("sys", "hello-prompt"); err == nil {
+	if _, err := client.Chat(context.Background(), "sys", "hello-prompt"); err == nil {
 		t.Fatal("跨主机重定向应当让请求失败")
 	}
 	if sawKey != "" || sawBody != "" {

@@ -1,13 +1,14 @@
 package ai
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 )
 
 // mockChat 预设响应序列的对话客户端桩:Chat/ChatStream 共用同一响应队列,
-// prompts 记录每次调用的完整 userMessage,供重试提示断言使用。
+// prompts 记录每次调用的完整 userMessage,供重试提示断言使用。ctx 被忽略。
 type mockChat struct {
 	responses []string
 	i         int
@@ -15,7 +16,7 @@ type mockChat struct {
 	chunkN    int // >0 时把每个响应切成 chunkN 份模拟流式增量
 }
 
-func (m *mockChat) pop(_ string, userMessage string) (string, error) {
+func (m *mockChat) pop(_ context.Context, userMessage string) (string, error) {
 	m.prompts = append(m.prompts, userMessage)
 	if m.i >= len(m.responses) {
 		return "", fmt.Errorf("mock 响应已耗尽")
@@ -25,12 +26,12 @@ func (m *mockChat) pop(_ string, userMessage string) (string, error) {
 	return resp, nil
 }
 
-func (m *mockChat) Chat(systemPrompt string, userMessage string) (string, error) {
-	return m.pop(systemPrompt, userMessage)
+func (m *mockChat) Chat(_ context.Context, systemPrompt string, userMessage string) (string, error) {
+	return m.pop(context.Background(), userMessage)
 }
 
-func (m *mockChat) ChatStream(systemPrompt string, userMessage string, onDelta func(string)) (string, error) {
-	resp, err := m.pop(systemPrompt, userMessage)
+func (m *mockChat) ChatStream(_ context.Context, systemPrompt string, userMessage string, onDelta func(string)) (string, error) {
+	resp, err := m.pop(context.Background(), userMessage)
 	if err != nil {
 		return "", err
 	}
@@ -51,7 +52,7 @@ func (m *mockChat) ChatStream(systemPrompt string, userMessage string, onDelta f
 	return resp, nil
 }
 
-func (m *mockChat) TestConnection() (*StepResult, error) {
+func (m *mockChat) TestConnection(_ context.Context) (*StepResult, error) {
 	return &StepResult{Success: true}, nil
 }
 
@@ -131,13 +132,13 @@ func TestGenerateDDLValidated_TransportErrorNoRetry(t *testing.T) {
 // exhaustedMock 永远返回同一传输层错误的桩。
 type exhaustedMock struct{}
 
-func (e *exhaustedMock) Chat(string, string) (string, error) {
+func (e *exhaustedMock) Chat(context.Context, string, string) (string, error) {
 	return "", fmt.Errorf("连接被拒")
 }
-func (e *exhaustedMock) ChatStream(string, string, func(string)) (string, error) {
+func (e *exhaustedMock) ChatStream(context.Context, string, string, func(string)) (string, error) {
 	return "", fmt.Errorf("连接被拒")
 }
-func (e *exhaustedMock) TestConnection() (*StepResult, error) {
+func (e *exhaustedMock) TestConnection(context.Context) (*StepResult, error) {
 	return nil, fmt.Errorf("连接被拒")
 }
 

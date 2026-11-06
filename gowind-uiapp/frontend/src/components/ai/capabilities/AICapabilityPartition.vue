@@ -10,7 +10,7 @@ const {
   ddlContent, partitions, partitionWarnings, partitionLoading, hasPartitions,
   editingPartitions, unassignedTables,
   partition, beginEditPartitions, cancelEditPartitions, savePartitions,
-  removeTable, moveTable, assignTable, addService, removeService,
+  removeTable, moveTable, assignTable, addService, removeService, cancelTask,
 } = useAI()
 
 const saving = ref(false)
@@ -92,6 +92,9 @@ const serviceIndexes = computed(() => partitions.value.map((_, i) => i))
           <!-- 视图态才有"编辑";生成按钮在编辑态禁用,避免编辑中途被 AI 重跑覆盖 -->
           <a-button v-if="hasPartitions && !editingPartitions" @click="handleBeginEdit">
             <EditOutlined style="margin-right: 4px"/> {{ t('ai.partition.edit') }}
+          </a-button>
+          <a-button v-if="partitionLoading" danger @click="cancelTask('partition')">
+            {{ t('ai.cancel') }}
           </a-button>
           <a-button type="primary" :loading="partitionLoading" :disabled="editingPartitions" @click="handlePartition">
             <TableOutlined style="margin-right: 4px"/> {{ t('ai.partition.generateBtn') }}

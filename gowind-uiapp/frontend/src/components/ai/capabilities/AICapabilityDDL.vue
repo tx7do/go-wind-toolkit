@@ -8,7 +8,7 @@ import MonacoEditor from '../../backend/MonacoEditor.vue'
 const {t} = useI18n()
 const {
   requirements, ddlContent, ddlGenerating, ddlAttempt,
-  generateDDL, saveArtifacts,
+  generateDDL, saveArtifacts, cancelTask,
 } = useAI()
 
 async function handleGenerate() {
@@ -42,6 +42,9 @@ async function handleSave() {
         <div class="card-actions">
           <a-button :disabled="ddlGenerating || !ddlContent" @click="handleSave">
             <SaveOutlined style="margin-right: 4px"/> {{ t('ai.artifact.saveBtn') }}
+          </a-button>
+          <a-button v-if="ddlGenerating" danger @click="cancelTask('ddl')">
+            {{ t('ai.cancel') }}
           </a-button>
           <a-button type="primary" :loading="ddlGenerating" @click="handleGenerate">
             <RobotOutlined style="margin-right: 4px"/> {{ t('ai.ddl.generateBtn') }}

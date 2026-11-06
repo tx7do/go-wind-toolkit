@@ -10,6 +10,8 @@ import {detect} from '../models';
 
 export function AIApplyBackendCode(arg1:string):Promise<string>;
 
+export function AICancelTask(arg1:string):Promise<boolean>;
+
 export function AIDiscardBackendPlan(arg1:string):Promise<void>;
 
 export function AIFindOpenAPIFiles():Promise<ai.OpenAPIResult>;

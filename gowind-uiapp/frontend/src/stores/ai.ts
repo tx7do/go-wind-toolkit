@@ -3,6 +3,7 @@ import {
   AIGenerateDDLStream,
   AIPartitionMicroservices,
   AIValidateDDL,
+  AICancelTask,
   AIPlanBackendCode,
   AIApplyBackendCode,
   AIDiscardBackendPlan,
@@ -132,6 +133,18 @@ function parsePartitionsJSON(raw: string): ai.MicroservicePartition[] {
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
+  }
+}
+
+// 取消在途任务("ddl"/"partition"/"review"):在途调用自己的返回路径
+// 会以「已取消」失败收场,现有 message.error 与 finally 复位逻辑自动收尾;
+// DDL 已流出的部分内容保留。任务没在跑时返回 false,静默忽略即可。
+async function cancelTask(task: 'ddl' | 'partition' | 'review'): Promise<boolean> {
+  try {
+    return await AICancelTask(task)
+  } catch (e) {
+    console.error('取消任务失败:', e)
+    return false
   }
 }
 
@@ -440,6 +453,7 @@ export function useAI() {
     initAI, loadArtifacts, resetForProject,
     generateDDL, saveArtifacts, partition, findOpenAPI,
     planBackend, applyBackend, discardBackendPlan, openPlanFile,
+    cancelTask,
     beginEditPartitions, cancelEditPartitions, savePartitions,
     removeTable, moveTable, assignTable, addService, removeService,
     scanForReview, runReview, viewReview,
