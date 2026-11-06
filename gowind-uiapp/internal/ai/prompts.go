@@ -1,5 +1,7 @@
 package ai
 
+import "sort"
+
 // DDL 生成系统提示
 const ddlSystemPrompt = "You are an expert database architect. Your task is to generate MySQL-compatible DDL (CREATE TABLE) statements based on the user's requirements.\n\nRules:\n1. Generate complete CREATE TABLE statements with proper column types, constraints, and indexes.\n2. Use MySQL-compatible syntax.\n3. Include PRIMARY KEY, NOT NULL, DEFAULT, AUTO_INCREMENT constraints where appropriate.\n4. Add proper indexes for foreign keys and commonly queried columns.\n5. Add COMMENT on tables and columns to describe their purpose.\n6. Use utf8mb4 character set.\n7. Follow naming conventions: table names in snake_case, use singular form (e.g., user, not users).\n8. Include created_at and updated_at TIMESTAMP columns for all tables.\n9. Include proper FOREIGN KEY constraints with ON DELETE and ON UPDATE rules.\n10. Output ONLY the SQL DDL statements, no explanations or markdown code fences.\n11. Do not wrap the output in ```sql``` code blocks."
 
@@ -44,10 +46,17 @@ func GetPartitionFixPrompt(ddl string, previousResponse string, problem string) 
 
 // GetReviewPrompt 获取代码审查的完整用户提示
 func GetReviewPrompt(fileContents map[string]string) string {
+	// map 遍历序随机,先按路径排序保证提示词稳定可复现。
+	paths := make([]string, 0, len(fileContents))
+	for path := range fileContents {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+
 	prompt := "Please review the following generated code files:\n\n"
-	for path, content := range fileContents {
+	for _, path := range paths {
 		prompt += "=== " + path + " ===\n"
-		prompt += content + "\n\n"
+		prompt += fileContents[path] + "\n\n"
 	}
 	prompt += "\nPlease provide your review and suggestions for improvement."
 	return prompt

@@ -760,6 +760,66 @@ func (a *App) AIReviewCodeStream(fileContents map[string]string) *ai.StepResult 
 	return result
 }
 
+// ==================== 项目代码扫描与审查 ====================
+
+// AIReviewScan 扫描项目内可审查的代码文件:app/ 下 Go 源码(排除测试与
+// protoc 生成物)与 api/protos/ 下 proto,返回相对路径清单供前端勾选。
+func (a *App) AIReviewScan() *ai.ReviewScanResult {
+	pi := a.getProjectInfo()
+	if pi == nil {
+		runtime.LogErrorf(a.ctx, "未打开项目")
+		return &ai.ReviewScanResult{Success: false, Error: "未打开项目"}
+	}
+
+	res, err := ai.ScanProjectCode(pi.Root)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "扫描项目代码失败: %v", err)
+		return &ai.ReviewScanResult{Success: false, Error: err.Error()}
+	}
+	return res
+}
+
+// AIReviewProject 对选中的项目文件做 AI 审查:意见经 "ai:stream" 事件逐块
+// 推送,结束后报告自动落盘 .gowind/ai/review-<时间戳>.md。
+// 旧 AIReviewCodeStream 保留给 CLI 与自定义文件集场景。
+func (a *App) AIReviewProject(paths []string) *ai.StepResult {
+	pi := a.getProjectInfo()
+	if pi == nil {
+		runtime.LogErrorf(a.ctx, "未打开项目")
+		return &ai.StepResult{Success: false, Error: "未打开项目"}
+	}
+
+	fileContents, warnings, err := ai.ReadProjectFiles(pi.Root, paths)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "读取待审查文件失败: %v", err)
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+	for _, w := range warnings {
+		runtime.LogWarningf(a.ctx, "审查文件: %s", w)
+	}
+
+	result, err := a.aiService.ReviewCodeStream(fileContents, func(delta string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "ai:stream", map[string]any{"task": "review", "delta": delta})
+		}
+	})
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "AI 代码审查失败: %v", err)
+		runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "review", "success": false, "error": err.Error()})
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+
+	// 审查报告落盘;失败不影响审查结果本身。
+	if path, serr := ai.SaveArtifact(pi.Root, ai.ArtifactReview, result.Content); serr != nil {
+		runtime.LogWarningf(a.ctx, "审查报告落盘失败: %v", serr)
+	} else {
+		runtime.EventsEmit(a.ctx, "ai-review-saved", map[string]any{"path": path})
+	}
+
+	runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "review", "success": true})
+	return result
+}
+
 // ==================== AI 产物落盘 ====================
 
 // saveAIArtifactQuietly 把 AI 产物落盘到项目 .gowind/ai/ 目录。
