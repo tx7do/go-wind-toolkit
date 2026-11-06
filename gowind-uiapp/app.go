@@ -595,7 +595,8 @@ func (a *App) AIGenerateDDL(requirements string) *ai.StepResult {
 }
 
 // AIGenerateDDLStream AIGenerateDDL 的流式版本:生成过程中的增量内容经
-// "ai:stream" 事件逐块推送(task 标识任务类型),结束发 "ai:done";
+// "ai:stream" 事件逐块推送(task 标识任务类型,attempt 标识第几次尝试——
+// 校验失败自动修复重试时前端须清空已累积内容),结束发 "ai:done";
 // 返回值为完整结果。
 func (a *App) AIGenerateDDLStream(requirements string) *ai.StepResult {
 	if requirements == "" {
@@ -603,9 +604,9 @@ func (a *App) AIGenerateDDLStream(requirements string) *ai.StepResult {
 		return &ai.StepResult{Success: false, Error: "需求文档不能为空"}
 	}
 
-	result, err := a.aiService.GenerateDDLStream(requirements, func(delta string) {
+	result, err := a.aiService.GenerateDDLValidated(requirements, func(attempt int, delta string) {
 		if a.ctx != nil {
-			runtime.EventsEmit(a.ctx, "ai:stream", map[string]string{"task": "ddl", "delta": delta})
+			runtime.EventsEmit(a.ctx, "ai:stream", map[string]any{"task": "ddl", "delta": delta, "attempt": attempt})
 		}
 	})
 	if err != nil {
@@ -626,13 +627,13 @@ func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
 		return &ai.PartitionResult{Success: false, Error: "DDL 不能为空"}
 	}
 
-	partitions, err := a.aiService.PartitionMicroservices(ddl)
+	partitions, warnings, err := a.aiService.PartitionMicroservicesValidated(ddl)
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "AI 微服务划分失败: %v", err)
 		return &ai.PartitionResult{Success: false, Error: err.Error()}
 	}
 
-	return &ai.PartitionResult{Success: true, Partitions: partitions}
+	return &ai.PartitionResult{Success: true, Partitions: partitions, Warnings: warnings}
 }
 
 // AIGenerateBackendCode AI 辅助生成后端代码

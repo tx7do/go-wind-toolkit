@@ -23,6 +23,25 @@ func GetPartitionPrompt(ddl string) string {
 		"Respond with ONLY a JSON array."
 }
 
+// GetDDLFixPrompt DDL 校验失败后的修复重试提示:附上被否决的产物与解析错误。
+func GetDDLFixPrompt(requirements string, previousDDL string, parseError string) string {
+	return "Here are the requirements for a software system:\n\n" + requirements +
+		"\n\nYou previously generated the following DDL, but it failed to parse:\n\n" + previousDDL +
+		"\n\nThe parser reported:\n" + parseError +
+		"\n\nPlease regenerate the COMPLETE corrected DDL (CREATE TABLE statements) that satisfies " +
+		"the requirements and parses cleanly. Output ONLY raw SQL statements, no explanations."
+}
+
+// GetPartitionFixPrompt 划分结果无效后的修复重试提示:附上被否决的原始响应与问题。
+func GetPartitionFixPrompt(ddl string, previousResponse string, problem string) string {
+	return "Here is the database DDL:\n\n" + ddl +
+		"\n\nYou previously responded with:\n\n" + previousResponse +
+		"\n\nBut it has a problem: " + problem +
+		"\n\nPlease analyze these database tables and partition them into microservices again. " +
+		"Every table name must be taken verbatim from the DDL above. " +
+		"Respond with ONLY a valid JSON array of {serviceName, tables, description}."
+}
+
 // GetReviewPrompt 获取代码审查的完整用户提示
 func GetReviewPrompt(fileContents map[string]string) string {
 	prompt := "Please review the following generated code files:\n\n"
