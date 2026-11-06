@@ -46,6 +46,7 @@ func Run(args []string) int {
 	rootCmd.AddCommand(frontendCmd)
 	rootCmd.AddCommand(aiCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(mcpCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		return exitCodeFor(err)

@@ -30,6 +30,7 @@ cd gowind-uiapp && go build -o gowind-uiapp .
 | `gowind-uiapp frontend gen/parse` | 前端 CRUD 代码生成（三框架）/ OpenAPI 服务解析预览 |
 | `gowind-uiapp ai presets/test/ddl/partition/review/backend/find-openapi/config` | AI 助手（含按划分生成后端、配置查看/持久化） |
 | `gowind-uiapp config types/services/export` | 远程配置中心导出 |
+| `gowind-uiapp mcp` | MCP stdio 服务：把 AI 能力暴露为 MCP 工具 |
 
 ## 交给 gow 的能力
 
@@ -199,3 +200,46 @@ Etcd 走 v3 gRPC 协议；endpoint 支持 `host:port` 或 `http(s)://host:port`�
 2. 退出码非 0 时，stdout（`--json`）会输出 `{"error":"..."}`。
 3. 长流程（backend grpc 的后处理链）日志在 stderr 实时输出，最终结果一次性输出到 stdout。
 4. 涉及凭证（数据库密码、AI API Key）建议用环境变量传入。
+
+---
+
+## mcp — MCP stdio 服务
+
+```bash
+gowind-uiapp mcp
+```
+
+以 MCP(Model Context Protocol) stdio 服务模式运行:stdin 收 JSON-RPC 帧,stdout 只输出协议帧,日志走 stderr。在任何 MCP 客户端的 `mcpServers` 配置中指向本命令即可把 AI 能力当工具调用:
+
+```json
+{
+  "mcpServers": {
+    "gowind-uiapp": {
+      "command": "D:/path/to/gowind-uiapp.exe",
+      "args": ["mcp"],
+      "env": {
+        "GOWIND_AI_PROVIDER": "deepseek",
+        "GOWIND_AI_API_KEY": "sk-...",
+        "GOWIND_AI_MODEL": "deepseek-chat"
+      }
+    }
+  }
+}
+```
+
+AI 凭据约定与 `ai` 命令一致:持久化配置为底,`GOWIND_AI_*` 环境变量覆盖且不回写。
+
+### 工具清单
+
+| 工具 | 入参 | 说明 |
+|------|------|------|
+| `generate_ddl` | requirements | 需求 → DDL(带解析校验与修复重试) |
+| `validate_ddl` | sql | tidb parser 语法校验,返回表清单与带行列诊断 |
+| `partition_microservices` | ddl | 微服务划分(幻觉表名剔除/去重,附 warnings) |
+| `find_openapi` | projectRoot | 查找项目内 OpenAPI 文档 |
+| `scan_reviewable_files` | projectRoot | 列出可审查代码文件 |
+| `review_files` | projectRoot, paths[] | 分批结构化审查:issues + 总评(多次 LLM 调用) |
+| `plan_backend` | projectRoot, ddl, ormType, partitions | 预演生成:文件树落临时目录,返回新增/覆盖清单 |
+| `apply_backend` | planId | 确认写入项目并执行后处理链(需 go/buf/wire 在 PATH) |
+
+说明:`projectRoot` 必须是可探测的 Go 模块根目录;`plan_backend` 不写任何文件,`apply_backend` 确认后才落盘——失败不回滚,错误信息以"文件已写入"前缀区分。
