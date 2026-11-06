@@ -207,6 +207,13 @@ func (s *Service) PartitionMicroservices(ddl string) ([]MicroservicePartition, e
 //   不在 DDL 中的幻觉表名剔除,跨服务重复表去重——全部记入 warnings 返回。
 // 可经 CancelTask("partition") 取消。
 func (s *Service) PartitionMicroservicesValidated(ddl string) ([]MicroservicePartition, []string, []string, error) {
+	return s.PartitionMicroservicesValidatedStream(ddl, nil)
+}
+
+// PartitionMicroservicesValidatedStream 划分流式版本:onDelta 携带尝试序号
+// (从 1 起,修复重试时递增,流式消费方据此清空已累积内容)。传输走流式端点,
+// 其余校验/清洗/重试语义与非流式版本完全一致。
+func (s *Service) PartitionMicroservicesValidatedStream(ddl string, onDelta func(attempt int, delta string)) ([]MicroservicePartition, []string, []string, error) {
 	ctx := s.taskCtx(taskPartition)
 	defer s.finishTask(taskPartition)
 
@@ -222,7 +229,11 @@ func (s *Service) PartitionMicroservicesValidated(ddl string) ([]MicroservicePar
 		if err := ctx.Err(); err != nil {
 			return nil, nil, ddlTables, fmt.Errorf("已取消")
 		}
-		content, err := s.GetClient().Chat(ctx, partitionSystemPrompt, userPrompt)
+		content, err := s.GetClient().ChatStream(ctx, partitionSystemPrompt, userPrompt, func(delta string) {
+			if onDelta != nil {
+				onDelta(attempt, delta)
+			}
+		})
 		if err != nil {
 			return nil, nil, ddlTables, fmt.Errorf("AI 微服务划分失败: %s", friendlyError(ctx, err))
 		}

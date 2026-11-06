@@ -506,6 +506,7 @@ export default {
       ddlRequired: '请先生成 DDL',
       empty: '暂无划分结果，请点击按钮进行微服务划分',
       warnings: '划分清洗告警（幻觉表名剔除、跨服务去重等）',
+      streaming: '生成中（实时预览）',
       edit: '编辑',
       editing: '编辑模式——改动在保存后才生效，AI 重新划分按钮已禁用',
       unassigned: '未分配表',

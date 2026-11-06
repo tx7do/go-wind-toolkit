@@ -8,7 +8,7 @@ import {useAI} from '../../../stores/ai'
 const {t} = useI18n()
 const {
   ddlContent, partitions, partitionWarnings, partitionLoading, hasPartitions,
-  editingPartitions, unassignedTables,
+  editingPartitions, unassignedTables, partitionStreamContent,
   partition, beginEditPartitions, cancelEditPartitions, savePartitions,
   removeTable, moveTable, assignTable, addService, removeService, cancelTask,
 } = useAI()
@@ -125,6 +125,12 @@ const serviceIndexes = computed(() => partitions.value.map((_, i) => i))
         show-icon
         style="margin-bottom: 8px"
     />
+
+    <!-- 流式原始 JSON 预览:解析前的原始文本,完成即清 -->
+    <div v-if="partitionLoading && partitionStreamContent" class="stream-preview">
+      <span class="stream-label">{{ t('ai.partition.streaming') }}</span>
+      <pre class="stream-text">{{ partitionStreamContent.slice(-400) }}</pre>
+    </div>
 
     <template v-if="hasPartitions">
       <!-- 未分配池:编辑态展示,池表可分配给任意服务 -->
@@ -311,6 +317,33 @@ const serviceIndexes = computed(() => partitions.value.map((_, i) => i))
 .no-tables {
   font-size: 12px;
   color: #bfbfbf;
+}
+
+.stream-preview {
+  margin-bottom: 8px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #141414;
+  padding: 6px 8px;
+}
+
+.stream-label {
+  font-size: 11px;
+  color: #8c8c8c;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.stream-text {
+  margin: 0;
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #a6adb4;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .edit-footer {

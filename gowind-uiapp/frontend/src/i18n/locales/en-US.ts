@@ -479,6 +479,7 @@ export default {
       ddlRequired: 'Please generate DDL first',
       empty: 'No partition results. Click the button to partition microservices.',
       warnings: 'Partition cleanup warnings (hallucinated table names dropped, cross-service dedup, etc.)',
+      streaming: 'Generating (live preview)',
       edit: 'Edit',
       editing: 'Edit mode — changes take effect after saving; AI re-partition is disabled meanwhile',
       unassigned: 'Unassigned tables',

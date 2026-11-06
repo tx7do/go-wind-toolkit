@@ -654,7 +654,11 @@ func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
 		return &ai.PartitionResult{Success: false, Error: "DDL 不能为空"}
 	}
 
-	partitions, ddlTables, warnings, err := a.aiService.PartitionMicroservicesValidated(ddl)
+	partitions, ddlTables, warnings, err := a.aiService.PartitionMicroservicesValidatedStream(ddl, func(attempt int, delta string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "ai:stream", map[string]any{"task": "partition", "delta": delta, "attempt": attempt})
+		}
+	})
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "AI 微服务划分失败: %v", err)
 		return &ai.PartitionResult{Success: false, Error: err.Error()}

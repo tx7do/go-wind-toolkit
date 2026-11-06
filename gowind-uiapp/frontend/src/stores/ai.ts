@@ -37,6 +37,9 @@ const ddlAttempt = ref(1)
 const partitions = ref<ai.MicroservicePartition[]>([])
 const partitionWarnings = ref<string[]>([])
 const partitionLoading = ref(false)
+// 划分流式原始 JSON 预览(修复重试时 attempt 变化清空,与 DDL 同语义)
+const partitionStreamContent = ref('')
+let partitionStreamAttempt = 0
 // 划分编辑态:ddlTables 是 DDL 全表清单(未分配池基准),进入编辑时快照
 // partitions,保存或放弃时二选一,避免半途编辑污染生成链的真值。
 const editingPartitions = ref(false)
@@ -88,6 +91,13 @@ function onAIStream(data: any) {
       ddlContent.value = ''
     }
     ddlContent.value += data.delta
+  } else if (data.task === 'partition' && partitionLoading.value) {
+    const attempt = typeof data.attempt === 'number' ? data.attempt : 1
+    if (attempt !== partitionStreamAttempt) {
+      partitionStreamAttempt = attempt
+      partitionStreamContent.value = ''
+    }
+    partitionStreamContent.value += data.delta
   } else if (data.task === 'review' && reviewLoading.value) {
     reviewResult.value += data.delta
   }
@@ -175,6 +185,8 @@ function resetForProject() {
   partitions.value = []
   partitionWarnings.value = []
   partitionLoading.value = false
+  partitionStreamContent.value = ''
+  partitionStreamAttempt = 0
   editingPartitions.value = false
   ddlTables.value = []
   partitionsSnapshot = null
@@ -236,6 +248,8 @@ async function saveArtifacts(): Promise<string> {
 async function partition() {
   if (!ddlContent.value.trim() || partitionLoading.value) return null
   partitionLoading.value = true
+  partitionStreamContent.value = ''
+  partitionStreamAttempt = 0
   try {
     const result = await AIPartitionMicroservices(ddlContent.value)
     if (result.success) {
@@ -246,6 +260,7 @@ async function partition() {
     return result
   } finally {
     partitionLoading.value = false
+    partitionStreamContent.value = ''
   }
 }
 
@@ -468,7 +483,7 @@ export function useAI() {
     mode,
     requirements, ddlContent, ddlGenerating, ddlAttempt,
     partitions, partitionWarnings, partitionLoading, hasPartitions,
-    editingPartitions, ddlTables, unassignedTables,
+    editingPartitions, ddlTables, unassignedTables, partitionStreamContent,
     ormType, backendPlan, planningLoading, applyingLoading,
     previewFile, previewContent, previewDrawerOpen,
     openapiFiles, openapiMessage, openapiLoading,
