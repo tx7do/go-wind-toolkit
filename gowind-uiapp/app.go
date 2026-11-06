@@ -857,6 +857,20 @@ func (a *App) LoadAIArtifacts() *ai.Artifacts {
 	return ai.LoadArtifacts(pi.Root)
 }
 
+// LoadAIReviewReport 读取一份已落盘的审查报告内容,供前端回看。
+func (a *App) LoadAIReviewReport(name string) *ai.StepResult {
+	pi := a.getProjectInfo()
+	if pi == nil {
+		return &ai.StepResult{Success: false, Error: "未打开项目"}
+	}
+	content, err := ai.LoadReviewReport(pi.Root, name)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "读取审查报告失败: %v", err)
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+	return &ai.StepResult{Success: true, Content: content}
+}
+
 // ==================== 远程配置相关方法 ====================
 
 // GetRemoteConfigTypes 获取支持的远程配置中心类型

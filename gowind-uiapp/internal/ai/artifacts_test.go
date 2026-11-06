@@ -101,6 +101,34 @@ func TestSavePartitionsArtifact(t *testing.T) {
 	}
 }
 
+func TestLoadReviewReport(t *testing.T) {
+	root := t.TempDir()
+	if _, err := SaveArtifact(root, ArtifactReview, "# 审查意见\n\n问题若干。"); err != nil {
+		t.Fatal(err)
+	}
+	name := LoadArtifacts(root).Reviews[0].Name
+
+	content, err := LoadReviewReport(root, name)
+	if err != nil {
+		t.Fatalf("读取失败: %v", err)
+	}
+	if !strings.Contains(content, "审查意见") {
+		t.Fatalf("内容不符: %q", content)
+	}
+
+	for _, bad := range []string{
+		"../ddl.sql",        // 路径成分
+		"sub/report.md",     // 路径成分
+		"ddl.sql",           // 非报告前缀
+		"review-x.txt",      // 非报告后缀
+		"",                  // 空
+	} {
+		if _, err := LoadReviewReport(root, bad); err == nil {
+			t.Fatalf("非法报告名 %q 不应通过", bad)
+		}
+	}
+}
+
 func TestSaveArtifact_EmptyRoot(t *testing.T) {
 	if _, err := SaveArtifact("  ", ArtifactDDL, "x"); err == nil {
 		t.Fatal("空项目根应报错")

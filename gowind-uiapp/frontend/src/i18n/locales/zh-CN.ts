@@ -437,6 +437,20 @@ export default {
       openapi: 'OpenAPI 文档',
       review: 'AI 代码审查',
     },
+    mode: {
+      panel: '能力面板',
+      wizard: '新手向导',
+      panelHint: '每个能力独立触发，产物自动保存到项目 .gowind/ai/ 目录',
+      wizardHint: '从需求到后端代码的固定链路，随时可在面板中单独重跑某一步',
+    },
+    wizard: {
+      hint: '按链路逐步完成；产物自动落盘，可随时切到能力面板单独操作',
+      configHint: 'AI 配置在能力面板中',
+    },
+    artifact: {
+      saveBtn: '保存产物',
+      saved: '产物已保存到项目 .gowind/ai/ 目录',
+    },
     project: {
       selectProject: '选择项目目录',
       switchProject: '切换项目',
@@ -478,6 +492,7 @@ export default {
       generateBtn: 'AI 生成 DDL',
       generateSuccess: 'DDL 生成成功',
       generateFailed: 'DDL 生成失败',
+      retrying: 'DDL 未通过解析校验，第 {attempt} 次自动修复重试',
     },
     partition: {
       title: '微服务划分',
@@ -486,6 +501,7 @@ export default {
       failed: '微服务划分失败',
       ddlRequired: '请先生成 DDL',
       empty: '暂无划分结果，请点击按钮进行微服务划分',
+      warnings: '划分清洗告警（幻觉表名剔除、跨服务去重等）',
     },
     backend: {
       title: '生成后端代码',
@@ -509,11 +525,17 @@ export default {
     },
     review: {
       title: 'AI 代码审查',
-      desc: '使用 AI 扫描生成的项目代码，提供改进建议和最佳实践。',
+      desc: '扫描项目代码（app 下 Go 源码与 api/protos 下 proto），AI 审查后报告自动保存到项目 .gowind/ai/ 目录。',
       startBtn: '开始 AI 代码审查',
       success: '代码审查完成',
       failed: '代码审查失败',
       noFiles: '没有可审查的代码文件',
+      scanBtn: '扫描项目代码',
+      scanFailed: '扫描项目代码失败',
+      filesFound: '找到 {count} 个可审查文件',
+      selectFiles: '选择要审查的文件（默认全选）',
+      reports: '历史报告',
+      viewing: '正在查看历史报告：{name}',
     },
   },
 }

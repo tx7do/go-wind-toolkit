@@ -22,6 +22,10 @@ export function AIReviewCode(arg1:Record<string, string>):Promise<ai.StepResult>
 
 export function AIReviewCodeStream(arg1:Record<string, string>):Promise<ai.StepResult>;
 
+export function AIReviewProject(arg1:Array<string>):Promise<ai.StepResult>;
+
+export function AIReviewScan():Promise<ai.ReviewScanResult>;
+
 export function AddService(arg1:devtools.AddServiceOptions):Promise<devtools.CommandResult>;
 
 export function CleanConfig():Promise<void>;
@@ -76,11 +80,17 @@ export function ImportGoSchemaTables(arg1:string,arg2:string):Promise<string>;
 
 export function ImportSqlTables(arg1:string):Promise<string>;
 
+export function LoadAIArtifacts():Promise<ai.Artifacts>;
+
+export function LoadAIReviewReport(arg1:string):Promise<ai.StepResult>;
+
 export function OpenProject(arg1:string):Promise<main.OpenProjectResult>;
 
 export function ParseFrontendServices(arg1:string):Promise<main.FrontendServicesResult>;
 
 export function PreviewFrontendCode(arg1:main.FrontendGenParams):Promise<main.FrontendPreviewResult>;
+
+export function SaveAIArtifact(arg1:string,arg2:string):Promise<ai.ArtifactSaveResult>;
 
 export function SelectFolder():Promise<string>;
 

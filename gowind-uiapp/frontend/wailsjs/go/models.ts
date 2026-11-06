@@ -16,6 +16,88 @@ export namespace ai {
 	        this.baseUrl = source["baseUrl"];
 	    }
 	}
+	export class ArtifactSaveResult {
+	    success: boolean;
+	    path?: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArtifactSaveResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.path = source["path"];
+	        this.error = source["error"];
+	    }
+	}
+	export class ReviewFile {
+	    name: string;
+	    path: string;
+	    modTime: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReviewFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.modTime = source["modTime"];
+	    }
+	}
+	export class Artifacts {
+	    requirements: string;
+	    ddl: string;
+	    partitions: string;
+	    reviews?: ReviewFile[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Artifacts(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.requirements = source["requirements"];
+	        this.ddl = source["ddl"];
+	        this.partitions = source["partitions"];
+	        this.reviews = this.convertValues(source["reviews"], ReviewFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CodeFileInfo {
+	    path: string;
+	    size: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodeFileInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.size = source["size"];
+	    }
+	}
 	export class Config {
 	    provider: string;
 	    baseUrl: string;
@@ -77,6 +159,7 @@ export namespace ai {
 	export class PartitionResult {
 	    success: boolean;
 	    partitions: MicroservicePartition[];
+	    warnings?: string[];
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -87,6 +170,44 @@ export namespace ai {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.partitions = this.convertValues(source["partitions"], MicroservicePartition);
+	        this.warnings = source["warnings"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ReviewScanResult {
+	    success: boolean;
+	    files: CodeFileInfo[];
+	    warnings?: string[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReviewScanResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.files = this.convertValues(source["files"], CodeFileInfo);
+	        this.warnings = source["warnings"];
 	        this.error = source["error"];
 	    }
 	

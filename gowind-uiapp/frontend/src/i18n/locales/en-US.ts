@@ -410,6 +410,20 @@ export default {
       openapi: 'OpenAPI Docs',
       review: 'AI Code Review',
     },
+    mode: {
+      panel: 'Capability Panel',
+      wizard: 'Guided Wizard',
+      panelHint: 'Each capability runs independently; artifacts are saved to the project .gowind/ai/ directory',
+      wizardHint: 'A fixed path from requirements to backend code; switch to the panel to rerun any single step',
+    },
+    wizard: {
+      hint: 'Complete the chain step by step; artifacts are saved automatically and you can switch to the panel anytime',
+      configHint: 'AI settings live in the capability panel',
+    },
+    artifact: {
+      saveBtn: 'Save artifacts',
+      saved: 'Artifacts saved to the project .gowind/ai/ directory',
+    },
     project: {
       selectProject: 'Select Project',
       switchProject: 'Switch Project',
@@ -451,6 +465,7 @@ export default {
       generateBtn: 'AI Generate DDL',
       generateSuccess: 'DDL generated successfully',
       generateFailed: 'DDL generation failed',
+      retrying: 'DDL failed validation; auto-fix retry #{attempt}',
     },
     partition: {
       title: 'Microservice Partition',
@@ -459,6 +474,7 @@ export default {
       failed: 'Microservice partition failed',
       ddlRequired: 'Please generate DDL first',
       empty: 'No partition results. Click the button to partition microservices.',
+      warnings: 'Partition cleanup warnings (hallucinated table names dropped, cross-service dedup, etc.)',
     },
     backend: {
       title: 'Generate Backend Code',
@@ -482,11 +498,17 @@ export default {
     },
     review: {
       title: 'AI Code Review',
-      desc: 'Use AI to scan generated project code and provide improvement suggestions and best practices.',
+      desc: 'Scan project code (Go sources under app/ and protos under api/protos); the AI review report is saved to the project .gowind/ai/ directory.',
       startBtn: 'Start AI Code Review',
       success: 'Code review completed',
       failed: 'Code review failed',
       noFiles: 'No code files to review',
+      scanBtn: 'Scan Project Code',
+      scanFailed: 'Failed to scan project code',
+      filesFound: 'Found {count} reviewable file(s)',
+      selectFiles: 'Select files to review (all selected by default)',
+      reports: 'Past reports',
+      viewing: 'Viewing report: {name}',
     },
   },
 }

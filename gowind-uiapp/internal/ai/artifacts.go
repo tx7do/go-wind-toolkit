@@ -97,8 +97,8 @@ func SavePartitionsArtifact(projectRoot string, partitions []MicroservicePartiti
 
 // LoadArtifacts 读取项目内已保存的 AI 产物。目录不存在返回空快照;
 // 单个文件读取失败跳过该文件,不阻断其余产物。
-	// Reviews 按文件名倒序(最新在前):文件名内嵌毫秒时间戳,字典序即时间序,
-	// 且不受文件系统修改时间精度的影响。
+// Reviews 按文件名倒序(最新在前):文件名内嵌毫秒时间戳,字典序即时间序,
+// 且不受文件系统修改时间精度的影响。
 func LoadArtifacts(projectRoot string) *Artifacts {
 	arts := &Artifacts{}
 	dir := artifactDir(projectRoot)
@@ -142,4 +142,20 @@ func LoadArtifacts(projectRoot string) *Artifacts {
 		return arts.Reviews[i].Name > arts.Reviews[j].Name
 	})
 	return arts
+}
+
+// LoadReviewReport 读取指定审查报告的内容。
+// name 必须是产物目录下的单个文件名且形如 review-*.md,拒绝任何路径成分。
+func LoadReviewReport(projectRoot, name string) (string, error) {
+	if strings.TrimSpace(name) == "" || filepath.IsAbs(name) || strings.ContainsAny(name, `/\`) || name != filepath.Base(name) {
+		return "", fmt.Errorf("非法的报告文件名")
+	}
+	if !strings.HasPrefix(name, "review-") || !strings.HasSuffix(name, ".md") {
+		return "", fmt.Errorf("不是审查报告文件")
+	}
+	data, err := os.ReadFile(filepath.Join(artifactDir(projectRoot), name))
+	if err != nil {
+		return "", fmt.Errorf("读取审查报告失败: %w", err)
+	}
+	return string(data), nil
 }

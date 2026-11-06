@@ -30,6 +30,14 @@ export function AIReviewCodeStream(arg1) {
   return window['go']['main']['App']['AIReviewCodeStream'](arg1);
 }
 
+export function AIReviewProject(arg1) {
+  return window['go']['main']['App']['AIReviewProject'](arg1);
+}
+
+export function AIReviewScan() {
+  return window['go']['main']['App']['AIReviewScan']();
+}
+
 export function AddService(arg1) {
   return window['go']['main']['App']['AddService'](arg1);
 }
@@ -138,6 +146,14 @@ export function ImportSqlTables(arg1) {
   return window['go']['main']['App']['ImportSqlTables'](arg1);
 }
 
+export function LoadAIArtifacts() {
+  return window['go']['main']['App']['LoadAIArtifacts']();
+}
+
+export function LoadAIReviewReport(arg1) {
+  return window['go']['main']['App']['LoadAIReviewReport'](arg1);
+}
+
 export function OpenProject(arg1) {
   return window['go']['main']['App']['OpenProject'](arg1);
 }
@@ -148,6 +164,10 @@ export function ParseFrontendServices(arg1) {
 
 export function PreviewFrontendCode(arg1) {
   return window['go']['main']['App']['PreviewFrontendCode'](arg1);
+}
+
+export function SaveAIArtifact(arg1, arg2) {
+  return window['go']['main']['App']['SaveAIArtifact'](arg1, arg2);
 }
 
 export function SelectFolder() {
