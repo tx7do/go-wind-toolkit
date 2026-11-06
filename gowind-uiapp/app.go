@@ -1013,41 +1013,95 @@ func (a *App) AIReviewScan() *ai.ReviewScanResult {
 	return res
 }
 
-// AIReviewProject 对选中的项目文件做 AI 审查:意见经 "ai:stream" 事件逐块
-// 推送,结束后报告自动落盘 .gowind/ai/review-<时间戳>.md。
+// AIReviewProject 对选中的项目文件做 AI 审查(map-reduce):
+// 按服务贪心装箱分批,逐批结构化审查(每批发 ai:review-batch 进度事件),
+// 全部完成后流式汇总总评(ai:stream),最后 md+json 双落盘 .gowind/ai/。
 // 旧 AIReviewCodeStream 保留给 CLI 与自定义文件集场景。
-func (a *App) AIReviewProject(paths []string) *ai.StepResult {
+// 取消粒度说明:批次执行中即时生效;批次间隙(毫秒级)可能错过一次取消。
+func (a *App) AIReviewProject(paths []string) *ai.ReviewProjectResult {
 	pi := a.getProjectInfo()
 	if pi == nil {
 		runtime.LogErrorf(a.ctx, "未打开项目")
-		return &ai.StepResult{Success: false, Error: "未打开项目"}
+		return &ai.ReviewProjectResult{Success: false, Error: "未打开项目"}
 	}
 
 	fileContents, warnings, err := ai.ReadProjectFiles(pi.Root, paths)
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "读取待审查文件失败: %v", err)
-		return &ai.StepResult{Success: false, Error: err.Error()}
+		return &ai.ReviewProjectResult{Success: false, Error: err.Error()}
 	}
 	for _, w := range warnings {
 		runtime.LogWarningf(a.ctx, "审查文件: %s", w)
 	}
 
-	result, err := a.aiService.ReviewCodeStream(fileContents, func(delta string) {
+	// 从已读内容重建装箱所需的大小信息
+	infos := make([]ai.CodeFileInfo, 0, len(fileContents))
+	for path, content := range fileContents {
+		infos = append(infos, ai.CodeFileInfo{Path: path, Size: int64(len(content))})
+	}
+	batches := ai.BuildReviewBatches(infos)
+	if len(batches) == 0 {
+		return &ai.ReviewProjectResult{Success: false, Error: "没有可审查的文件"}
+	}
+
+	result := &ai.ReviewProjectResult{Success: true}
+	var allIssues []ai.ReviewIssue
+	var summaries []string
+
+	for i, batch := range batches {
+		batchContents := make(map[string]string, len(batch))
+		for _, f := range batch {
+			batchContents[f.Path] = fileContents[f.Path]
+		}
+
+		review, err := a.aiService.ReviewCodeStructured(batchContents)
+		if err != nil {
+			runtime.LogErrorf(a.ctx, "AI 代码审查失败(批次 %d/%d): %v", i+1, len(batches), err)
+			runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "review", "success": false, "error": err.Error()})
+			return &ai.ReviewProjectResult{Success: false, Batches: result.Batches, Issues: allIssues, Error: err.Error()}
+		}
+
+		outcome := ai.ReviewBatchOutcome{
+			Label:      ai.BatchLabel(batch),
+			Summary:    review.Summary,
+			IssueCount: len(review.Issues),
+		}
+		result.Batches = append(result.Batches, outcome)
+		allIssues = append(allIssues, review.Issues...)
+		summaries = append(summaries, fmt.Sprintf("### %s(%d 个问题)\n%s", outcome.Label, outcome.IssueCount, outcome.Summary))
+
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "ai:review-batch", map[string]any{
+				"index":      i + 1,
+				"total":      len(batches),
+				"label":      outcome.Label,
+				"issueCount": outcome.IssueCount,
+				"summary":    outcome.Summary,
+			})
+		}
+	}
+	result.Issues = allIssues
+
+	synthesis, err := a.aiService.SynthesizeReview(summaries, func(delta string) {
 		if a.ctx != nil {
 			runtime.EventsEmit(a.ctx, "ai:stream", map[string]any{"task": "review", "delta": delta})
 		}
 	})
 	if err != nil {
-		runtime.LogErrorf(a.ctx, "AI 代码审查失败: %v", err)
+		runtime.LogErrorf(a.ctx, "AI 审查汇总失败: %v", err)
 		runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "review", "success": false, "error": err.Error()})
-		return &ai.StepResult{Success: false, Error: err.Error()}
+		return &ai.ReviewProjectResult{Success: false, Batches: result.Batches, Issues: allIssues, Error: err.Error()}
 	}
+	result.Synthesis = synthesis
 
-	// 审查报告落盘;失败不影响审查结果本身。
-	if path, serr := ai.SaveArtifact(pi.Root, ai.ArtifactReview, result.Content); serr != nil {
+	// md+json 双落盘;失败不影响审查结果本身。
+	mdPath, jsonPath, serr := ai.SaveReviewReports(pi.Root, result.Batches, allIssues, synthesis)
+	if serr != nil {
 		runtime.LogWarningf(a.ctx, "审查报告落盘失败: %v", serr)
 	} else {
-		runtime.EventsEmit(a.ctx, "ai-review-saved", map[string]any{"path": path})
+		result.ReportPath = mdPath
+		runtime.LogInfof(a.ctx, "审查报告已保存: %s, %s", mdPath, jsonPath)
+		runtime.EventsEmit(a.ctx, "ai-review-saved", map[string]any{"path": mdPath})
 	}
 
 	runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "review", "success": true})

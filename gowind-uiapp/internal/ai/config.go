@@ -113,3 +113,37 @@ type OpenAPIResult struct {
 	Message string   `json:"message,omitempty"`
 	Error   string   `json:"error,omitempty"`
 }
+
+// ReviewIssue 结构化审查问题。Severity 取 critical/major/minor/info,
+// 未知值清洗降级为 minor。
+type ReviewIssue struct {
+	Severity string `json:"severity"`
+	File     string `json:"file"`
+	Line     int    `json:"line,omitempty"`
+	Title    string `json:"title"`
+	Detail   string `json:"detail,omitempty"`
+}
+
+// ReviewResult 单批审查的结构化结果(LLM 输出契约)。
+type ReviewResult struct {
+	Summary string        `json:"summary"`
+	Issues  []ReviewIssue `json:"issues"`
+}
+
+// ReviewBatchOutcome 一批审查的归宿(编排层用,前端批次进度同构)。
+type ReviewBatchOutcome struct {
+	Label      string `json:"label"`
+	Summary    string `json:"summary"`
+	IssueCount int    `json:"issueCount"`
+}
+
+// ReviewProjectResult 整个项目的审查结果:分批 outcomes + 汇总 issue 清单
+// + 流式总评 + 落盘路径。
+type ReviewProjectResult struct {
+	Success    bool                 `json:"success"`
+	Batches    []ReviewBatchOutcome `json:"batches,omitempty"`
+	Issues     []ReviewIssue        `json:"issues,omitempty"`
+	Synthesis  string               `json:"synthesis,omitempty"`
+	ReportPath string               `json:"reportPath,omitempty"`
+	Error      string               `json:"error,omitempty"`
+}

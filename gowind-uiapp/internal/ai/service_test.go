@@ -160,6 +160,76 @@ func TestGenerateDDLStream_WrapsAttempt(t *testing.T) {
 	}
 }
 
+// reviewGood 合法的结构化审查 JSON。
+const reviewGood = `{"summary": "本批整体健康。", "issues": [
+  {"severity": "critical", "file": "a.go", "line": 12, "title": "空指针", "detail": "可能解引用 nil"},
+  {"severity": "nonsense", "file": "b.go", "line": -3, "title": "", "detail": "未知严重度与空标题应被清洗"}
+]}`
+
+// reviewBad 不是 JSON 的审查响应。
+const reviewBad = "这批代码写得不错,没有发现问题。"
+
+func TestReviewCodeStructured_Parses(t *testing.T) {
+	svc, _ := newTestService(reviewGood)
+
+	result, err := svc.ReviewCodeStructured(map[string]string{"a.go": "package a\n"})
+	if err != nil {
+		t.Fatalf("解析失败: %v", err)
+	}
+	if result.Summary != "本批整体健康。" {
+		t.Fatalf("summary 不符: %q", result.Summary)
+	}
+	if len(result.Issues) != 2 {
+		t.Fatalf("应有 2 条 issue,得到 %d", len(result.Issues))
+	}
+	// 未知 severity 降 minor;负行号归 0;空 title 用 detail 兜底(detail 不足 40 字时取全文)
+	cleaned := result.Issues[1]
+	if cleaned.Severity != "minor" || cleaned.Line != 0 || cleaned.Title != cleaned.Detail {
+		t.Fatalf("清洗规则不符: %+v", cleaned)
+	}
+}
+
+func TestReviewCodeStructured_RetriesOnBadJSON(t *testing.T) {
+	svc, mock := newTestService(reviewBad, reviewGood)
+
+	result, err := svc.ReviewCodeStructured(map[string]string{"a.go": "package a\n"})
+	if err != nil {
+		t.Fatalf("重试后应成功: %v", err)
+	}
+	if mock.i != 2 {
+		t.Fatalf("应调用两次,实际 %d 次", mock.i)
+	}
+	if !strings.Contains(mock.prompts[1], "has a problem") {
+		t.Fatalf("第二次提示应包含问题反馈: %.120s", mock.prompts[1])
+	}
+	if result.Summary == "" {
+		t.Fatal("summary 不应为空")
+	}
+}
+
+func TestReviewCodeStructured_TwiceInvalid(t *testing.T) {
+	svc, _ := newTestService(reviewBad, reviewBad)
+
+	if _, err := svc.ReviewCodeStructured(map[string]string{"a.go": "package a\n"}); err == nil {
+		t.Fatal("两次都无效时应返回错误")
+	}
+}
+
+func TestSynthesizeReview_Streams(t *testing.T) {
+	svc, _ := newTestService("## 总评\n先修空指针。")
+
+	var streamed strings.Builder
+	content, err := svc.SynthesizeReview([]string{"### app/user(2 个问题)\n整体健康。"}, func(d string) {
+		streamed.WriteString(d)
+	})
+	if err != nil {
+		t.Fatalf("汇总失败: %v", err)
+	}
+	if !strings.Contains(content, "总评") || streamed.String() != content {
+		t.Fatalf("汇总内容或流式累积不符: %q vs %q", content, streamed.String())
+	}
+}
+
 // partitionBad 无效划分:一个服务混入幻觉表,一个服务名为空,一个服务重复认领。
 const partitionBad = `[
   {"serviceName": "user", "tables": ["user", "user_role", "ghost_table"], "description": "用户"},

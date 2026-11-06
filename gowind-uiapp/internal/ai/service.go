@@ -332,8 +332,124 @@ func (s *Service) ReviewCode(fileContents map[string]string) (*StepResult, error
 	return &StepResult{Success: true, Content: content}, nil
 }
 
-// ReviewCodeStream ReviewCode 的流式版本:onDelta 逐块接收增量审查意见。
+// maxStructuredReviewAttempts 结构化审查的最大尝试次数:首次 + 至多一次修复重试。
+const maxStructuredReviewAttempts = 2
+
+// ReviewCodeStructured 单批结构化审查:输出 JSON 契约(summary+issues),
+// 解析失败或清洗后无有效内容时带原始响应重试一次。可经 CancelTask("review") 取消。
+func (s *Service) ReviewCodeStructured(fileContents map[string]string) (*ReviewResult, error) {
+	if len(fileContents) == 0 {
+		return nil, fmt.Errorf("没有可审查的代码文件")
+	}
+
+	ctx := s.taskCtx(taskReview)
+	defer s.finishTask(taskReview)
+
+	userPrompt := GetStructuredReviewPrompt(fileContents)
+
+	for attempt := 1; attempt <= maxStructuredReviewAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("已取消")
+		}
+		content, err := s.GetClient().Chat(ctx, structuredReviewSystemPrompt, userPrompt)
+		if err != nil {
+			return nil, fmt.Errorf("AI 审查失败: %s", friendlyError(ctx, err))
+		}
+
+		cleaned := strings.TrimSpace(cleanMarkdownFence(content))
+		result, perr := parseReviewResultJSON(cleaned)
+		problem := ""
+		if perr != nil {
+			problem = fmt.Sprintf("响应不是合法的审查 JSON 对象: %v", perr)
+		} else {
+			result.Issues = sanitizeReviewIssues(result.Issues, fileContents)
+			if result.Issues == nil {
+				result.Issues = []ReviewIssue{}
+			}
+			if result.Summary == "" {
+				result.Summary = "本批未给出摘要"
+			}
+			return result, nil
+		}
+
+		if attempt == maxStructuredReviewAttempts {
+			return nil, fmt.Errorf("审查结果连续 %d 次无效(%s)，最后响应: %s", maxStructuredReviewAttempts, problem, cleaned)
+		}
+		userPrompt = GetStructuredReviewFixPrompt(fileContents, cleaned, problem)
+	}
+
+	// 不可达:循环内必返回。
+	return nil, fmt.Errorf("结构化审查失败")
+}
+
+// parseReviewResultJSON 从清理后的 LLM 文本解析审查结果:
+// 先整体 Unmarshal,失败再退化为截取首个 "{" 到最后一个 "}" 的启发式。
+func parseReviewResultJSON(cleaned string) (*ReviewResult, error) {
+	var result ReviewResult
+	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+		start := strings.Index(cleaned, "{")
+		end := strings.LastIndex(cleaned, "}")
+		if start < 0 || end <= start {
+			return nil, err
+		}
+		if err2 := json.Unmarshal([]byte(cleaned[start:end+1]), &result); err2 != nil {
+			return nil, err2
+		}
+	}
+	return &result, nil
+}
+
+// reviewSeverities 合法严重度集合。
+var reviewSeverities = map[string]bool{
+	"critical": true,
+	"major":    true,
+	"minor":    true,
+	"info":     true,
+}
+
+// sanitizeReviewIssues 清洗 issue 清单:severity 白名单(未知降 minor)、
+// line 负数归 0、空 title 用 detail 前 40 字兜底。file 不在批次内也保留
+// (LLM 偶尔写相对路径变体,信息仍有效)。
+func sanitizeReviewIssues(issues []ReviewIssue, fileContents map[string]string) []ReviewIssue {
+	var valid []ReviewIssue
+	for _, iss := range issues {
+		if !reviewSeverities[iss.Severity] {
+			iss.Severity = "minor"
+		}
+		if iss.Line < 0 {
+			iss.Line = 0
+		}
+		if strings.TrimSpace(iss.Title) == "" {
+			detail := strings.TrimSpace(iss.Detail)
+			if len(detail) > 40 {
+				detail = detail[:40]
+			}
+			iss.Title = detail
+		}
+		if strings.TrimSpace(iss.Title) == "" {
+			continue // title 与 detail 全空,无信息量,丢弃
+		}
+		valid = append(valid, iss)
+	}
+	return valid
+}
+
+// SynthesizeReview 汇总各批次结果生成总评(markdown,流式)。
 // 可经 CancelTask("review") 取消。
+func (s *Service) SynthesizeReview(batchSummaries []string, onDelta func(string)) (string, error) {
+	if len(batchSummaries) == 0 {
+		return "", fmt.Errorf("没有可汇总的批次结果")
+	}
+
+	ctx := s.taskCtx(taskReview)
+	defer s.finishTask(taskReview)
+
+	content, err := s.GetClient().ChatStream(ctx, reviewSystemPrompt, GetReviewSynthesisPrompt(batchSummaries), onDelta)
+	if err != nil {
+		return "", fmt.Errorf("AI 汇总失败: %s", friendlyError(ctx, err))
+	}
+	return content, nil
+}
 func (s *Service) ReviewCodeStream(fileContents map[string]string, onDelta func(string)) (*StepResult, error) {
 	if len(fileContents) == 0 {
 		return &StepResult{Success: false, Error: "没有可审查的代码文件"}, nil
