@@ -590,6 +590,9 @@ func (a *App) AIGenerateDDL(requirements string) *ai.StepResult {
 		return &ai.StepResult{Success: false, Error: err.Error()}
 	}
 
+	// 与流式版本一致:需求与 DDL 自动落盘。
+	a.saveAIArtifactQuietly(ai.ArtifactRequirements, requirements)
+	a.saveAIArtifactQuietly(ai.ArtifactDDL, result.Content)
 	runtime.EventsEmit(a.ctx, "ai-ddl-generated")
 	return result
 }
@@ -616,6 +619,9 @@ func (a *App) AIGenerateDDLStream(requirements string) *ai.StepResult {
 	}
 
 	runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "ddl", "success": true})
+	// 产物自动落盘:需求与 DDL 一起存,后者是重跑划分/生成链的输入。
+	a.saveAIArtifactQuietly(ai.ArtifactRequirements, requirements)
+	a.saveAIArtifactQuietly(ai.ArtifactDDL, result.Content)
 	runtime.EventsEmit(a.ctx, "ai-ddl-generated")
 	return result
 }
@@ -631,6 +637,13 @@ func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "AI 微服务划分失败: %v", err)
 		return &ai.PartitionResult{Success: false, Error: err.Error()}
+	}
+
+	// 划分结果自动落盘,供换项目/重开应用后恢复。
+	if pi := a.getProjectInfo(); pi != nil {
+		if _, err := ai.SavePartitionsArtifact(pi.Root, partitions); err != nil {
+			runtime.LogWarningf(a.ctx, "划分结果落盘失败: %v", err)
+		}
 	}
 
 	return &ai.PartitionResult{Success: true, Partitions: partitions, Warnings: warnings}
@@ -745,6 +758,43 @@ func (a *App) AIReviewCodeStream(fileContents map[string]string) *ai.StepResult 
 
 	runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "review", "success": true})
 	return result
+}
+
+// ==================== AI 产物落盘 ====================
+
+// saveAIArtifactQuietly 把 AI 产物落盘到项目 .gowind/ai/ 目录。
+// 落盘失败仅告警不阻断主流程(与 AI 配置持久化同策略)。
+func (a *App) saveAIArtifactQuietly(kind ai.ArtifactKind, content string) {
+	pi := a.getProjectInfo()
+	if pi == nil {
+		return
+	}
+	if _, err := ai.SaveArtifact(pi.Root, kind, content); err != nil {
+		runtime.LogWarningf(a.ctx, "AI 产物(%s)落盘失败: %v", kind, err)
+	}
+}
+
+// SaveAIArtifact 把用户手动编辑的产物(需求/DDL)保存到项目 .gowind/ai/ 目录。
+func (a *App) SaveAIArtifact(kind string, content string) *ai.ArtifactSaveResult {
+	pi := a.getProjectInfo()
+	if pi == nil {
+		return &ai.ArtifactSaveResult{Success: false, Error: "未打开项目"}
+	}
+	path, err := ai.SaveArtifact(pi.Root, ai.ArtifactKind(kind), content)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "AI 产物保存失败: %v", err)
+		return &ai.ArtifactSaveResult{Success: false, Error: err.Error()}
+	}
+	return &ai.ArtifactSaveResult{Success: true, Path: path}
+}
+
+// LoadAIArtifacts 读取项目内已保存的 AI 产物(打开项目/进入面板时恢复现场)。
+func (a *App) LoadAIArtifacts() *ai.Artifacts {
+	pi := a.getProjectInfo()
+	if pi == nil {
+		return &ai.Artifacts{}
+	}
+	return ai.LoadArtifacts(pi.Root)
 }
 
 // ==================== 远程配置相关方法 ====================
