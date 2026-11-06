@@ -15,8 +15,8 @@ import {
   SaveAIArtifact,
   LoadAIReviewReport,
 } from '../../wailsjs/go/main/App'
-import {EventsOn} from '../../wailsjs/runtime'
 import type {ai} from '../../wailsjs/go/models'
+import {EventsOn} from '../../wailsjs/runtime'
 import {useProject} from './project'
 
 // ==================== 模式 ====================
@@ -66,6 +66,10 @@ const reviewResult = ref('')
 const reviewReports = ref<ai.ReviewFile[]>([])
 // 正在回看的历史报告名;空串表示展示实时/最新审查结果
 const reviewViewName = ref('')
+// map-reduce 批次进度与结构化 issue(ai:review-batch 事件驱动)
+const reviewBatches = ref<{index: number; total: number; label: string; issueCount: number}[]>([])
+const reviewBatchTotal = ref(0)
+const reviewIssues = ref<ai.ReviewIssue[]>([])
 
 const hasPartitions = computed(() => partitions.value.length > 0)
 
@@ -96,6 +100,20 @@ function bindEvents() {
   // 绑定在 store 级单例上且不随页面卸载退订:生成/审查在后台继续,
   // 用户切走再切回仍能接上流式内容。
   EventsOn('ai:stream', onAIStream)
+  // map-reduce 审查的批次进度:逐批点亮
+  EventsOn('ai:review-batch', (data: any) => {
+    if (!data || typeof data.index !== 'number') return
+    reviewBatchTotal.value = data.total || 0
+    reviewBatches.value = [
+        ...reviewBatches.value.filter(b => b.index !== data.index),
+        {
+          index: data.index,
+          total: data.total,
+          label: typeof data.label === 'string' ? data.label : '',
+          issueCount: typeof data.issueCount === 'number' ? data.issueCount : 0,
+        },
+    ].sort((a, b) => a.index - b.index)
+  })
   // 审查报告落盘后只刷新报告列表——不能全量 loadArtifacts,
   // 否则磁盘值会覆盖用户尚未保存的 DDL/需求手动编辑。
   EventsOn('ai-review-saved', () => {
@@ -170,6 +188,9 @@ function resetForProject() {
   reviewResult.value = ''
   reviewViewName.value = ''
   reviewReports.value = []
+  reviewBatches.value = []
+  reviewBatchTotal.value = 0
+  reviewIssues.value = []
   // 未确认的后端生成计划随项目作废(服务端临时目录一并清理)
   if (backendPlan.value) {
     AIDiscardBackendPlan(backendPlan.value.planId || '').catch(() => {})
@@ -398,10 +419,14 @@ async function runReview() {
   reviewLoading.value = true
   reviewResult.value = ''
   reviewViewName.value = ''
+  reviewBatches.value = []
+  reviewBatchTotal.value = 0
+  reviewIssues.value = []
   try {
     const result = await AIReviewProject(reviewSelected.value)
     if (result.success) {
-      reviewResult.value = result.content
+      reviewResult.value = result.synthesis || ''
+      reviewIssues.value = result.issues || []
     }
     return result
   } finally {
@@ -449,6 +474,7 @@ export function useAI() {
     openapiFiles, openapiMessage, openapiLoading,
     reviewScanFiles, reviewScanWarnings, reviewScanLoading, reviewSelected,
     reviewLoading, reviewResult, reviewReports, reviewViewName,
+    reviewBatches, reviewBatchTotal, reviewIssues,
     // 动作
     initAI, loadArtifacts, resetForProject,
     generateDDL, saveArtifacts, partition, findOpenAPI,

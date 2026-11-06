@@ -543,6 +543,12 @@ export default {
       selectFiles: 'Select files to review (all selected by default)',
       reports: 'Past reports',
       viewing: 'Viewing report: {name}',
+      batchProgress: 'Review batches ({total} total)',
+      issuesCount: '{count} issue(s) found',
+      sevCritical: 'Critical',
+      sevMajor: 'Major',
+      sevMinor: 'Minor',
+      sevInfo: 'Info',
     },
   },
 }

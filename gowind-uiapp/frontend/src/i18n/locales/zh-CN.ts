@@ -570,6 +570,12 @@ export default {
       selectFiles: '选择要审查的文件（默认全选）',
       reports: '历史报告',
       viewing: '正在查看历史报告：{name}',
+      batchProgress: '审查批次（共 {total} 批）',
+      issuesCount: '发现 {count} 个问题',
+      sevCritical: '严重',
+      sevMajor: '重要',
+      sevMinor: '次要',
+      sevInfo: '提示',
     },
   },
 }

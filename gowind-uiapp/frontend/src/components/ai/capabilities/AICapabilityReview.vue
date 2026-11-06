@@ -12,8 +12,25 @@ const {projectInfo} = useProject()
 const {
   reviewScanFiles, reviewScanWarnings, reviewScanLoading, reviewSelected,
   reviewLoading, reviewResult, reviewReports, reviewViewName,
+  reviewBatches, reviewBatchTotal, reviewIssues,
   scanForReview, runReview, viewReview, cancelTask,
 } = useAI()
+
+// 严重度 → 标签颜色与文案
+const severityMeta: Record<string, {color: string; key: string}> = {
+  critical: {color: 'red', key: 'ai.review.sevCritical'},
+  major: {color: 'orange', key: 'ai.review.sevMajor'},
+  minor: {color: 'blue', key: 'ai.review.sevMinor'},
+  info: {color: 'default', key: 'ai.review.sevInfo'},
+}
+
+function severityColor(sev: string): string {
+  return severityMeta[sev]?.color || 'default'
+}
+
+function severityLabel(sev: string): string {
+  return t(severityMeta[sev]?.key || 'ai.review.sevInfo')
+}
 
 // 勾选项按路径展示,附文件大小
 const fileOptions = computed(() =>
@@ -98,6 +115,31 @@ async function handleViewReport(file: any) {
       <a-button v-if="reviewLoading" danger style="margin-top: 12px; margin-left: 8px" @click="cancelTask('review')">
         {{ t('ai.cancel') }}
       </a-button>
+
+      <!-- map-reduce 批次进度:逐批点亮 -->
+      <div v-if="reviewLoading && reviewBatchTotal > 0" class="batch-progress">
+        <span class="batch-progress-title">{{ t('ai.review.batchProgress', {total: reviewBatchTotal}) }}</span>
+        <a-tag
+            v-for="b in reviewBatches"
+            :key="b.index"
+            :color="b.issueCount > 0 ? 'orange' : 'green'"
+        >
+          {{ b.index }}/{{ reviewBatchTotal }} · {{ b.label }} · {{ b.issueCount }}
+        </a-tag>
+      </div>
+    </div>
+
+    <!-- 结构化 issue 列表:按严重度着色 -->
+    <div v-if="reviewIssues.length > 0" class="issue-list">
+      <h4>{{ t('ai.review.issuesCount', {count: reviewIssues.length}) }}</h4>
+      <div v-for="(iss, idx) in reviewIssues" :key="idx" class="issue-item">
+        <a-tag :color="severityColor(iss.severity)" class="sev-tag">{{ severityLabel(iss.severity) }}</a-tag>
+        <div class="issue-body">
+          <div class="issue-title">{{ iss.title }}</div>
+          <div class="issue-loc">{{ iss.file }}<template v-if="(iss.line ?? 0) > 0">:{{ iss.line }}</template></div>
+          <div v-if="iss.detail" class="issue-detail">{{ iss.detail }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- 历史报告列表 -->
@@ -168,6 +210,68 @@ async function handleViewReport(file: any) {
 .file-checkbox {
   margin: 0;
   word-break: break-all;
+}
+
+.batch-progress {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.batch-progress-title {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.issue-list {
+  margin-top: 16px;
+}
+
+.issue-list h4 {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.issue-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.issue-item:hover {
+  background: #fafafa;
+}
+
+.sev-tag {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.issue-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.issue-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.issue-loc {
+  font-family: monospace;
+  font-size: 12px;
+  color: #8c8c8c;
+  word-break: break-all;
+}
+
+.issue-detail {
+  font-size: 12px;
+  color: #595959;
+  margin-top: 2px;
 }
 
 .report-list {

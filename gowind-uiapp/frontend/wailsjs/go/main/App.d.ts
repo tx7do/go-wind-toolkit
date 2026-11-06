@@ -32,7 +32,7 @@ export function AIReviewCode(arg1:Record<string, string>):Promise<ai.StepResult>
 
 export function AIReviewCodeStream(arg1:Record<string, string>):Promise<ai.StepResult>;
 
-export function AIReviewProject(arg1:Array<string>):Promise<ai.StepResult>;
+export function AIReviewProject(arg1:Array<string>):Promise<ai.ReviewProjectResult>;
 
 export function AIReviewScan():Promise<ai.ReviewScanResult>;
 
