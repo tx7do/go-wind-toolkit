@@ -2,35 +2,82 @@ package ai
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
-	"github.com/tx7do/go-utils/ddl_parser"
+	// 独立 parser 模块要求显式注入表达式求值驱动,否则 New() 直接 panic
+	// (见 https://github.com/pingcap/parser/issues/43)。
+	_ "github.com/pingcap/tidb/pkg/parser/test_driver"
+
+	"github.com/pingcap/tidb/pkg/parser"
+	"github.com/pingcap/tidb/pkg/parser/ast"
 )
 
-// ValidateDDL 解析 DDL 文本,返回其中的表名清单(按出现顺序)。
-// 解析失败或未解析出任何 CREATE TABLE 都视为无效。
-// 注意:底层解析器对个别残缺语句可能跳过而非报错,因此这是"至少可用"级别的校验,
-// 不是完整的 SQL 语法检查。
-func ValidateDDL(sqlContent string) ([]string, error) {
+// DDLDiagnostic 单条 DDL 语法诊断。Line 从 1 起;Column 是解析器的字节近似列
+// (CJK 字符多的行会偏几个字符),用作编辑器标注足够。
+type DDLDiagnostic struct {
+	Line    int    `json:"line"`
+	Column  int    `json:"column"`
+	Message string `json:"message"`
+}
+
+// tidb 解析器的错误是纯文本,位置只存在于消息里,两种稳定格式:
+//   line %d column %d near "%s"...   (语法错, Scanner.Errorf)
+//   near '%s' at line %d             (词法错, ParseErrorWith)
+var (
+	reGrammarLineCol = regexp.MustCompile(`line (\d+) column (\d+)`)
+	reTokenAtLine    = regexp.MustCompile(`at line (\d+)`)
+)
+
+// extractDiagnostic 从解析错误的文本里提取行/列,提取不到则 0/0 仅留消息。
+func extractDiagnostic(err error) DDLDiagnostic {
+	msg := err.Error()
+	diag := DDLDiagnostic{Message: msg}
+	if m := reGrammarLineCol.FindStringSubmatch(msg); m != nil {
+		diag.Line, _ = strconv.Atoi(m[1])
+		diag.Column, _ = strconv.Atoi(m[2])
+	} else if m := reTokenAtLine.FindStringSubmatch(msg); m != nil {
+		diag.Line, _ = strconv.Atoi(m[1])
+	}
+	return diag
+}
+
+// ValidateDDLDetailed 用 tidb parser 做真语法校验,返回表名清单与诊断。
+// 解析器实例每次新建(New 便宜且实例非并发安全),免锁;空 charset 走默认
+// utf8mb4。语法错只回首个错误——够修复重试循环逐条收敛。
+func ValidateDDLDetailed(sqlContent string) ([]string, []DDLDiagnostic, error) {
 	if strings.TrimSpace(sqlContent) == "" {
-		return nil, fmt.Errorf("DDL 内容为空")
+		return nil, nil, fmt.Errorf("DDL 内容为空")
 	}
 
-	tables, err := ddlparser.ParseCreateTables(sqlContent)
+	p := parser.New()
+	stmts, _, err := p.Parse(sqlContent, "", "")
 	if err != nil {
-		return nil, fmt.Errorf("DDL 解析失败: %w", err)
+		diag := extractDiagnostic(err)
+		diags := []DDLDiagnostic{diag}
+		return nil, diags, fmt.Errorf("DDL 语法错误(第 %d 行): %s", diag.Line, diag.Message)
 	}
 
-	names := make([]string, 0, len(tables))
-	for _, t := range tables {
-		if name := strings.TrimSpace(t.Name); name != "" {
-			names = append(names, name)
+	names := make([]string, 0, len(stmts))
+	for _, stmt := range stmts {
+		if ct, ok := stmt.(*ast.CreateTableStmt); ok {
+			if name := strings.TrimSpace(ct.Table.Name.O); name != "" {
+				names = append(names, name)
+			}
 		}
 	}
 	if len(names) == 0 {
-		return nil, fmt.Errorf("DDL 中没有可识别的 CREATE TABLE 语句")
+		return nil, nil, fmt.Errorf("DDL 中没有可识别的 CREATE TABLE 语句")
 	}
-	return names, nil
+	return names, nil, nil
+}
+
+// ValidateDDL 解析 DDL 文本,返回其中的表名清单(按出现顺序)。
+// 解析失败或未解析出任何 CREATE TABLE 都视为无效。ValidateDDLDetailed 的薄包装。
+func ValidateDDL(sqlContent string) ([]string, error) {
+	tables, _, err := ValidateDDLDetailed(sqlContent)
+	return tables, err
 }
 
 // normalizeTableName 表名归一化:去空白与包裹符、统一小写,用于

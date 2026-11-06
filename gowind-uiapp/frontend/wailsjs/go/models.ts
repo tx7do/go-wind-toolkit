@@ -180,9 +180,26 @@ export namespace ai {
 	        this.maxTokens = source["maxTokens"];
 	    }
 	}
+	export class DDLDiagnostic {
+	    line: number;
+	    column: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DDLDiagnostic(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.line = source["line"];
+	        this.column = source["column"];
+	        this.message = source["message"];
+	    }
+	}
 	export class DDLValidateResult {
 	    success: boolean;
 	    tables?: string[];
+	    diagnostics?: DDLDiagnostic[];
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -193,8 +210,27 @@ export namespace ai {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.tables = source["tables"];
+	        this.diagnostics = this.convertValues(source["diagnostics"], DDLDiagnostic);
 	        this.error = source["error"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class MicroservicePartition {
 	    serviceName: string;

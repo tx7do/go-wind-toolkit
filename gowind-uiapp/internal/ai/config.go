@@ -70,9 +70,10 @@ type PartitionResult struct {
 
 // DDLValidateResult DDL 校验结果
 type DDLValidateResult struct {
-	Success bool     `json:"success"`
-	Tables  []string `json:"tables,omitempty"`
-	Error   string   `json:"error,omitempty"`
+	Success     bool            `json:"success"`
+	Tables      []string        `json:"tables,omitempty"`
+	Diagnostics []DDLDiagnostic `json:"diagnostics,omitempty"`
+	Error       string          `json:"error,omitempty"`
 }
 
 // BackendPlanFile 后端生成计划中的单个文件

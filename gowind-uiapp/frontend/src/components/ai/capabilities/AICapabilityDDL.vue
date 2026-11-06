@@ -1,15 +1,30 @@
 <script setup lang="ts">
+import {ref, watch} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
-import {RobotOutlined, SaveOutlined} from '@ant-design/icons-vue'
+import {RobotOutlined, SaveOutlined, SafetyCertificateOutlined} from '@ant-design/icons-vue'
+import {AIValidateDDL} from '../../../../wailsjs/go/main/App'
 import {useAI} from '../../../stores/ai'
 import MonacoEditor from '../../backend/MonacoEditor.vue'
+
+// 与 MonacoEditor 的 diagnostics prop 同形(script setup 不允许导出类型)
+interface EditorDiagnostic {
+  line: number
+  column: number
+  message: string
+}
 
 const {t} = useI18n()
 const {
   requirements, ddlContent, ddlGenerating, ddlAttempt,
   generateDDL, saveArtifacts, cancelTask,
 } = useAI()
+
+// 编辑器语法诊断:校验按钮/生成失败时回填,内容一变即清(陈旧标记误导)
+const ddlDiagnostics = ref<EditorDiagnostic[]>([])
+watch(ddlContent, () => {
+  ddlDiagnostics.value = []
+})
 
 async function handleGenerate() {
   if (!requirements.value.trim()) {
@@ -21,6 +36,33 @@ async function handleGenerate() {
     message.success(t('ai.ddl.generateSuccess'))
   } else {
     message.error(result?.error || t('ai.ddl.generateFailed'))
+    // 校验耗尽重试的失败消息带行列诊断,回填编辑器
+    const diag = extractDiagnosticFromMessage(result?.error || '')
+    if (diag) {
+      ddlDiagnostics.value = [diag]
+    }
+  }
+}
+
+// 从「DDL 语法错误(第 N 行): line X column Y near ...」格式的错误串还原诊断
+function extractDiagnosticFromMessage(msg: string): EditorDiagnostic | null {
+  const m = msg.match(/line (\d+) column (\d+)/)
+  if (!m) return null
+  return {line: parseInt(m[1], 10), column: parseInt(m[2], 10), message: msg}
+}
+
+async function handleValidate() {
+  if (!ddlContent.value.trim()) {
+    message.warning(t('ai.partition.ddlRequired'))
+    return
+  }
+  const result = await AIValidateDDL(ddlContent.value)
+  if (result.success) {
+    ddlDiagnostics.value = []
+    message.success(t('ai.ddl.validOk'))
+  } else {
+    ddlDiagnostics.value = result.diagnostics || []
+    message.warning(t('ai.ddl.validFailed', {count: ddlDiagnostics.value.length}))
   }
 }
 
@@ -40,6 +82,9 @@ async function handleSave() {
       <div class="card-title-row">
         <span>{{ t('ai.ddl.title') }}</span>
         <div class="card-actions">
+          <a-button :disabled="ddlGenerating || !ddlContent" @click="handleValidate">
+            <SafetyCertificateOutlined style="margin-right: 4px"/> {{ t('ai.ddl.validateBtn') }}
+          </a-button>
           <a-button :disabled="ddlGenerating || !ddlContent" @click="handleSave">
             <SaveOutlined style="margin-right: 4px"/> {{ t('ai.artifact.saveBtn') }}
           </a-button>
@@ -73,7 +118,7 @@ async function handleSave() {
         style="margin-bottom: 8px"
     />
 
-    <MonacoEditor v-model="ddlContent" db-type="mysql" height="360px"/>
+    <MonacoEditor v-model="ddlContent" db-type="mysql" height="360px" :diagnostics="ddlDiagnostics"/>
   </a-card>
 </template>
 

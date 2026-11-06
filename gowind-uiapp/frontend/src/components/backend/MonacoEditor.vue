@@ -26,12 +26,15 @@ self.MonacoEnvironment = {
   }
 }
 
+// 外部语法诊断(如 DDL 校验):line 1 起,column 为字节近似列(可 0),
+// 转成 Monaco 错误标记渲染。script setup 不允许导出类型,消费方各自声明同形类型。
 const props = defineProps<{
   modelValue?: string
   dbType?: 'mysql' | 'postgresql' | 'sqlite' | 'oracle'
   language?: string // 直接指定 Monaco 语言，如 typescript, vue, html, css, json, yaml 等
   height?: string | number
   readOnly?: boolean
+  diagnostics?: { line: number; column: number; message: string }[]
 }>()
 
 const emit = defineEmits<{
@@ -344,6 +347,8 @@ onMounted(() => {
   })
 
   emit('editorDidMount', editor)
+  // 挂载前已传入的诊断补一次应用(immediate watch 时 editor 还是 null)
+  applyDiagnostics(props.diagnostics)
 })
 
 // 监听外部值变化
@@ -352,6 +357,27 @@ watch(() => props.modelValue, (newVal) => {
     editor.setValue(newVal || '')
   }
 })
+
+// 外部语法诊断 → Monaco 错误标记(同 owner 重复调用即整体替换)。
+// 抽成函数:watch 触发与编辑器挂载完成两个时机都要应用。
+function applyDiagnostics(diags?: { line: number; column: number; message: string }[]) {
+  if (!editor) return
+  const model = editor.getModel()
+  if (!model) return
+  const markers: monaco.editor.IMarkerData[] = (diags || [])
+      .filter(d => d.message)
+      .map(d => ({
+        message: d.message,
+        severity: monaco.MarkerSeverity.Error,
+        startLineNumber: Math.max(1, d.line || 1),
+        startColumn: Math.max(1, d.column || 1),
+        endLineNumber: Math.max(1, d.line || 1),
+        endColumn: Math.max(2, (d.column || 1) + 1),
+      }))
+  monaco.editor.setModelMarkers(model, 'ddl-validator', markers)
+}
+
+watch(() => props.diagnostics, applyDiagnostics)
 
 // 监听语言变化
 watch(() => props.language, (newLang) => {

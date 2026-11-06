@@ -494,6 +494,9 @@ export default {
       generateSuccess: 'DDL 生成成功',
       generateFailed: 'DDL 生成失败',
       retrying: 'DDL 未通过解析校验，第 {attempt} 次自动修复重试',
+      validateBtn: '校验语法',
+      validOk: 'DDL 语法校验通过',
+      validFailed: '发现 {count} 处语法问题，已在编辑器标注',
     },
     partition: {
       title: '微服务划分',

@@ -467,6 +467,9 @@ export default {
       generateSuccess: 'DDL generated successfully',
       generateFailed: 'DDL generation failed',
       retrying: 'DDL failed validation; auto-fix retry #{attempt}',
+      validateBtn: 'Validate Syntax',
+      validOk: 'DDL syntax check passed',
+      validFailed: '{count} syntax issue(s) found, marked in the editor',
     },
     partition: {
       title: 'Microservice Partition',

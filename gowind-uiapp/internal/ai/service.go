@@ -176,13 +176,14 @@ func (s *Service) GenerateDDLValidated(requirements string, onDelta func(attempt
 		}
 
 		cleaned := cleanMarkdownFence(content)
-		_, verr := ValidateDDL(cleaned)
+		// 诊断已随 verr.Error() 带行列进入修复提示,这里无需单独取用
+		_, _, verr := ValidateDDLDetailed(cleaned)
 		if verr == nil {
 			return &StepResult{Success: true, Content: cleaned}, nil
 		}
 		lastErr = verr
 
-		// 修复重试:附上被否决的 DDL 与解析错误,要求完整重出。
+		// 修复重试:附上被否决的 DDL 与带行列的解析诊断,要求完整重出。
 		userPrompt = GetDDLFixPrompt(requirements, cleaned, verr.Error())
 	}
 

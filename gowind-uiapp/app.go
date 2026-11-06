@@ -670,12 +670,13 @@ func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
 	return &ai.PartitionResult{Success: true, Partitions: partitions, AvailableTables: ddlTables, Warnings: warnings}
 }
 
-// AIValidateDDL 校验 DDL 可解析并返回表名清单。
-// 前端编辑划分时进入编辑态用它取"未分配池"的基准清单,也可独立作校验用。
+// AIValidateDDL 校验 DDL 可解析并返回表名清单与语法诊断(带行列)。
+// 前端编辑划分时进入编辑态用它取"未分配池"的基准清单;DDL 卡片的
+// "校验语法"按钮用它把诊断画进 Monaco 编辑器。
 func (a *App) AIValidateDDL(ddl string) *ai.DDLValidateResult {
-	tables, err := ai.ValidateDDL(ddl)
+	tables, diags, err := ai.ValidateDDLDetailed(ddl)
 	if err != nil {
-		return &ai.DDLValidateResult{Success: false, Error: err.Error()}
+		return &ai.DDLValidateResult{Success: false, Tables: tables, Diagnostics: diags, Error: err.Error()}
 	}
 	return &ai.DDLValidateResult{Success: true, Tables: tables}
 }
