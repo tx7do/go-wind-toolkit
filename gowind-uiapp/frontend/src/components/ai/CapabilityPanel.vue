@@ -16,12 +16,12 @@ const {t} = useI18n()
 <template>
   <div class="capability-panel">
     <a-row :gutter="[12, 12]">
-      <a-col :span="12"><AICapabilityConfig/></a-col>
-      <a-col :span="12"><AICapabilityDDL/></a-col>
-      <a-col :span="12"><AICapabilityPartition/></a-col>
-      <a-col :span="12"><AICapabilityBackend/></a-col>
-      <a-col :span="12"><AICapabilityOpenAPI/></a-col>
-      <a-col :span="12"><AICapabilityReview/></a-col>
+      <a-col :xs="24" :md="12"><AICapabilityConfig/></a-col>
+      <a-col :xs="24" :md="12"><AICapabilityDDL/></a-col>
+      <a-col :xs="24" :md="12"><AICapabilityPartition/></a-col>
+      <a-col :xs="24" :md="12"><AICapabilityBackend/></a-col>
+      <a-col :xs="24" :md="12"><AICapabilityOpenAPI/></a-col>
+      <a-col :xs="24" :md="12"><AICapabilityReview/></a-col>
     </a-row>
   </div>
 </template>

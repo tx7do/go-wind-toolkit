@@ -402,13 +402,9 @@ export default {
   },
   ai: {
     steps: {
-      aiConfig: 'AI Config',
-      requirements: 'Requirements',
       generateDDL: 'Generate DDL',
       partition: 'Microservice Partition',
       backendGen: 'Generate Backend',
-      openapi: 'OpenAPI Docs',
-      review: 'AI Code Review',
     },
     mode: {
       panel: 'Capability Panel',

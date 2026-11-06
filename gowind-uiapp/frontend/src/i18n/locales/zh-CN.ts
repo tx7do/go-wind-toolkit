@@ -429,13 +429,9 @@ export default {
   },
   ai: {
     steps: {
-      aiConfig: 'AI 配置',
-      requirements: '需求输入',
       generateDDL: '生成 DDL',
       partition: '微服务划分',
       backendGen: '生成后端代码',
-      openapi: 'OpenAPI 文档',
-      review: 'AI 代码审查',
     },
     mode: {
       panel: '能力面板',
