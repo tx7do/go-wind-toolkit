@@ -19,13 +19,20 @@ type Project struct {
 	Module string
 }
 
-// New a project from remote repo.
+// New a project from a git repo, or from a local template directory when
+// layout points at one (免 clone,替换机制与仓库路径完全一致).
 func (p *Project) New(ctx context.Context, dir string, layout string, branch string) error {
 	to := filepath.Join(dir, p.Name)
 
-	repo := pkg.NewRepo(layout, branch)
-	if err := repo.CopyTo(ctx, to, p.Name, []string{".git", ".github"}); err != nil {
-		return err
+	if isLocalTemplateDir(layout) {
+		if err := pkg.CopyLocalTemplate(layout, to, p.Name, []string{".git", ".github"}); err != nil {
+			return err
+		}
+	} else {
+		repo := pkg.NewRepo(layout, branch)
+		if err := repo.CopyTo(ctx, to, p.Name, []string{".git", ".github"}); err != nil {
+			return err
+		}
 	}
 
 	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, TemplateModuleName, p.Module)
@@ -47,10 +54,17 @@ func (p *Project) Add(ctx context.Context, dir string, layout string, branch str
 	log.Printf("🚀 Add service %s, layout repo is %s, please wait a moment.\n\n", p.Name, layout)
 
 	pkgPath = fmt.Sprintf("%s/%s", mod, pkgPath)
-	repo := pkg.NewRepo(layout, branch)
-	err := repo.CopyToV2(ctx, to, pkgPath, repoAddIgnores, []string{filepath.Join(p.Path, "api"), "api"})
-	if err != nil {
-		return err
+	if isLocalTemplateDir(layout) {
+		if err := pkg.CopyLocalTemplateV2(layout, to, pkgPath, repoAddIgnores,
+			[]string{filepath.Join(p.Path, "api"), "api"}); err != nil {
+			return err
+		}
+	} else {
+		repo := pkg.NewRepo(layout, branch)
+		err := repo.CopyToV2(ctx, to, pkgPath, repoAddIgnores, []string{filepath.Join(p.Path, "api"), "api"})
+		if err != nil {
+			return err
+		}
 	}
 
 	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, TemplateModuleName, p.Module)

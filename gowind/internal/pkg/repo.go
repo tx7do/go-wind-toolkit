@@ -140,3 +140,47 @@ func ModulePath(filename string) (string, error) {
 	}
 	return modfile.ModulePath(modBytes), nil
 }
+
+// CopyLocalTemplate 把本地模板目录拷到项目路径——免 clone 的 Repo.CopyTo 等价物。
+// 替换机制一致:读模板 go.mod 的 module 名,以 [模板module, modPath] 对做字节替换。
+// 适合团队自持的脚手架模板目录(版本管理完全交给模板目录自身)。
+func CopyLocalTemplate(srcDir, to, modPath string, ignores []string) error {
+	abs, err := filepath.Abs(srcDir)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		return fmt.Errorf("模板目录不存在: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("模板路径不是目录: %s", abs)
+	}
+	mod, err := ModulePath(filepath.Join(abs, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("模板缺少可解析的 go.mod: %w", err)
+	}
+	return copyDir(abs, to, []string{mod, modPath}, ignores)
+}
+
+// CopyLocalTemplateV2 是 CopyLocalTemplate 的多替换对版本(等价 Repo.CopyToV2),
+// 供 `gow add service` 的本地模板路径使用。
+func CopyLocalTemplateV2(srcDir, to, modPath string, ignores, replaces []string) error {
+	abs, err := filepath.Abs(srcDir)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		return fmt.Errorf("模板目录不存在: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("模板路径不是目录: %s", abs)
+	}
+	mod, err := ModulePath(filepath.Join(abs, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("模板缺少可解析的 go.mod: %w", err)
+	}
+	replaces = append([]string{mod, modPath}, replaces...)
+	return copyDir(abs, to, replaces, ignores)
+}

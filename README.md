@@ -36,6 +36,7 @@ go-wind-toolkit/
 | Ent / GORM 模型生成 | ✅ | ✅ |
 | Protobuf gRPC & REST 定义生成 | ✅ | ✅ |
 | Wire 依赖注入生成 | ✅ | ✅ |
+| 前端 CRUD 页面生成 (`gow frontend`) | ✅ | ✅ |
 | 微服务模块提取 (`gow extract`) | ✅ | — |
 | 配置导出到 Consul / Etcd / Nacos | — | ✅ |
 | 可视化表配置与服务分配 | — | ✅ |
@@ -88,6 +89,17 @@ go install github.com/tx7do/go-wind-toolkit/gowind/cmd/gow@latest
 gow new myproject
 cd myproject && go mod tidy
 ```
+
+使用自定义模板（本地目录或任意 git 仓库，替换机制与内置模板一致：模板 go.mod 的 module 名会被改写为目标模块名）：
+
+```shell
+# 本地模板目录（免 clone,适合团队自持脚手架）
+gow new myproject --template ./path/to/template-dir
+
+# 任意模板仓库(等价 -r)
+gow new myproject --template https://github.com/your-org/your-template.git
+```
+
 
 ### 添加服务
 
@@ -175,6 +187,16 @@ gow version
 
 `go install` 安装时自动回落显示模块版本；本地源码构建显示 `dev`。
 
+### 环境体检
+
+```shell
+gow doctor
+```
+
+检查 gow 与生成管线依赖的外部工具（go / git / protoc / buf / wire / node / 各 protoc-gen-* 插件）是否可用，
+并报告 `go install` 落点是否在 PATH 上（protoc 找不到插件的最常见原因）。必需工具缺失时退出码非 0。
+
+
 ### 从数据库生成 CRUD 代码
 
 ```shell
@@ -198,6 +220,27 @@ gow generate --dsn "postgres://user:pass@localhost:5432/dbname" --service admin 
 # 生成 REST 服务（代理自 gRPC 服务）
 gow generate --dsn "mysql://..." --service user-admin \
   --servers rest --source-module user --skip-orm
+```
+
+### 前端 CRUD 页面生成（gow frontend）
+
+从 OpenAPI 3.0 规范生成前端管理页代码，支持 Vue 3 + Element Plus、Vue 3 + Vben Admin、React + Ant Design Pro 三种框架，产物与桌面端一致（同一生成引擎 `pkg/frontendgen`）：
+
+```shell
+# 列出规范中可生成的服务（tag）
+gow frontend parse --openapi ./api/openapi.yaml
+
+# 预览将生成的文件清单，不写盘
+gow frontend gen --openapi http://localhost:8000/q/openapi.yaml \
+  --framework vue-vben --dry-run
+
+# 生成到前端项目 src 目录
+gow frontend gen --openapi ./api/openapi.yaml \
+  --framework vue-element --out ./admin-web/src
+
+# 只生成指定服务/文件类型
+gow frontend gen --openapi ./api/openapi.yaml --framework react \
+  --out ./admin-web/src --tags RoleService --types composable,page,drawer
 ```
 
 ### Ent 代码生成
@@ -250,6 +293,19 @@ gow migrate admin --dialect mysql --db-version 5.7
 ```
 
 `gow migrate` 把 `app/<服务>/service/internal/data/ent` 的 ent schema 逆向为 `CREATE TABLE` 脚本（通过 ent 的 `schema.DDL` 离线规划，**无需连接数据库**），默认写入各服务的 `migrations/schema.<方言>.sql`。缺失的 ent 代码生成会自动补齐（同 `gow ent`）；非 ent（gorm）服务自动跳过。产物可直接作为 Atlas 基线迁移或用于审查 schema 状态。
+
+版本化迁移（基于 ent 的 `NamedDiff`，需要 `--url` 指向真实数据库）：
+
+```shell
+# Atlas 格式版本化迁移(对比数据库现状生成增量 SQL)
+gow migrate admin --versioned --url "mysql://user:pass@localhost:3306/dbname"
+
+# 指定迁移工具格式(atlas / golang-migrate / goose / db-mate / flyway / liquibase)
+gow migrate admin --versioned --tool goose --name init_schema \
+  --url "postgres://user:pass@localhost:5432/dbname"
+```
+
+`--versioned` 模式生成**增量**迁移文件（而非全量 DDL），写入各服务的 `migrations/` 目录；`--name` 为迁移命名（默认 `changes`，仅保留 `[a-z0-9_-]`）。
 
 ### 微服务演进（模块提取）
 

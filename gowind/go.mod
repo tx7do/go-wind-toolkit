@@ -7,7 +7,6 @@ require (
 	entgo.io/contrib v0.7.0
 	entgo.io/ent v0.14.5
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-openapi/inflect v0.21.5
 	github.com/go-sql-driver/mysql v1.9.3

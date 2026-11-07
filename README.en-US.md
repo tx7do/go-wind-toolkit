@@ -36,6 +36,7 @@ go-wind-toolkit/
 | Ent / GORM model generation | ✅ | ✅ |
 | Protobuf gRPC & REST definition generation | ✅ | ✅ |
 | Wire dependency injection generation | ✅ | ✅ |
+| Frontend CRUD page generation (`gow frontend`) | ✅ | ✅ |
 | Microservice module extraction (`gow extract`) | ✅ | — |
 | Config export to Consul / Etcd / Nacos | — | ✅ |
 | Visual table configuration & service assignment | — | ✅ |
@@ -88,6 +89,17 @@ go install github.com/tx7do/go-wind-toolkit/gowind/cmd/gow@latest
 gow new myproject
 cd myproject && go mod tidy
 ```
+
+Use a custom template (a local directory or any git repo; the replacement mechanism is identical to the built-in template — the template go.mod module path is rewritten to the target module):
+
+```shell
+# Local template directory (no clone, good for team-owned scaffolds)
+gow new myproject --template ./path/to/template-dir
+
+# Any template repository (equivalent to -r)
+gow new myproject --template https://github.com/your-org/your-template.git
+```
+
 
 ### Add a Service
 
@@ -175,6 +187,15 @@ gow version
 
 Binaries installed via `go install` fall back to the module version; local source builds show `dev`.
 
+### Environment Check
+
+```shell
+gow doctor
+```
+
+Checks whether the external tools gow and the generation pipelines depend on (go / git / protoc / buf / wire / node / the protoc-gen-* plugins) are available, and reports whether the `go install` target is on PATH (the most common reason protoc cannot find plugins). Exits non-zero when a required tool is missing.
+
+
 ### Generate CRUD Code from Database
 
 ```shell
@@ -198,6 +219,24 @@ gow generate --dsn "postgres://user:pass@localhost:5432/dbname" --service admin 
 # Generate REST service (proxying from gRPC service)
 gow generate --dsn "mysql://..." --service user-admin \
   --servers rest --source-module user --skip-orm
+```
+
+### Frontend CRUD Page Generation (gow frontend)
+
+Generate frontend admin pages from an OpenAPI 3.0 spec. Supports Vue 3 + Element Plus, Vue 3 + Vben Admin and React + Ant Design Pro. Output is identical to the desktop client (same engine, `pkg/frontendgen`):
+
+```shell
+# List the services (tags) available in the spec
+gow frontend parse --openapi ./api/openapi.yaml
+
+# Preview the generated file list without writing anything
+gow frontend gen --openapi http://localhost:8000/q/openapi.yaml   --framework vue-vben --dry-run
+
+# Generate into the frontend project's src directory
+gow frontend gen --openapi ./api/openapi.yaml   --framework vue-element --out ./admin-web/src
+
+# Only generate selected services / file types
+gow frontend gen --openapi ./api/openapi.yaml --framework react   --out ./admin-web/src --tags RoleService --types composable,page,drawer
 ```
 
 ### Ent Code Generation
@@ -255,6 +294,21 @@ database connection needed**), written to `migrations/schema.<dialect>.sql` of
 each service by default. Missing ent codegen is filled in automatically (as
 `gow ent` does); non-ent (gorm) services are skipped. The output works as an
 Atlas baseline migration or for reviewing schema state.
+
+Versioned migrations (built on ent's `NamedDiff`; requires `--url` pointing at
+a real database):
+
+```shell
+# Atlas-format versioned migration (diffs against the live database)
+gow migrate admin --versioned --url "mysql://user:pass@localhost:3306/dbname"
+
+# Pick the migration tool format (atlas / golang-migrate / goose / db-mate / flyway / liquibase)
+gow migrate admin --versioned --tool goose --name init_schema   --url "postgres://user:pass@localhost:5432/dbname"
+```
+
+The `--versioned` mode produces **incremental** migration files (rather than a
+full DDL dump), written to each service's `migrations/` directory; `--name`
+names the migration (default `changes`, restricted to `[a-z0-9_-]`).
 
 ### Microservice Evolution (Module Extraction)
 

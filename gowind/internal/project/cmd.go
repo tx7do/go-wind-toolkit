@@ -30,12 +30,13 @@ var CmdProject = &cobra.Command{
 }
 
 var (
-	repoURL    string
-	branch     string
-	timeout    string
-	moduleName string
-	nomod      bool
-	skipCI     bool
+	repoURL     string
+	templateDir string
+	branch      string
+	timeout     string
+	moduleName  string
+	nomod       bool
+	skipCI      bool
 )
 
 const (
@@ -56,6 +57,7 @@ func init() {
 	timeout = "60s"
 
 	CmdProject.Flags().StringVarP(&repoURL, "repo-url", "r", GithubRepoURL, "layout repo")
+	CmdProject.Flags().StringVar(&templateDir, "template", "", "template source: a local directory or a git repo URL (overrides -r)")
 	CmdProject.Flags().StringVarP(&branch, "branch", "b", branch, "repo branch")
 	CmdProject.Flags().StringVarP(&timeout, "timeout", "t", timeout, "time out")
 	CmdProject.Flags().StringVarP(&moduleName, "module", "m", moduleName, "set go module name, if not set, use project name")
@@ -64,10 +66,13 @@ func init() {
 }
 
 func Run(cmd *cobra.Command, args []string) error {
-	// Default endpoint (no explicit -r): prefer GitHub, fall back to Gitee if
-	// unreachable. Probed here rather than in init() so unrelated commands
-	// don't pay a blocking network round-trip on startup.
-	if !cmd.Flags().Changed("repo-url") {
+	// --template 显式指定模板源(本地目录或仓库 URL),优先于 -r 与端点探测。
+	if templateDir != "" {
+		repoURL = templateDir
+	} else if !cmd.Flags().Changed("repo-url") {
+		// Default endpoint (no explicit -r): prefer GitHub, fall back to Gitee if
+		// unreachable. Probed here rather than in init() so unrelated commands
+		// don't pay a blocking network round-trip on startup.
 		if canReach("github.com:443", 3*time.Second) {
 			repoURL = GithubRepoURL
 		} else {
