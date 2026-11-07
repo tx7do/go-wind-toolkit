@@ -263,6 +263,15 @@ gow openapi api --out app/admin/service/cmd/server/assets
 go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
 ```
 
+### 客户端 SDK 生成（gow client）
+
+用本仓库的客户端插件从 proto 生成 TS / Dart HTTP 客户端，写入前端/移动端仓库：
+
+```shell
+gow client typescript api --out ../admin-web/src/api/generated
+gow client dart api --out ../mobile/lib/api
+```
+
 ### Ent 代码生成
 
 ```shell

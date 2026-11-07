@@ -260,6 +260,15 @@ gow openapi api --out app/admin/service/cmd/server/assets
 go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
 ```
 
+### Client SDK Generation (gow client)
+
+Generate TS / Dart HTTP clients from your protos using this repo's client plugins, written into the frontend/mobile repos:
+
+```shell
+gow client typescript api --out ../admin-web/src/api/generated
+gow client dart api --out ../mobile/lib/api
+```
+
 ### Ent Code Generation
 
 ```shell
