@@ -313,9 +313,8 @@ func (g *GoGenerator) GenerateService(ctx context.Context, opts code_generator.O
 	return g.Generate(ctx, opts, "service.tpl")
 }
 
-// GenerateServiceTest 渲染 service 的单测骨架(fake 仓储 + 参数守卫用例)。
-// 仅在 UseRepo(gRPC + 本地仓储)形态下有意义;其余形态静默跳过——
-// REST 服务消费的 proto client 本身就是接口,无需 fake 接缝。
+// GenerateServiceTest 渲染 service 的单测骨架 + 参数守卫用例:
+// repo 形态为 fake 仓储,BFF 形态为嵌入接口的 fake client。
 func (g *GoGenerator) GenerateServiceTest(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {
 	if g.CodeGenerator == nil {
 		return "", os.ErrInvalid
@@ -323,9 +322,7 @@ func (g *GoGenerator) GenerateServiceTest(ctx context.Context, opts code_generat
 
 	applyServiceDefaults(opts)
 
-	if useRepo, _ := opts.Vars["UseRepo"].(bool); !useRepo {
-		return "", nil
-	}
+	// repo 形态(BFF 则是 proto client 接口)都有骨架,模板内按 UseRepo 分支。
 
 	modelName, _ := opts.Vars["Model"].(string)
 	opts.OutputName = stringcase.ToSnakeCase(modelName) + "_service_test.go"

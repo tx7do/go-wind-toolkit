@@ -53,6 +53,7 @@ func TestCompileE2E_GeneratedServiceCompilesAndTestsPass(t *testing.T) {
 	variants := []compileVariant{
 		{name: "grpc-ent", servers: []string{"grpc"}, orm: "ent", useRepo: true, entCodegen: true, extraPlugins: []string{"protoc-gen-go-grpc"}},
 		{name: "rest-ent", servers: []string{"grpc", "rest"}, orm: "ent", useRepo: true, entCodegen: true, extraPlugins: []string{"protoc-gen-go-grpc", "protoc-gen-go-http"}},
+		{name: "rest-bff", servers: []string{"rest"}, orm: "ent", useRepo: false, entCodegen: false, extraPlugins: []string{"protoc-gen-go-grpc", "protoc-gen-go-http"}},
 		{name: "grpc-gorm", servers: []string{"grpc"}, orm: "gorm", useRepo: true, entCodegen: false, extraPlugins: []string{"protoc-gen-go-grpc"}},
 	}
 	for _, v := range variants {
@@ -96,6 +97,8 @@ func runCompileVariant(t *testing.T, v compileVariant) {
 	ddl := `CREATE TABLE users (
 	id bigint(20) NOT NULL AUTO_INCREMENT,
 	name varchar(100) NOT NULL COMMENT '用户名',
+	created_by bigint unsigned NOT NULL DEFAULT 0 COMMENT '创建人',
+	updated_by bigint unsigned NOT NULL DEFAULT 0 COMMENT '更新人',
 	score int(10) unsigned NOT NULL DEFAULT 0,
 	is_active tinyint(1) NOT NULL DEFAULT 1,
 	created_at datetime,
@@ -105,6 +108,8 @@ func runCompileVariant(t *testing.T, v compileVariant) {
 CREATE TABLE orders (
 	id bigint(20) NOT NULL AUTO_INCREMENT,
 	total decimal(10,2) NOT NULL,
+	created_by bigint unsigned NOT NULL DEFAULT 0,
+	updated_by bigint unsigned NOT NULL DEFAULT 0,
 	PRIMARY KEY (id)
 );`
 
@@ -112,14 +117,15 @@ CREATE TABLE orders (
 		Source:           ddl,
 		OrmType:          v.orm,
 		UseRepo:          v.useRepo,
-		// proto/ORM/data/service/server/tests 是可独立编译的产物;main/config/
-		// makefile 依赖模板仓的 pkg/serviceid 与手写装配,scratch 里没有,剔除。
+		// proto/service/server/单测骨架是可独立编译的产物(骨架按 useRepo 分
+		// fake 仓储/fake client 两形态);main/config/makefile 依赖模板仓的
+		// pkg/serviceid 与手写装配,scratch 里没有,剔除。
 		GenerateProto:    true,
 		GenerateORM:      v.useRepo,
 		GenerateData:     v.useRepo,
 		GenerateService:  true,
 		GenerateServer:   true,
-		GenerateTests:    v.useRepo,
+		GenerateTests:    true,
 		GenerateMain:     false,
 		GenerateConfig:   false,
 		GenerateMakefile: false,
@@ -131,11 +137,9 @@ CREATE TABLE orders (
 		OutputPath:       scratch,
 	}))
 
-	// 生成的测试骨架必须在场(门禁主对象之一,仅 repo 形态产出)。
-	if v.useRepo {
-		testFile := filepath.Join(scratch, "app", service, "service", "internal", "service", "user_service_test.go")
-		assert.FileExists(t, testFile, "service 单测骨架应已生成")
-	}
+	// 生成的测试骨架必须在场(门禁主对象之一)。
+	testFile := filepath.Join(scratch, "app", service, "service", "internal", "service", "user_service_test.go")
+	assert.FileExists(t, testFile, "service 单测骨架应已生成")
 
 	// 顺序必须是 buf → ent → tidy:新鲜产物没有 gen/go 与 ent client 时,
 	// tidy 会把 scratch.local/<缺失包> 当外部模块去网上解析,必挂。
@@ -302,6 +306,19 @@ func bufGenerate(t *testing.T, protoDir, module string, extraPlugins ...string) 
 		_ = os.MkdirAll(assetsDir, 0o755)
 		_ = os.WriteFile(filepath.Join(assetsDir, "openapi.yaml"),
 			[]byte("openapi: 3.0.3\ninfo:\n  title: placeholder\n  version: \"0.0.1\"\npaths: {}\n"), 0o644)
+	}
+
+	// 环境补齐:REST service 引用模板仓的 pkg/middleware/auth(写操作人),
+	// 写最小同形桩(真实项目由脚手架模板提供)。
+	if serversHasRest(extraPlugins) {
+		root := filepath.Join(out, "..", "..", "..")
+		authDir := filepath.Join(root, "pkg", "middleware", "auth")
+		_ = os.MkdirAll(authDir, 0o755)
+		_ = os.WriteFile(filepath.Join(authDir, "auth.go"), []byte(
+			"package auth\n\nimport \"context\"\n\n"+
+				"type UserTokenPayload struct{ UserId uint64 }\n\n"+
+				"func (p *UserTokenPayload) GetUserId() uint64 { if p == nil { return 0 }; return p.UserId }\n\n"+
+				"func FromContext(_ context.Context) (*UserTokenPayload, error) { return &UserTokenPayload{}, nil }\n"), 0o644)
 	}
 
 	// 环境补齐:repo 模板调用包级 ErrorXxx 助手,真实项目由其错误码方案

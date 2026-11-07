@@ -266,7 +266,24 @@ func (g *Generator) generateProtobufCode(ctx context.Context, opts GeneratorOpti
 		return nil, err
 	}
 
+	// 纯 rest 配置也要产出基础 proto:rest 形态的 i_<模型>.proto(BFF 接口)
+	// import 基础 <模型>.proto,而基础定义只随 grpc 形态产出——缺了它,
+	// rest 接口 proto 的 import 全部悬空(BFF 产物不可编译)。
+	hasGrpc, hasRest := false, false
 	for _, server := range opts.Servers {
+		if server == "grpc" {
+			hasGrpc = true
+		}
+		if server == "rest" {
+			hasRest = true
+		}
+	}
+	servers := opts.Servers
+	if hasRest && !hasGrpc {
+		servers = append([]string{"grpc"}, servers...)
+	}
+
+	for _, server := range servers {
 		if server != "grpc" && server != "rest" {
 			continue
 		}

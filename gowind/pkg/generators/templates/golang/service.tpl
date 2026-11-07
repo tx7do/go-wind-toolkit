@@ -74,7 +74,7 @@ func (s *{{.ClassName}}) Create(ctx context.Context, req *{{.SourceApiPackage}}.
 	// 获取操作人信息
 	operator, err := auth.FromContext(ctx)
 	if err != nil {
-		return &emptypb.Empty{}, err
+		return nil, err
 	}
 
 	req.Data.CreatedBy = trans.Ptr(operator.GetUserId())
