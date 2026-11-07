@@ -269,6 +269,16 @@ gow client typescript api --out ../admin-web/src/api/generated
 gow client dart api --out ../mobile/lib/api
 ```
 
+### Config Export (gow config)
+
+Export each service's `service/configs` files to a remote config center, same engine as the desktop client:
+
+```shell
+gow config services --path ./backend          # list exportable services
+gow config export --type consul --endpoint http://localhost:8500   --project demo --path ./backend             # export all services
+gow config export --type nacos --endpoint http://nacos:8848   --project demo --group DEFAULT_GROUP --service admin --dry-run
+```
+
 ### Ent Code Generation
 
 ```shell

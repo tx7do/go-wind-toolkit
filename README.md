@@ -272,6 +272,16 @@ gow client typescript api --out ../admin-web/src/api/generated
 gow client dart api --out ../mobile/lib/api
 ```
 
+### 配置导出（gow config）
+
+把 app/<服务>/service/configs 下的配置文件导出到远程配置中心，与桌面端同一引擎：
+
+```shell
+gow config services --path ./backend          # 列出可导出的服务
+gow config export --type consul --endpoint http://localhost:8500   --project demo --path ./backend             # 导出全部服务
+gow config export --type nacos --endpoint http://nacos:8848   --project demo --group DEFAULT_GROUP --service admin --dry-run
+```
+
 ### Ent 代码生成
 
 ```shell
