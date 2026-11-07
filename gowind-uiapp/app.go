@@ -182,6 +182,11 @@ func (a *App) SetGeneratorOption(options generator.GeneratorOptions) {
 	a.generator.SetOptions(options)
 }
 
+// SetGenerateTests 开关 CRUD service 的单测骨架生成(fake 仓储)
+func (a *App) SetGenerateTests(enable bool) {
+	a.generator.SetGenerateTests(enable)
+}
+
 // EditGeneratorOption 编辑代码生成选项
 func (a *App) EditGeneratorOption(o *generator.Option) {
 	a.generator.EditOption(o)

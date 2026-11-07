@@ -96,6 +96,7 @@ func toolDefinitions() []toolDef {
 				"ddl":         map[string]any{"type": "string", "description": "CREATE TABLE 语句文本"},
 				"ormType":     map[string]any{"type": "string", "enum": []string{"ent", "gorm"}, "description": "ORM 类型,默认 ent"},
 				"partitions":  map[string]any{"type": "array", "items": map[string]any{"type": "object"}, "description": "微服务划分 [{serviceName, tables[], description}]"},
+				"withTests":   map[string]any{"type": "boolean", "description": "为 CRUD service 追加单测骨架(fake 仓储),默认 false"},
 			}, "projectRoot", "ddl", "partitions"),
 		},
 		{
@@ -165,6 +166,7 @@ type planBackendArgs struct {
 	DDL         string          `json:"ddl"`
 	ORMType     string          `json:"ormType"`
 	Partitions  json.RawMessage `json:"partitions"`
+	WithTests   bool            `json:"withTests"`
 }
 
 type applyBackendArgs struct {
@@ -419,7 +421,9 @@ func (s *Server) handlePlanBackend(args json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("初始化预览目录失败: %w", err)
 	}
 	s.gen.SetSkipPostProcess(true)
+	s.gen.SetGenerateTests(a.WithTests)
 	genErr := s.gen.GenerateGrpcCode(s.ctx, *dbCfg, ormType, "per-table", tmpDir, modPath, []string{"grpc"})
+	s.gen.SetGenerateTests(false)
 	s.gen.SetSkipPostProcess(false)
 	os.Remove(stubGoMod)
 	if genErr != nil {

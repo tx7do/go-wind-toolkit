@@ -109,6 +109,7 @@ export function SelectFolder():Promise<string>;
 export function SetAIConfig(arg1:ai.Config):Promise<void>;
 
 export function SetDBConfig(arg1:database.DBConfig):Promise<void>;
+export function SetGenerateTests(arg1:boolean):Promise<void>;
 
 export function SetGeneratorOption(arg1:generator.GeneratorOptions):Promise<void>;
 

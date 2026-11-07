@@ -108,6 +108,8 @@ gowind-uiapp backend grpc --ddl schema.sql --mapping tables.json \
 
 产物位于 `<out>/app/<服务名>/service/`，与 GUI 的 gRPC/REST 生成完全同源。
 
+`--tests` 为每个 CRUD service 追加单测骨架（fake 仓储 + 参数守卫用例，不依赖数据库；仅 gRPC + 本地仓储形态产出）。GUI 后端向导的「生成测试骨架」开关与 MCP `plan_backend` 的 `withTests` 参数同源。
+
 `--servers` 可选 `grpc` / `rest` / `websocket`（逗号分隔，缺省 `grpc`）。`websocket` 是消息驱动传输，只生成 `websocket_server.go`（不承载逐表 proto 服务），并在 `initApp` 装配里注入 `wsServer`/`wsMiddlewares`；它是**惰性**的——需在配置里补 `server.websocket` 段后才真正生效。GUI 后端向导的「传输层」多选框与此同源。
 
 ## frontend — 前端 CRUD 代码生成

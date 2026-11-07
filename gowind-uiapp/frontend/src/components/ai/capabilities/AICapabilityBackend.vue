@@ -13,6 +13,7 @@ const {projectInfo} = useProject()
 const {
   ormType, partitions, hasPartitions,
   backendPlan, planningLoading, applyingLoading,
+  backendWithTests, setBackendWithTests,
   previewFile, previewContent, previewDrawerOpen,
   planBackend, applyBackend, discardBackendPlan, openPlanFile,
 } = useAI()
@@ -89,6 +90,12 @@ async function handleOpenFile(path: string) {
             <span class="partition-table-count">{{ p.tables.length }} {{ t('ai.backend.tables') }}</span>
           </div>
         </div>
+      </div>
+
+      <div class="tests-row">
+        <a-switch size="small" :checked="backendWithTests" @change="(v: any) => setBackendWithTests(!!v)"/>
+        <span class="tests-label">{{ t('ai.backend.withTests') }}</span>
+        <span class="tests-hint">{{ t('ai.backend.withTestsHint') }}</span>
       </div>
 
       <a-button
@@ -287,5 +294,21 @@ async function handleOpenFile(path: string) {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+}
+
+.tests-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tests-label {
+  font-size: 13px;
+}
+
+.tests-hint {
+  font-size: 12px;
+  color: #8c8c8c;
 }
 </style>

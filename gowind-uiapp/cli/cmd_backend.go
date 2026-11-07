@@ -38,6 +38,7 @@ func addBackendFlags(cmd *cobra.Command) {
 	cmd.Flags().String("strategy", "per-table", "proto 包策略: per-table | by-service | custom")
 	cmd.Flags().String("out", ".", "项目根目录（生成到 app/<服务名>/service，默认当前目录）")
 	cmd.Flags().Bool("skip-postprocess", false, "跳过生成后的 tidy/buf/ent/wire 后处理链")
+	cmd.Flags().Bool("tests", false, "为 CRUD service 生成单测骨架(fake 仓储)")
 	cmd.Flags().String("service-name", "", "REST 网关服务名（rest 命令必填）")
 }
 
@@ -143,6 +144,7 @@ var backendGrpcCmd = &cobra.Command{
 		g.SetLogger(cliLogger{})
 		g.SetOptions(opts)
 		g.SetSkipPostProcess(boolFlag(cmd, "skip-postprocess"))
+		g.SetGenerateTests(boolFlag(cmd, "tests"))
 
 		logf("项目根目录: %s (module: %s)", rootPath, projectName)
 		logf("开始生成 gRPC 代码 (orm=%s, strategy=%s)...", ormType, strategy)

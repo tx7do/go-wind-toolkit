@@ -421,6 +421,8 @@ export default {
       ddlReady: 'Ready · {lines} lines',
       partitionReady: 'Ready · {count} service(s)',
       planPending: 'Plan pending · {newCount} new / {overwriteCount} overwrite',
+      withTests: 'Generate test scaffolds',
+      withTestsHint: 'Attach fake-repo unit tests to each CRUD service',
       files: '{count} file(s)',
       reports: '{count} report(s)',
     },

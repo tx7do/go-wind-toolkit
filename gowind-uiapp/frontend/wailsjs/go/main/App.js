@@ -205,6 +205,9 @@ export function SetAIConfig(arg1) {
 export function SetDBConfig(arg1) {
   return window['go']['main']['App']['SetDBConfig'](arg1);
 }
+export function SetGenerateTests(arg1) {
+  return window['go']['main']['App']['SetGenerateTests'](arg1);
+}
 
 export function SetGeneratorOption(arg1) {
   return window['go']['main']['App']['SetGeneratorOption'](arg1);

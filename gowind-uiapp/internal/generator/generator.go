@@ -29,6 +29,8 @@ type Generator struct {
 	logger  Logger
 	// skipPostProcess 跳过生成后的 tidy/buf/ent/wire 后处理链
 	skipPostProcess bool
+	// generateTests 为 CRUD service 追加单测骨架(fake 仓储)
+	generateTests bool
 }
 
 func NewGenerator() *Generator {
@@ -53,6 +55,13 @@ func (g *Generator) SetSkipPostProcess(skip bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.skipPostProcess = skip
+}
+
+// SetGenerateTests 为 CRUD service 追加单测骨架(fake 仓储,gRPC+本地仓储形态)
+func (g *Generator) SetGenerateTests(enable bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.generateTests = enable
 }
 
 // GetOptions 获取选项(副本)
@@ -218,6 +227,7 @@ func (g *Generator) GenerateGrpcCode(
 		options.GenerateORM = true
 		options.GenerateData = true
 		options.GenerateService = true
+		options.GenerateTests = g.generateTests
 		options.GenerateServer = true
 		options.GenerateMain = true
 		options.GenerateConfig = true
@@ -341,6 +351,7 @@ func (g *Generator) GenerateRestCode(
 		options.GenerateORM = false
 		options.GenerateData = false
 		options.GenerateService = true
+		options.GenerateTests = g.generateTests
 		options.GenerateServer = true
 		options.GenerateMain = true
 		options.GenerateConfig = true

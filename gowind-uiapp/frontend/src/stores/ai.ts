@@ -5,6 +5,7 @@ import {
   AIValidateDDL,
   AICancelTask,
   AIPlanBackendCode,
+  SetGenerateTests,
   AIApplyBackendCode,
   AIDiscardBackendPlan,
   AIReadBackendPlanFile,
@@ -48,6 +49,12 @@ const ddlTables = ref<string[]>([])
 let partitionsSnapshot: ai.MicroservicePartition[] | null = null
 
 const ormType = ref<'ent' | 'gorm'>('ent')
+// 后端生成时是否附带 CRUD service 单测骨架(fake 仓储);plan 前同步给 Go 侧
+const backendWithTests = ref(false)
+async function setBackendWithTests(enable: boolean) {
+  backendWithTests.value = enable
+  await SetGenerateTests(enable)
+}
 // 后端生成走预览确认两阶段:预览树在服务端临时目录,确认后原样拷贝进项目
 const backendPlan = ref<ai.BackendPlanResult | null>(null)
 const planningLoading = ref(false)
@@ -359,6 +366,7 @@ async function planBackend() {
   if (planningLoading.value) return null
   planningLoading.value = true
   try {
+    await SetGenerateTests(backendWithTests.value)
     const result = await AIPlanBackendCode(ddlContent.value, ormType.value, partitions.value)
     if (result.success) {
       backendPlan.value = result
@@ -499,7 +507,7 @@ export function useAI() {
     requirements, ddlContent, ddlGenerating, ddlAttempt,
     partitions, partitionWarnings, partitionLoading, hasPartitions,
     editingPartitions, ddlTables, unassignedTables, partitionStreamContent,
-    ormType, backendPlan, planningLoading, applyingLoading,
+    ormType, backendPlan, backendWithTests, setBackendWithTests, planningLoading, applyingLoading,
     previewFile, previewContent, previewDrawerOpen,
     openapiFiles, openapiMessage, openapiLoading,
     reviewScanFiles, reviewScanWarnings, reviewScanLoading, reviewSelected,

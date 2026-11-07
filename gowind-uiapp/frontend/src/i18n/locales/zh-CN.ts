@@ -448,6 +448,8 @@ export default {
       ddlReady: '就绪 · {lines} 行',
       partitionReady: '就绪 · {count} 服务',
       planPending: '计划待确认 · 新增 {newCount} / 覆盖 {overwriteCount}',
+      withTests: '生成测试骨架',
+      withTestsHint: '为每个 CRUD service 追加 fake 仓储单测', 
       files: '{count} 个文件',
       reports: '{count} 份报告',
     },
