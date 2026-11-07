@@ -38,7 +38,7 @@ go-wind-toolkit/
 | Wire 依赖注入生成 | ✅ | ✅ |
 | 前端 CRUD 页面生成 (`gow frontend`) | ✅ | ✅ |
 | 微服务模块提取 (`gow extract`) | ✅ | — |
-| 配置导出到 Consul / Etcd / Nacos | — | ✅ |
+| 配置导出到 Consul / Etcd / Nacos (`gow config`) | ✅ | ✅ |
 | 可视化表配置与服务分配 | — | ✅ |
 | AI 辅助 DDL 生成与微服务划分 | — | ✅ |
 | AI 代码审查 | — | ✅ |
@@ -208,6 +208,9 @@ gow generate
 gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user --dry-run
 # 追加生成 CRUD service 的单测骨架(fake 仓储,不依赖数据库)
 gow generate --dsn "mysql://..." --service user --tests
+
+# 漂移守卫:重新生成到临时目录与工作区比对,CI 挡"手改生成文件"(退出码非 0)
+gow generate --dsn "mysql://..." --service user --check
 
 # 完整命令行
 gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user

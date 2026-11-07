@@ -38,7 +38,7 @@ go-wind-toolkit/
 | Wire dependency injection generation | ✅ | ✅ |
 | Frontend CRUD page generation (`gow frontend`) | ✅ | ✅ |
 | Microservice module extraction (`gow extract`) | ✅ | — |
-| Config export to Consul / Etcd / Nacos | — | ✅ |
+| Config export to Consul / Etcd / Nacos (`gow config`) | ✅ | ✅ |
 | Visual table configuration & service assignment | — | ✅ |
 | AI-assisted DDL generation & microservice partitioning | — | ✅ |
 | AI code review | — | ✅ |
@@ -206,6 +206,10 @@ gow generate
 # works with a database DSN or inline DDL text)
 # Also generate unit test scaffolds (fake repo, no database needed)
 gow generate --dsn "mysql://..." --service user --tests
+
+# Drift guard: regenerate into a temp dir and diff against the working tree
+# (non-zero exit on drift — for CI to block hand-edited generated files)
+gow generate --dsn "mysql://..." --service user --check
 gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user --dry-run
 
 # Full command line
