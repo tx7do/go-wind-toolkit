@@ -2,10 +2,9 @@ package service
 
 import (
 	"context"
-	"io"
 	"testing"
 
-	"github.com/go-kratos/kratos/v2/log"
+	bLogger "github.com/tx7do/kratos-bootstrap/logger"
 
 	paginationV1 "github.com/tx7do/go-crud/api/gen/go/pagination/v1"
 
@@ -50,7 +49,7 @@ func (f *fake{{pascal .Model}}Repo) Delete(ctx context.Context, req *{{.SourceAp
 // newTest{{.ClassName}} 以 fake 仓储构造被测 service,不经过 bootstrap 装配。
 func newTest{{.ClassName}}(repo {{pascal .Model}}Repo) *{{.ClassName}} {
 	return &{{.ClassName}}{
-		log: log.NewHelper(log.NewStdLogger(io.Discard)),
+		log: bLogger.NewHelper(bLogger.NewStdLogger()),
 		{{.DataSourceVar}}: repo,
 	}
 }

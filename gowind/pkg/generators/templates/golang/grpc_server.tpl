@@ -6,6 +6,7 @@ import (
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
+	bLogger "github.com/tx7do/kratos-bootstrap/logger"
 	"github.com/tx7do/kratos-bootstrap/rpc"
 
 	"{{.Module}}/app/{{lower .Service}}/service/internal/service"
@@ -18,7 +19,7 @@ type GrpcMiddlewares []middleware.Middleware
 
 func NewGrpcMiddleware(ctx *bootstrap.Context) GrpcMiddlewares {
 	var ms []middleware.Middleware
-	ms = append(ms, logging.Server(ctx.GetLogger()))
+	ms = append(ms, logging.Server(bLogger.AsKratosLogger(ctx.GetLogger())))
 	return ms
 }
 

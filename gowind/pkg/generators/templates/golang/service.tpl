@@ -3,7 +3,7 @@
 import (
 	"context"
 
-	"github.com/go-kratos/kratos/v2/log"
+	bLogger "github.com/tx7do/kratos-bootstrap/logger"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 {{if not .IsGrpc}}
 	"github.com/tx7do/go-utils/trans"
@@ -43,7 +43,7 @@ type {{pascal .Model}}Repo interface {
 type {{.ClassName}} struct {
 	{{.ServiceInterface}}
 
-	log *log.Helper
+	log *bLogger.Helper
 
 	{{.DataSourceVar}} {{if .UseRepo}}{{pascal .Model}}Repo{{else}}{{.DataSourceType}}{{end}}
 }

@@ -19,7 +19,7 @@ func NewRedisClient(ctx *bootstrap.Context) (*redis.Client, func(), error) {
 
     return cli, func() {
         if err := cli.Close(); err != nil {
-            l.Error(err)
+            l.Errorf(ctx.Context(), "%v", err)
         }
     }, nil
 }

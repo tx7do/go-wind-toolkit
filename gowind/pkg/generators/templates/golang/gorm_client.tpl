@@ -16,7 +16,7 @@ func NewGormClient(ctx *bootstrap.Context) (*gormCrud.Client, error) {
 
 	cfg := ctx.GetConfig()
 	if cfg == nil || cfg.Data == nil {
-		l.Fatalf("[GORM] failed getting config")
+		l.Errorf(ctx.Context(), "[GORM] failed getting config")
 		return nil, nil
 	}
 
@@ -24,11 +24,11 @@ func NewGormClient(ctx *bootstrap.Context) (*gormCrud.Client, error) {
 
 	gormClient, err := gormBootstrap.NewGormClient(cfg, l, nil)
 	if err != nil {
-		l.Fatalf("[GORM] failed creating client: %v", err)
+		l.Errorf(ctx.Context(), "[GORM] failed creating client: %v", err)
 		return nil, err
 	}
 	if gormClient == nil {
-		l.Fatalf("[GORM] failed creating client")
+		l.Errorf(ctx.Context(), "[GORM] failed creating client")
 		return nil, err
 	}
 

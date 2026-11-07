@@ -8,6 +8,7 @@ import (
 	swaggerUI "github.com/tx7do/kratos-swagger-ui"
 
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
+	bLogger "github.com/tx7do/kratos-bootstrap/logger"
 	"github.com/tx7do/kratos-bootstrap/rpc"
 
 	"{{.Module}}/app/{{lower .Service}}/service/cmd/server/assets"
@@ -22,7 +23,7 @@ func NewRestMiddleware(
 	ctx *bootstrap.Context,
 ) RestMiddlewares {
 	var ms []middleware.Middleware
-	ms = append(ms, logging.Server(ctx.GetLogger()))
+	ms = append(ms, logging.Server(bLogger.AsKratosLogger(ctx.GetLogger())))
 
 	return ms
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/go-kratos/kratos/v2/log"
+	bLogger "github.com/tx7do/kratos-bootstrap/logger"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 
 	"github.com/tx7do/go-utils/copierutil"
@@ -14,6 +14,9 @@ import (
 {{- end}}
 {{- if .HasStringNumConversionField}}
 	"github.com/tx7do/go-utils/stringutil"
+{{- end}}
+{{- if .HasNonNullStringNumField}}
+	"github.com/tx7do/go-utils/trans"
 {{- end}}
 
 	paginationV1 "github.com/tx7do/go-crud/api/gen/go/pagination/v1"
@@ -28,7 +31,7 @@ import (
 
 type {{.ClassName}} struct {
 	entClient *entCrud.EntClient[*ent.Client]
-	log          *log.Helper
+	log          *bLogger.Helper
 
 	mapper     *mapper.CopierMapper[{{.ApiPackage}}.{{pascal .Model}}, ent.{{pascal .Model}}]
 	repository *entCrud.Repository[
@@ -77,7 +80,7 @@ func (r *{{.ClassName}}) Count(ctx context.Context, req *paginationV1.PagingRequ
 
 	count, err := builder.Count(ctx)
 	if err != nil {
-		r.log.Errorf("query {{lower .Model}} count failed: %s", err.Error())
+		r.log.Errorf(ctx, "query {{lower .Model}} count failed: %s", err.Error())
 		return 0, {{.ApiPackage}}.ErrorInternalServerError("query {{lower .Model}} count failed")
 	}
 
@@ -105,12 +108,12 @@ func (r *{{.ClassName}}) List(ctx context.Context, req *paginationV1.PagingReque
     }, nil
 }
 
-func (r *{{.ClassName}}) IsExist(ctx context.Context, id uint32) (bool, error) {
+func (r *{{.ClassName}}) IsExist(ctx context.Context, id int64) (bool, error) {
 	exist, err := r.entClient.Client().{{pascal .Model}}.Query().
-		Where({{lower .Model}}.IDEQ(id)).
+		Where({{lower .Model}}.IDEQ(int64(id))).
 		Exist(ctx)
 	if err != nil {
-		r.log.Errorf("query {{lower .Model}} exist failed: %s", err.Error())
+		r.log.Errorf(ctx, "query {{lower .Model}} exist failed: %s", err.Error())
 		return false, {{.ApiPackage}}.ErrorInternalServerError("query {{lower .Model}} exist failed")
 	}
 	return exist, nil
@@ -124,9 +127,9 @@ func (r *{{.ClassName}}) Get(ctx context.Context, req *{{.ApiPackage}}.Get{{pasc
     var whereCond []func(s *sql.Selector)
     switch req.QueryBy.(type) {
     case *{{.ApiPackage}}.Get{{pascal .Model}}Request_Id:
-        whereCond = append(whereCond, {{lower .Model}}.IDEQ(req.GetId()))
+        whereCond = append(whereCond, {{lower .Model}}.IDEQ(int64(req.GetId())))
     default:
-        whereCond = append(whereCond, {{lower .Model}}.IDEQ(req.GetId()))
+        whereCond = append(whereCond, {{lower .Model}}.IDEQ(int64(req.GetId())))
     }
 
     builder := r.entClient.Client().{{pascal .Model}}.Query()
@@ -151,7 +154,7 @@ func (r *{{.ClassName}}) Create(ctx context.Context, req *{{.ApiPackage}}.Create
 {{- end}}
 
 	if ret, err := builder.Save(ctx); err != nil {
-		r.log.Errorf("insert one data failed: %s", err.Error())
+		r.log.Errorf(ctx, "insert one data failed: %s", err.Error())
 		return nil, {{.ApiPackage}}.ErrorInternalServerError("insert data failed")
 	} else {
 		return r.mapper.ToDTO(ret), nil

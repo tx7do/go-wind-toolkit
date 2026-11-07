@@ -62,10 +62,11 @@ func MakeEntSetFuncWithTransfer(fieldName string, transFunc string) string {
 
 // MakeEntSetFuncWithStringPtrNumTransfer 用于非空 DECIMAL 等字段：
 // proto string 值 -> ent float64 值
-// 通过取地址转换后解引用：*StringPtrToFloat64Ptr(&val)
+// 经 trans.Ptr 把值变指针，供 StringPtrToFloat64Ptr 这类指针->指针转换使用；
+// 不能对 Getter 返回值直接取地址(&req.Data.GetXxx() 非法 Go)。
 func MakeEntSetFuncWithStringPtrNumTransfer(fieldName string, transFunc string) string {
 	inputVar := "req.Data.Get" + SnakeToPascal(fieldName) + "()"
-	return "Set" + SnakeToPascalPlus(fieldName) + "(*" + transFunc + "(&" + inputVar + "))"
+	return "Set" + SnakeToPascalPlus(fieldName) + "(*" + transFunc + "(trans.Ptr(" + inputVar + ")))"
 }
 
 func RemoveTableCommentSuffix(input string) string {

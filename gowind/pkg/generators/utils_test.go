@@ -934,7 +934,7 @@ func TestDataField_EntCreateSetFunc_Decimal(t *testing.T) {
 		Null:         false,
 		IsPrimaryKey: false,
 	}
-	expected := "SetPrice(*stringutil.StringPtrToFloat64Ptr(&req.Data.GetPrice()))"
+	expected := "SetPrice(*stringutil.StringPtrToFloat64Ptr(trans.Ptr(req.Data.GetPrice())))"
 	assert.Equal(t, expected, field.EntCreateSetFunc())
 }
 

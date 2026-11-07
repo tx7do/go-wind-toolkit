@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-kratos/kratos/v2/log"
+	bLogger "github.com/tx7do/kratos-bootstrap/logger"
 	"github.com/tx7do/kratos-bootstrap/bootstrap"
 	"gorm.io/gorm"
 
@@ -21,7 +21,7 @@ import (
 
 type {{.ClassName}} struct {
 	gormClient *gormCrud.Client
-	log  *log.Helper
+	log  *bLogger.Helper
 
 	mapper     *mapper.CopierMapper[{{.ApiPackage}}.{{pascal .Model}}, models.{{pascal .Model}}]
 	repository *gormCrud.Repository[{{.ApiPackage}}.{{pascal .Model}}, models.{{pascal .Model}}]

@@ -108,6 +108,17 @@ func (f DataField) NeedsStringNumConversion() bool {
 	return f.Type == ProtoTypeString && f.IsDecimalType()
 }
 
+// HasNonNullStringNumField 判断字段组是否含「非空 + 字符串数字」字段——
+// 该组合的 Create setter 需要 trans 导入(见 MakeEntSetFuncWithStringPtrNumTransfer)。
+func (fs DataFieldArray) HasNonNullStringNumField() bool {
+	for _, f := range fs {
+		if !f.Null && f.NeedsStringNumConversion() {
+			return true
+		}
+	}
+	return false
+}
+
 // TimeConvertFunc 返回时间转换函数名
 func (f DataField) TimeConvertFunc() string {
 	switch {
