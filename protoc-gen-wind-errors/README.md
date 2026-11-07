@@ -37,3 +37,40 @@ plugins:
 生成的文件名与 kratos 官方产物一致（`<proto>_errors.pb.go`），v2 分支重生成时可直接原位替换；调用侧 `IsXxx` 无感，`ErrorXxx` 返回类型从 kratos `*errors.Error` 变为 `*windErrors.WindError`（以 error 返回的调用点零改动）。
 
 The output file name matches the kratos generator (`<proto>_errors.pb.go`), so regeneration replaces it in place on a v2 branch. `IsXxx` call sites are unaffected; `ErrorXxx` returns `*windErrors.WindError` instead of kratos `*errors.Error` (call sites returning it as `error` need no change).
+
+## 前端 i18n 词表 / Frontend i18n vocabularies
+
+设置 `i18n_langs` 参数后，除 Go 文件外还会为每个含错误枚举的 proto 文件输出一份
+reason → `{code, message}` 的 JSON 词表，供前端按 reason 本地化（与"后端 message
+不出网"契约配套）：
+
+With the `i18n_langs` parameter, a JSON vocabulary (`reason` → `{code, message}`) is
+emitted alongside the Go file for frontend localization by reason:
+
+```yaml
+# buf.gen.yaml (v2) — 注意:protogen 按逗号切分参数,值内分隔符用 ";"
+# Note: protogen splits plugin params on commas; separate locales with ";"
+plugins:
+  - local: protoc-gen-wind-errors
+    out: gen/go
+    opt:
+      - paths=source_relative
+      - i18n_langs=zh;en
+```
+
+产物 / Output (`<proto>_errors_i18n.<lang>.json`):
+
+```json
+{
+  "USER_NOT_FOUND": {
+    "code": 404,
+    "message": "满足请求的资源不存在"
+  }
+}
+```
+
+文案来源是枚举值的注释：正文按 `|` 分段，段序与 `i18n_langs` 声明序位置对应
+（段1→第一个语言，段2→第二个语言）；缺段为空串，留给译者补齐。注释里不含 `|`
+时所有语言共用该段文本。/ Messages come from the enum value comments: the comment
+text is split on `|`, segments map positionally to the declared locales (missing
+segments are empty strings); a comment without `|` is shared by every locale.

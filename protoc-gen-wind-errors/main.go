@@ -16,8 +16,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
@@ -28,7 +31,7 @@ import (
 )
 
 // release is the current protoc-gen-wind-errors version.
-const release = "v0.1.0"
+const release = "v0.1.1"
 
 // Extension field numbers declared in errors/errors.proto
 // (github.com/go-kratos/kratos/v2/errors; protoc consumes it via the
@@ -38,7 +41,14 @@ const (
 	enumValueCodeFieldNum   protowire.Number = 1109 // errors.code → google.protobuf.EnumValueOptions
 )
 
-var showVersion = flag.Bool("version", false, "print the version and exit")
+var (
+	showVersion = flag.Bool("version", false, "print the version and exit")
+	// i18nLangs 逗号分隔的语言列表(如 zh,en)。设置后,除 Go 文件外,还为每个
+	// 含错误枚举的 proto 文件输出一份 <prefix>_errors_i18n.<lang>.json,
+	// 形如 {"USER_NOT_FOUND": {"code": 404, "message": "用户不存在"}}——
+	// 前端按 reason 本地化的词表,与 WindError "后端 message 不出网" 契约配套。
+	i18nLangs = flag.String("i18n_langs", "", "comma-separated locales for companion i18n JSON files (e.g. zh,en)")
+)
 
 func main() {
 	flag.Parse()
@@ -50,14 +60,41 @@ func main() {
 		ParamFunc: flag.CommandLine.Set,
 	}.Run(func(gen *protogen.Plugin) error {
 		gen.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
+		langs := parseLangs(*i18nLangs)
 		for _, f := range gen.Files {
 			if !f.Generate {
 				continue
 			}
-			generateFile(gen, f)
+			generateFile(gen, f, langs)
 		}
 		return nil
 	})
+}
+
+// parseLangs 解析并清洗语言列表:仅保留 [A-Za-z0-9_-] 字符,
+// 空项丢弃。语言名直接进文件名,不能放行任意字符。
+func parseLangs(raw string) []string {
+	var langs []string
+	// protogen 按逗号切分插件参数,值内的语言分隔符用 ";"(也兼容 ",")。
+	for _, lang := range strings.FieldsFunc(raw, func(r rune) bool { return r == ';' || r == ',' }) {
+		lang = strings.TrimSpace(lang)
+		if lang == "" {
+			continue
+		}
+		ok := true
+		for _, r := range lang {
+			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+				ok = false
+				break
+			}
+		}
+		if !ok {
+			fmt.Fprintf(os.Stderr, "WARN: skipping invalid locale %q\n", lang)
+			continue
+		}
+		langs = append(langs, lang)
+	}
+	return langs
 }
 
 // errorEnum pairs an enum with its resolved per-value codes
@@ -70,8 +107,9 @@ type errorEnum struct {
 // generateFile emits <prefix>_errors.pb.go when the file contains at least one
 // error enum. An enum counts as an error enum when the enum itself carries
 // errors.default_code or any of its values carries errors.code — files with
-// ordinary (non-error) enums produce no output.
-func generateFile(gen *protogen.Plugin, f *protogen.File) {
+// ordinary (non-error) enums produce no output. When i18n_langs is set, a
+// companion <prefix>_errors_i18n.<lang>.json is emitted per requested locale.
+func generateFile(gen *protogen.Plugin, f *protogen.File, langs []string) {
 	var enums []*errorEnum
 	for _, e := range f.Enums {
 		if ee := newErrorEnum(e); ee != nil {
@@ -107,6 +145,61 @@ func generateFile(gen *protogen.Plugin, f *protogen.File) {
 			g.P()
 		}
 	}
+
+	for i, lang := range langs {
+		emitI18NFile(gen, f, enums, lang, i, len(langs))
+	}
+}
+
+// emitI18NFile 输出 <prefix>_errors_i18n.<lang>.json:reason → {code, message}。
+// 文案取枚举值的 leading 注释,按 "|" 分段、按 langs 声明序位置对应
+// (段1→langs[0],段2→langs[1]);缺段或无注释为空串,由调用方译者补齐。
+func emitI18NFile(gen *protogen.Plugin, f *protogen.File, enums []*errorEnum, lang string, langIdx, langTotal int) {
+	type entry struct {
+		Code    int32  `json:"code"`
+		Message string `json:"message"`
+	}
+	entries := make(map[string]entry)
+	for _, ee := range enums {
+		for _, v := range ee.enum.Values {
+			entries[string(v.Desc.Name())] = entry{
+				Code:    ee.codes[v.Desc.Number()],
+				Message: i18nMessage(v, langIdx, langTotal),
+			}
+		}
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(entries); err != nil {
+		return // map[string]entry 不会失败,防御而已
+	}
+	out := gen.NewGeneratedFile(f.GeneratedFilenamePrefix+"_errors_i18n."+lang+".json", f.GoImportPath)
+	out.P(strings.TrimRight(buf.String(), "\n"))
+}
+
+// i18nMessage 提取枚举值注释中目标语言的文案。
+// 注释正文按 "|" 分段,段序对应 i18n_langs 声明序;缺段为空串。
+func i18nMessage(v *protogen.EnumValue, langIdx, langTotal int) string {
+	leading := strings.TrimSuffix(string(v.Comments.Leading), "\n")
+	if leading == "" {
+		return ""
+	}
+	var lines []string
+	for _, line := range strings.Split(leading, "\n") {
+		line = strings.TrimPrefix(strings.TrimSpace(line), "//")
+		line = strings.TrimSpace(line)
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	text := strings.Join(lines, " ")
+	segs := strings.Split(text, "|")
+	if langIdx >= len(segs) {
+		return ""
+	}
+	return strings.TrimSpace(segs[langIdx])
 }
 
 func appendEnumsFromMessage(acc []*errorEnum, m *protogen.Message) []*errorEnum {
@@ -165,7 +258,9 @@ func emitValueComment(g *protogen.GeneratedFile, v *protogen.EnumValue) {
 		return
 	}
 	for _, line := range strings.Split(leading, "\n") {
-		g.P("//", line)
+		// protogen 的 Comments 保留 "//" 前缀,先剥掉再统一补,避免输出 ////。
+		line = strings.TrimPrefix(strings.TrimSpace(line), "//")
+		g.P("// ", line)
 	}
 }
 
