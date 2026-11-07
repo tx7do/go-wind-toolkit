@@ -27,6 +27,12 @@ func Importer(_ context.Context, drv, dsn, schemaPath, daoPath *string, tables, 
 
 	// 判断是 SQL 文本还是数据库连接串
 	// SQL 文本包含 CREATE TABLE 语句，而 DSN 包含 :// 协议头
+	// 上游(sqlkratos)会把 DDL 文本归一化成 text:// 前缀再传进来,
+	// 这里剥掉前缀后按纯 SQL 文本走内存库。
+	if strings.HasPrefix(*dsn, "text://") {
+		stripped := strings.TrimPrefix(*dsn, "text://")
+		dsn = &stripped
+	}
 	var db *gorm.DB
 	var err error
 	if isSQLText(*dsn) {
