@@ -11,6 +11,7 @@
 - 生成コードは**純粋なインターフェースのみ**を出力 — HTTP / SSE / WebSocket トランスポートの実装は呼び出し側が完全に注入
 - `google.api.default_host` による `DEFAULT_HOST` 定数の自動生成をサポート
 - Protobuf canonical JSON エンコーディングに準拠
+- int64/uint64（およびその wrapper 型 Int64Value/UInt64Value）は `number` にマッピングされます：canonical JSON は 64 ビット整数を 10 進文字列としてエンコードしますが、フロントエンドの利便性のため `number` にマッピングします（2^53 を超える値は精度が失われるため、無損失が必要な場合は proto 側で string フィールドを使用してください）
 
 ## インストール
 
@@ -39,6 +40,7 @@ protoc \
 | `unary()` | 通常のリクエスト/レスポンス | Unary RPC |
 | `serverStream()` | サーバーストリーミングプッシュ（`ServerStream<T>` を返す） | `returns (stream T)` |
 | `duplexStream()` | 双方向ストリーミング（`DuplexStream<TIn, TOut>` を返す） | `stream T returns (stream U)` |
+| `byteStream()` | 生バイトチャンクストリーム（`ServerStream<Uint8Array>` を返す） | `returns (stream google.api.HttpBody)` |
 
 **呼び出し側が `ClientTransport` の実装を提供する必要があります。** これにより、HTTP クライアント（fetch、Axios など）、認証ヘッダー、SSE トランスポート、WebSocket トランスポートを完全に制御できます。
 
@@ -132,6 +134,8 @@ interface BookService {
 サーバーストリーミング RPC（`returns (stream ...)`）と双方向ストリーミング RPC（`stream ... returns (stream ...)`）は、それぞれ `ClientTransport` の `serverStream()` メソッドと `duplexStream()` メソッドでサポートされます。
 
 生成コードは **`ServerStream<T>` と `DuplexStream<TIn, TOut>` インターフェースのみを定義**します — 実際のトランスポート実装（`fetch` + `ReadableStream` を使った SSE、`EventSource`、WebSocket など）は呼び出し側が提供します。
+
+ストリーム要素が [`google.api.HttpBody`](https://google.aip.dev/134#httpbody) のサーバーストリーミング RPC（ファイルダウンロードなど）は専用の `byteStream()` を使用します：クライアントは `ServerStream<Uint8Array>` の生バイトチャンクを受け取り、**JSON デコードは行いません** — protoc-gen-go-http のサーバー契約（最初のチャンクの Content-Type は HTTP レスポンスヘッダーに載り、各チャンクは生ペイロードバイト）と一致します。
 
 ### Proto の例
 

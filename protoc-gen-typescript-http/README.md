@@ -12,6 +12,7 @@
 - 生成代码只输出**纯接口**，HTTP / SSE / WebSocket 传输实现完全由调用方注入
 - 支持 `google.api.default_host` 自动生成 `DEFAULT_HOST` 常量
 - 遵循 Protobuf canonical JSON 编码规范
+- int64/uint64 及其 wrapper（Int64Value/UInt64Value）映射为 `number`：canonical JSON 将 64 位整数编码为十进制字符串，为前端易用性本生成器映射为 `number`（超过 2^53 的值会丢精度；需要无损传输时请在 proto 中改用 string 字段）
 
 ## 安装
 
@@ -40,6 +41,7 @@ protoc \
 | `unary()` | 普通请求/响应 | Unary RPC |
 | `serverStream()` | 服务端流式推送（返回 `ServerStream<T>`） | `returns (stream T)` |
 | `duplexStream()` | 双向流式通信（返回 `DuplexStream<TIn, TOut>`） | `stream T returns (stream U)` |
+| `byteStream()` | 原始字节块流（返回 `ServerStream<Uint8Array>`） | `returns (stream google.api.HttpBody)` |
 
 **调用方负责提供 `ClientTransport` 的实现**。这样你可以完全掌控 HTTP 客户端（fetch、Axios 等）、认证头、SSE 传输方式和 WebSocket 传输方式。
 
@@ -133,6 +135,8 @@ interface BookService {
 服务端流式 RPC（`returns (stream ...)`）和双向流式 RPC（`stream ... returns (stream ...)`）分别通过 `ClientTransport` 的 `serverStream()` 和 `duplexStream()` 方法支持。
 
 生成代码**只定义 `ServerStream<T>` 和 `DuplexStream<TIn, TOut>` 接口**——实际的传输实现（基于 `fetch` + `ReadableStream` 的 SSE、`EventSource`、WebSocket 等）由调用方提供。
+
+元素为 [`google.api.HttpBody`](https://google.aip.dev/134#httpbody) 的服务端流式 RPC（文件下载等）走独立的 `byteStream()`：客户端拿到 `ServerStream<Uint8Array>` 原始字节块，**不做 JSON 解码**——与 protoc-gen-go-http 的服务端契约一致（首帧 Content-Type 经 HTTP 响应头传递，其后每个块都是原始载荷字节）。
 
 ### 示例 Proto
 

@@ -20,6 +20,10 @@ func generateTransportInfra(f *codegen.File, defaultHost string) {
 	f.P(t(2), "meta: TransportMeta,")
 	f.P(t(1), "): Promise<unknown>;")
 	f.P(t(1), "serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;")
+	f.P(t(1), "// Raw byte chunks for google.api.HttpBody server streams: the first")
+	f.P(t(1), "// chunk's content type rides the HTTP response Content-Type header,")
+	f.P(t(1), "// every chunk is raw payload bytes (no JSON framing).")
+	f.P(t(1), "byteStream(path: string, meta: TransportMeta): ServerStream<Uint8Array>;")
 	f.P(t(1), "duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;")
 	f.P("}")
 	f.P()
@@ -42,8 +46,8 @@ func generateTransportInfra(f *codegen.File, defaultHost string) {
 func generateStreamInterfaceMethod(f *codegen.File, pkg protoreflect.FullName, method protoreflect.MethodDescriptor, rule httprule.Rule) {
 	commentGenerator{descriptor: method}.generateLeading(f, 1)
 	input := typeFromMessage(pkg, method.Input())
-	output := typeFromMessage(pkg, method.Output())
 	if method.IsStreamingClient() {
+		output := typeFromMessage(pkg, method.Output())
 		if rule.Template.HasVariables() {
 			f.P(t(1), method.Name(), "(")
 			f.P(t(2), "request: ", input.Reference(), ",")
@@ -51,7 +55,13 @@ func generateStreamInterfaceMethod(f *codegen.File, pkg protoreflect.FullName, m
 		} else {
 			f.P(t(1), method.Name(), "(): DuplexStream<", input.Reference(), ", ", output.Reference(), ">;")
 		}
+	} else if isHttpBodyStream(method) {
+		// HttpBody 下载流:客户端拿到原始字节块,不生成消息接口。
+		f.P(t(1), method.Name(), "(")
+		f.P(t(2), "request: ", input.Reference(), ",")
+		f.P(t(1), "): ServerStream<Uint8Array>;")
 	} else {
+		output := typeFromMessage(pkg, method.Output())
 		f.P(t(1), method.Name(), "(")
 		f.P(t(2), "request: ", input.Reference(), ",")
 		f.P(t(1), "): ServerStream<", output.Reference(), ">;")
@@ -77,7 +87,11 @@ func generateServerStreamMethod(
 	method protoreflect.MethodDescriptor,
 	rule httprule.Rule,
 ) {
-	output := typeFromMessage(pkg, method.Output())
+	isBytes := isHttpBodyStream(method)
+	var output Type
+	if !isBytes {
+		output = typeFromMessage(pkg, method.Output())
+	}
 	paramName := "request"
 	if !httprule.MethodUsesRequest(rule, method.Input(), IsWellKnownType) {
 		paramName = "_request"
@@ -93,6 +107,14 @@ func generateServerStreamMethod(
 		f.P(t(4), "uri += `?${queryParams.join('&')}`;")
 		f.P(t(3), "}")
 		uriVar = "uri"
+	}
+	if isBytes {
+		f.P(t(3), "return transport.byteStream(", uriVar, ", {")
+		f.P(t(4), "service: '", method.Parent().Name(), "',")
+		f.P(t(4), "method: '", method.Name(), "',")
+		f.P(t(3), "});")
+		f.P(t(2), "},")
+		return
 	}
 	f.P(t(3), "return transport.serverStream<", output.Reference(), ">(", uriVar, ", {")
 	f.P(t(4), "service: '", method.Parent().Name(), "',")

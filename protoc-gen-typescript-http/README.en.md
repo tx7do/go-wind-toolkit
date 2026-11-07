@@ -11,6 +11,7 @@ Generates TypeScript types and service clients from Protobuf definitions annotat
 - Generated code outputs **pure interfaces only** — HTTP / SSE / WebSocket transport implementations are fully injected by the caller
 - Support for `google.api.default_host` to auto-generate a `DEFAULT_HOST` constant
 - Follows Protobuf canonical JSON encoding
+- int64/uint64 (and their wrappers Int64Value/UInt64Value) map to `number`: canonical JSON encodes 64-bit integers as decimal strings, but this generator maps them to `number` for front-end ergonomics (values beyond 2^53 lose precision — use a `string` proto field when lossless fidelity is required)
 
 ## Installation
 
@@ -39,6 +40,7 @@ The generated code defines a `ClientTransport` interface with three methods:
 | `unary()` | Standard request/response | Unary RPC |
 | `serverStream()` | Server-streaming push (returns `ServerStream<T>`) | `returns (stream T)` |
 | `duplexStream()` | Bidirectional streaming (returns `DuplexStream<TIn, TOut>`) | `stream T returns (stream U)` |
+| `byteStream()` | Raw byte chunk stream (returns `ServerStream<Uint8Array>`) | `returns (stream google.api.HttpBody)` |
 
 **The caller is responsible for providing a `ClientTransport` implementation.** This gives you full control over the HTTP client (fetch, Axios, etc.), authentication headers, SSE transport, and WebSocket transport.
 
@@ -132,6 +134,8 @@ Notes:
 Server-streaming RPCs (`returns (stream ...)`) and bidirectional streaming RPCs (`stream ... returns (stream ...)`) are supported through the `serverStream()` and `duplexStream()` methods on `ClientTransport`.
 
 The generated code **only defines `ServerStream<T>` and `DuplexStream<TIn, TOut>` interfaces** — the actual transport implementation (SSE via `fetch` + `ReadableStream`, `EventSource`, WebSocket, etc.) is provided by the caller.
+
+Server-streaming RPCs whose stream element is [`google.api.HttpBody`](https://google.aip.dev/134#httpbody) (file downloads etc.) use a dedicated `byteStream()`: the client receives `ServerStream<Uint8Array>` raw byte chunks with **no JSON decoding** — matching the protoc-gen-go-http server contract (the first chunk's content type rides the HTTP response Content-Type header; every chunk is raw payload bytes).
 
 ### Example Proto
 

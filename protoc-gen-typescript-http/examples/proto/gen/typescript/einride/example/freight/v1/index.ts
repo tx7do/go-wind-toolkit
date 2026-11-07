@@ -15,6 +15,10 @@ export interface ClientTransport {
     meta: TransportMeta,
   ): Promise<unknown>;
   serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;
+  // Raw byte chunks for google.api.HttpBody server streams: the first
+  // chunk's content type rides the HTTP response Content-Type header,
+  // every chunk is raw payload bytes (no JSON framing).
+  byteStream(path: string, meta: TransportMeta): ServerStream<Uint8Array>;
   duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;
 }
 
@@ -139,7 +143,7 @@ export type Site = {
   // Behaviors: REQUIRED
   displayName: string | undefined;
   // The geographic location of the site.
-  latLng: googletype_LatLng | undefined;
+  latLng: undefined | wellKnownLatLng;
   // The resource name of the site.
   name: string | undefined;
   // The last update timestamp of the site.
@@ -150,17 +154,9 @@ export type Site = {
   updateTime: undefined | wellKnownTimestamp;
 };
 
-// An object that represents a latitude/longitude pair. This is expressed as a
-// pair of doubles to represent degrees latitude and degrees longitude. Unless
-// specified otherwise, this object must conform to the
-// <a href="https://en.wikipedia.org/wiki/World_Geodetic_System#1984_version">
-// WGS84 standard</a>. Values must be within normalized ranges.
-export type googletype_LatLng = {
-  // The latitude in degrees. It must be in the range [-90.0, +90.0].
-  latitude: number | undefined;
-  // The longitude in degrees. It must be in the range [-180.0, +180.0].
-  longitude: number | undefined;
-};
+// An object that represents a latitude/longitude pair
+// (canonical JSON: {"latitude": number, "longitude": number}).
+type wellKnownLatLng = Record<string, unknown>;
 
 // Request message for FreightService.GetShipper.
 export type GetShipperRequest = {

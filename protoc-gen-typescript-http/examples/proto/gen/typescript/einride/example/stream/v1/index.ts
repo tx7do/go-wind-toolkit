@@ -15,6 +15,10 @@ export interface ClientTransport {
     meta: TransportMeta,
   ): Promise<unknown>;
   serverStream<T>(path: string, meta: TransportMeta): ServerStream<T>;
+  // Raw byte chunks for google.api.HttpBody server streams: the first
+  // chunk's content type rides the HTTP response Content-Type header,
+  // every chunk is raw payload bytes (no JSON framing).
+  byteStream(path: string, meta: TransportMeta): ServerStream<Uint8Array>;
   duplexStream<TIn, TOut>(path: string, meta: TransportMeta): DuplexStream<TIn, TOut>;
 }
 
@@ -29,6 +33,14 @@ export interface DuplexStream<TIn, TOut> extends ServerStream<TOut> {
 }
 
 export const DEFAULT_HOST = 'api.example.com';
+
+// Request message for DownloadFile.
+export type DownloadFileRequest = {
+  // The resource name of the file to download.
+  //
+  // Behaviors: REQUIRED
+  name: string | undefined;
+};
 
 // A log entry.
 export type LogEntry = {
@@ -120,6 +132,16 @@ export interface StreamService {
   TailLogs(
     request: TailLogsRequest,
   ): ServerStream<LogEntry>;
+  // Download a file as a raw byte stream.
+  //
+  // Server-streaming RPC with a google.api.HttpBody element → generated as a
+  // byte stream (Stream<Uint8List> / ServerStream<Uint8Array>), matching the
+  // protoc-gen-go-http server contract: the first chunk's content type is
+  // served as the HTTP response Content-Type header, and every chunk is raw
+  // payload bytes (no JSON framing).
+  DownloadFile(
+    request: DownloadFileRequest,
+  ): ServerStream<Uint8Array>;
   // Realtime bidirectional chat.
   //
   // Bidirectional streaming RPC → generated as WebSocket.
@@ -185,6 +207,16 @@ export function createStreamServiceClient(
         method: 'TailLogs',
       });
     },
+    DownloadFile(request) {
+      if (request.name === undefined || request.name === null) {
+        throw new Error('missing required field request.name');
+      }
+      const path = `/v1/${request.name}:download`;
+      return transport.byteStream(path, {
+        service: 'StreamService',
+        method: 'DownloadFile',
+      });
+    },
     Chat() {
       const path = '/v1/chat';
       return transport.duplexStream(path, {
@@ -194,6 +226,69 @@ export function createStreamServiceClient(
     },
   };
 }
+// Message that represents an arbitrary HTTP body. It should only be used for
+// payload formats that can't be represented as JSON, such as raw binary or
+// an HTML page.
+//
+//
+// This message can be used both in streaming and non-streaming API methods in
+// the request as well as the response.
+//
+// It can be used as a top-level request field, which is convenient if one
+// wants to extract parameters from either the URL or HTTP template into the
+// request fields and also want access to the raw HTTP body.
+//
+// Example:
+//
+// message GetResourceRequest {
+// // A unique request id.
+// string request_id = 1;
+//
+// // The raw HTTP body is bound to this field.
+// google.api.HttpBody http_body = 2;
+//
+// }
+//
+// service ResourceService {
+// rpc GetResource(GetResourceRequest)
+// returns (google.api.HttpBody);
+// rpc UpdateResource(google.api.HttpBody)
+// returns (google.protobuf.Empty);
+//
+// }
+//
+// Example with streaming methods:
+//
+// service CaldavService {
+// rpc GetCalendar(stream google.api.HttpBody)
+// returns (stream google.api.HttpBody);
+// rpc UpdateCalendar(stream google.api.HttpBody)
+// returns (stream google.api.HttpBody);
+//
+// }
+//
+// Use of this type only changes how the request and response bodies are
+// handled, all other features will continue to work unchanged.
+export type googleapi_HttpBody = {
+  // The HTTP Content-Type header value specifying the content type of the body.
+  contentType: string | undefined;
+  // The HTTP request/response body as raw binary.
+  data: string | undefined;
+  // Application specific response metadata. Must be set in the first response
+  // for streaming APIs.
+  extensions: undefined | wellKnownAny[];
+};
+
+// If the Any contains a value that has a special JSON mapping,
+// it will be converted as follows:
+// {"@type": xxx, "value": yyy}.
+// Otherwise, the value will be converted into a JSON object,
+// and the "@type" field will be inserted to indicate the actual data type.
+interface wellKnownAny {
+  '@type': string;
+  [key: string]: unknown;
+}
+
 export class ApiClient {
   private _streamService?: StreamService;
   private readonly _transport: ClientTransport;
