@@ -187,20 +187,9 @@ func (t *Text) SchemaMutations(ctx context.Context) ([]schemast.Mutator, error) 
 		return nil, err
 	}
 
-	tables := s.Tables
-	if t.excludedTables != nil {
-		tables = nil
-		excludedTableNames := make(map[string]bool)
-		for _, t := range t.excludedTables {
-			excludedTableNames[t] = true
-		}
-		// filter out tables that are in excludedTables:
-		for _, t := range s.Tables {
-			if !excludedTableNames[t.Name] {
-				tables = append(tables, t)
-			}
-		}
-	}
+	// exclude 过滤统一走 schemasource.FilterTables(atlas 只吃 include,
+	// InspectOptions.Tables 已按 include 过滤,这里不再重复)。
+	tables := schemasource.FilterTables(s.Tables, nil, t.excludedTables)
 
 	return schemaMutations(t.field, tables)
 }

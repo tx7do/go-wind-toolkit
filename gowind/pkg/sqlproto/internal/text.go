@@ -157,36 +157,8 @@ func (t *Text) SchemaTables(_ context.Context) ([]*TableData, error) {
 		return nil, fmt.Errorf("无效的 SQL: 无法解析任何有效的表")
 	}
 
-	tables := s.Tables
-
-	// Filter by includedTables if specified
-	if t.includedTables != nil && len(t.includedTables) > 0 {
-		includedTableNames := make(map[string]bool)
-		for _, tableName := range t.includedTables {
-			includedTableNames[tableName] = true
-		}
-		tables = nil
-		for _, table := range s.Tables {
-			if includedTableNames[table.Name] {
-				tables = append(tables, table)
-			}
-		}
-	}
-
-	// Filter out excludedTables
-	if t.excludedTables != nil && len(t.excludedTables) > 0 {
-		excludedTableNames := make(map[string]bool)
-		for _, tableName := range t.excludedTables {
-			excludedTableNames[tableName] = true
-		}
-		filteredTables := make([]*schema.Table, 0)
-		for _, table := range tables {
-			if !excludedTableNames[table.Name] {
-				filteredTables = append(filteredTables, table)
-			}
-		}
-		tables = filteredTables
-	}
+	// include/exclude 过滤统一走 schemasource.FilterTables。
+	tables := schemasource.FilterTables(s.Tables, t.includedTables, t.excludedTables)
 
 	return schemaTables(t.fieldType, tables)
 }

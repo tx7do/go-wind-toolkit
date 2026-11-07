@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"ariga.io/atlas/sql/schema"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 // GoSchema 转换由 Go 源码解析出的数据源(ent:// 与 gorm://):
@@ -26,20 +28,9 @@ func (gs *GoSchema) SchemaTables(ctx context.Context) ([]*TableData, error) {
 		return nil, fmt.Errorf("sqlproto: inspect go source schema: %w", err)
 	}
 
-	tables := s.Tables
-	if len(gs.excludedTables) > 0 {
-		excluded := make(map[string]bool, len(gs.excludedTables))
-		for _, t := range gs.excludedTables {
-			excluded[t] = true
-		}
-		filtered := make([]*schema.Table, 0, len(tables))
-		for _, t := range tables {
-			if !excluded[t.Name] {
-				filtered = append(filtered, t)
-			}
-		}
-		tables = filtered
-	}
+	// exclude 过滤统一走 schemasource.FilterTables(include 已由
+	// memoryInspector 的 InspectOptions.Tables 过滤)。
+	tables := schemasource.FilterTables(s.Tables, nil, gs.excludedTables)
 
 	return schemaTables(gs.fieldType, tables)
 }

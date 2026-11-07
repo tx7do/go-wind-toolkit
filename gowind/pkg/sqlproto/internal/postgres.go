@@ -120,20 +120,9 @@ func (p *Postgres) SchemaTables(ctx context.Context) ([]*TableData, error) {
 	if err != nil {
 		return nil, err
 	}
-	tables := s.Tables
-	if p.excludedTables != nil {
-		tables = nil
-		excludedTableNames := make(map[string]bool)
-		for _, t := range p.excludedTables {
-			excludedTableNames[t] = true
-		}
-		// filter out includedTables that are in excludedTables:
-		for _, t := range s.Tables {
-			if !excludedTableNames[t.Name] {
-				tables = append(tables, t)
-			}
-		}
-	}
+	// exclude 过滤统一走 schemasource.FilterTables(include 已由
+	// InspectOptions.Tables 在 inspect 期过滤)。
+	tables := schemasource.FilterTables(s.Tables, nil, p.excludedTables)
 	return schemaTables(PostgresFieldType, tables)
 }
 
