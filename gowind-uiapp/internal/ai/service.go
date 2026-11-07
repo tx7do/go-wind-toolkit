@@ -254,6 +254,15 @@ func (s *Service) PartitionMicroservicesValidatedStream(ddl string, onDelta func
 			partitions, warnings = sanitizePartitions(partitions, ddlTables)
 			if len(partitions) == 0 {
 				problem = "响应中没有包含任何有效划分( serviceName 非法/为空、tables 为空、表名不在 DDL 中都会被判无效)"
+			} else if orphans := unclaimedTables(ddlTables, partitions); len(orphans) > 0 {
+				// DDL 有表但没有任何服务认领:这些表会被后端生成静默跳过,
+				// 必须打回重试要求认领;重试预算耗尽则保留划分并降级为告警。
+				if attempt < maxPartitionAttempts {
+					problem = fmt.Sprintf("DDL 中的表 %v 没有被任何服务认领,微服务划分必须覆盖 DDL 的全部表", orphans)
+					warnings = nil // 重试后告警重新计算
+				} else {
+					warnings = append(warnings, fmt.Sprintf("表 %v 未被任何服务认领,生成后端时将被跳过", orphans))
+				}
 			}
 		}
 
@@ -331,6 +340,23 @@ func sanitizePartitions(partitions []MicroservicePartition, ddlTables []string) 
 		})
 	}
 	return valid, warnings
+}
+
+// unclaimedTables 返回 DDL 中存在但没有被任何划分认领的表(按 DDL 原拼写)。
+func unclaimedTables(ddlTables []string, partitions []MicroservicePartition) []string {
+	claimed := make(map[string]bool, len(partitions))
+	for _, p := range partitions {
+		for _, t := range p.Tables {
+			claimed[normalizeTableName(t)] = true
+		}
+	}
+	var orphans []string
+	for _, t := range ddlTables {
+		if !claimed[normalizeTableName(t)] {
+			orphans = append(orphans, t)
+		}
+	}
+	return orphans
 }
 
 // ReviewCode 审查代码

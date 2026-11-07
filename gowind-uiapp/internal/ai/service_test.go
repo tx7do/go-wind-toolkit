@@ -287,6 +287,59 @@ func TestPartitionMicroservicesValidated_ParseRetry(t *testing.T) {
 	}
 }
 
+func TestPartitionMicroservicesValidated_OrphanTableRetry(t *testing.T) {
+	// 首次划分漏掉 order 表(孤儿),必须打回重试;第二次认领全部表后成功。
+	partial := `[
+  {"serviceName": "user", "tables": ["user", "user_role"], "description": "用户"}
+]`
+	svc, mock := newTestService(partial, partitionGood)
+
+	partitions, _, warnings, err := svc.PartitionMicroservicesValidated(testDDL)
+	if err != nil {
+		t.Fatalf("重试后应成功: %v", err)
+	}
+	if mock.i != 2 {
+		t.Fatalf("孤儿表应触发一次重试,实际 %d 次调用", mock.i)
+	}
+	if !strings.Contains(mock.prompts[1], "没有被任何服务认领") || !strings.Contains(mock.prompts[1], "order") {
+		t.Fatalf("重试提示应指出未认领的表,得到: %.160s", mock.prompts[1])
+	}
+	claimed := map[string]bool{}
+	for _, p := range partitions {
+		for _, tbl := range p.Tables {
+			claimed[tbl] = true
+		}
+	}
+	for _, want := range []string{"user", "user_role", "order"} {
+		if !claimed[want] {
+			t.Fatalf("全部 DDL 表都应被认领,缺 %s", want)
+		}
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("成功路径不应残留告警,得到 %v", warnings)
+	}
+}
+
+func TestPartitionMicroservicesValidated_OrphanTableDegradesToWarning(t *testing.T) {
+	// 重试预算耗尽仍漏表:保留划分并降级为告警,不再报错。
+	partial := `[
+  {"serviceName": "user", "tables": ["user", "user_role"], "description": "用户"}
+]`
+	svc, _ := newTestService(partial, partial)
+
+	partitions, _, warnings, err := svc.PartitionMicroservicesValidated(testDDL)
+	if err != nil {
+		t.Fatalf("预算耗尽不应报错(降级告警): %v", err)
+	}
+	if len(partitions) != 1 {
+		t.Fatalf("应保留有效划分,得到 %d 个", len(partitions))
+	}
+	joined := strings.Join(warnings, ";")
+	if !strings.Contains(joined, "order") || !strings.Contains(joined, "未被任何服务认领") {
+		t.Fatalf("应降级为孤儿表告警,得到: %s", joined)
+	}
+}
+
 func TestPartitionMicroservicesValidated_TwiceInvalid(t *testing.T) {
 	svc, _ := newTestService("仍然不是 JSON。", "还是不是 JSON。")
 
