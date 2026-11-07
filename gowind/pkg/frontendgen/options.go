@@ -69,6 +69,11 @@ type Options struct {
 	RouterModules []RouterModuleConfig
 	// AutoRouterModules RouterModules 为空时按 basePath 自动检测分组
 	AutoRouterModules bool
+	// ErrorI18NFiles protoc-gen-wind-errors 产出的错误文案词表
+	// (<proto>_errors_i18n.<lang>.json,reason -> {code, message})。
+	// 非空时按语言合并,额外产出 locales/<lang>/errors.json——
+	// 错误文案后端不出网,前端按 reason 本地化。
+	ErrorI18NFiles []string
 }
 
 // GeneratedFile 生成的文件

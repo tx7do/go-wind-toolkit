@@ -25,6 +25,7 @@ var (
 	frontendTypes        []string
 	frontendModulePath   string
 	frontendRouterModule string
+	frontendErrorI18N    []string
 	frontendOut          string
 	frontendDryRun       bool
 	frontendStdout       bool
@@ -183,6 +184,7 @@ func buildOptions() (frontendgen.Options, error) {
 		GenerateTypes:     frontendTypes,
 		Tags:              frontendTags,
 		RouterModules:     routerModules,
+		ErrorI18NFiles:    expandErrorI18N(frontendErrorI18N),
 		AutoRouterModules: true,
 	}
 	return opts, nil
@@ -212,6 +214,25 @@ func findOpenAPIFiles(root string) ([]string, error) {
 		return nil, fmt.Errorf("搜索 OpenAPI 文件失败: %w", err)
 	}
 	return files, nil
+}
+
+// expandErrorI18N 展开 --error-i18n 参数:目录展开为其中的
+// *_errors_i18n.*.json 词表,文件原样保留。
+func expandErrorI18N(refs []string) []string {
+	var files []string
+	for _, ref := range refs {
+		info, err := os.Stat(ref)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			matches, _ := filepath.Glob(filepath.Join(ref, "*_errors_i18n.*.json"))
+			files = append(files, matches...)
+			continue
+		}
+		files = append(files, ref)
+	}
+	return files
 }
 
 // openAPISpecClient 带超时的拉取客户端:http.Get 用的是无超时的 DefaultClient,
@@ -316,6 +337,7 @@ func init() {
 	frontendGenCmd.Flags().StringVar(&frontendServiceName, "service-name", "admin", "生成代码的服务名（generated 导入路径前缀）")
 	frontendGenCmd.Flags().StringVar(&frontendModulePath, "module-path-map", "", "文件名->模块路径 JSON（如 {\"role\":\"permission/role\"}），支持 @file")
 	frontendGenCmd.Flags().StringVar(&frontendRouterModule, "router-modules", "auto", "路由模块分组 JSON 数组（@file），缺省 auto 按 basePath 自动检测")
+	frontendGenCmd.Flags().StringSliceVar(&frontendErrorI18N, "error-i18n", nil, "wind 错误词表文件或目录(*_errors_i18n.<lang>.json),合并产出 locales/<lang>/errors.json")
 	frontendGenCmd.Flags().StringVar(&frontendOut, "out", "", "输出目录（前端项目 src 目录）")
 	frontendGenCmd.Flags().BoolVar(&frontendDryRun, "dry-run", false, "只输出文件清单，不写盘")
 	frontendGenCmd.Flags().BoolVar(&frontendStdout, "stdout", false, "不写盘，输出全部文件内容 JSON")

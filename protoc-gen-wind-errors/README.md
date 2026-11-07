@@ -69,6 +69,10 @@ plugins:
 }
 ```
 
+消费端：`gow frontend gen --error-i18n <词表文件或目录>`（与 MCP
+`generate_frontend` 的 `errorI18n` 参数）会把词表按语言合并产出前端
+`locales/<lang>/errors.json`，zh/en 自动归一到 zh-CN/en-US。
+
 文案来源是枚举值的注释：正文按 `|` 分段，段序与 `i18n_langs` 声明序位置对应
 （段1→第一个语言，段2→第二个语言）；缺段为空串，留给译者补齐。注释里不含 `|`
 时所有语言共用该段文本。/ Messages come from the enum value comments: the comment

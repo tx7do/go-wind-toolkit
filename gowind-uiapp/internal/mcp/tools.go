@@ -118,6 +118,7 @@ func toolDefinitions() []toolDef {
 				"tags":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "要生成的服务 tag 名(缺省=全部)"},
 				"types":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "文件类型 composable/page/drawer/router/locale(缺省=全部)"},
 				"dryRun":      map[string]any{"type": "boolean", "description": "只返回文件清单不写盘,默认 false"},
+				"errorI18n":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "wind 错误词表文件或目录(*_errors_i18n.<lang>.json),合并产出 locales/<lang>/errors.json"},
 			}, "projectRoot", "framework", "out"),
 		},
 	}
@@ -181,6 +182,7 @@ type generateFrontendArgs struct {
 	ServiceName string   `json:"serviceName"`
 	Tags        []string `json:"tags"`
 	Types       []string `json:"types"`
+	ErrorI18N   []string `json:"errorI18n"`
 	DryRun      bool     `json:"dryRun"`
 }
 
@@ -546,6 +548,7 @@ func (s *Server) handleGenerateFrontend(args json.RawMessage) (any, error) {
 		ServiceName:       a.ServiceName,
 		Tags:              a.Tags,
 		GenerateTypes:     a.Types,
+		ErrorI18NFiles:    a.ErrorI18N,
 		AutoRouterModules: true,
 	}
 	files, err := frontendgen.Generate(opts)

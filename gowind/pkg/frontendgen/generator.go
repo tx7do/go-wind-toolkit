@@ -8,14 +8,18 @@ func Generate(opts Options) ([]GeneratedFile, error) {
 		return nil, fmt.Errorf("OpenAPI 规格不能为空")
 	}
 
+	var files []GeneratedFile
 	switch opts.Framework {
 	case FrameworkVueVben:
-		return generateVben(opts), nil
+		files = generateVben(opts)
 	case FrameworkVueElement:
-		return generateElement(opts), nil
+		files = generateElement(opts)
 	case FrameworkReactAntd:
-		return generateReact(opts), nil
+		files = generateReact(opts)
 	default:
 		return nil, fmt.Errorf("不支持的前端框架: %q（可选 vue-element / vue-vben / react）", string(opts.Framework))
 	}
+
+	files = append(files, generateErrorI18N(opts)...)
+	return files, nil
 }
