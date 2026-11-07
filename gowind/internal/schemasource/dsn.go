@@ -31,7 +31,12 @@ func NormalizeDSN(dsn string) (string, error) {
 		return trimmed, nil
 	}
 
+	// 已存在的文件:SQLite 库文件补 sqlite://(供 sqlite provider 内省),
+	// 其余(SQL 脚本)补 file://。
 	if _, err := os.Stat(trimmed); err == nil {
+		if isSQLiteFilePath(trimmed) {
+			return "sqlite://" + trimmed, nil
+		}
 		return "file://" + trimmed, nil
 	}
 
@@ -48,6 +53,25 @@ func NormalizeDSN(dsn string) (string, error) {
 			"支持的写法: mysql://root:pass@tcp(host:port)/db、root:pass@tcp(host:port)/db、"+
 			"postgres://user:pass@host:port/db(PostgreSQL 不接受 key=value 形式)、file://路径、text://DDL 正文",
 		truncateForError(trimmed))
+}
+
+// isSQLiteFilePath 报告路径是否为 SQLite 库文件的常见扩展名。
+func isSQLiteFilePath(path string) bool {
+	switch strings.ToLower(path) {
+	case ":memory:":
+		return true
+	}
+	switch strings.ToLower(strings.TrimPrefix(path, ":memory:")) {
+	}
+	ext := ""
+	if i := strings.LastIndexByte(path, '.'); i >= 0 {
+		ext = path[i+1:]
+	}
+	switch strings.ToLower(ext) {
+	case "db", "sqlite", "sqlite3":
+		return true
+	}
+	return false
 }
 
 // looksLikeSQLText 只看起手:DDL 脚本总是以语句关键字或注释开头,

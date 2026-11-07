@@ -35,7 +35,7 @@ func NewImport(opts ...ImportOption) (SchemaImporter, error) {
 		field = mysqlField
 	case dialect.Postgres:
 		field = postgresField
-	case "text":
+	case "text", dialect.SQLite:
 		field = textField
 	default:
 		return nil, fmt.Errorf("entimport: unsupported dialect %q", i.driver.Dialect)

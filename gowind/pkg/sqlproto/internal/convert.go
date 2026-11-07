@@ -28,6 +28,8 @@ func NewConvert(opts ...ConvertOption) (SchemaConverter, error) {
 		fnc = PostgresFieldType
 	case "text":
 		fnc = textFieldType
+	case dialect.SQLite:
+		fnc = sqliteFieldType
 	case schemasource.DialectEntSchema, schemasource.DialectGormSchema:
 		fnc = goSchemaFieldType
 	default:
