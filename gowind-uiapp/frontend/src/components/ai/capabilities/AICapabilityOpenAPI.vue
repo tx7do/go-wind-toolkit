@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {computed} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {SearchOutlined} from '@ant-design/icons-vue'
@@ -8,6 +9,10 @@ import {useProject} from '../../../stores/project'
 const {t} = useI18n()
 const {projectInfo} = useProject()
 const {openapiFiles, openapiMessage, openapiLoading, findOpenAPI} = useAI()
+
+const openapiBadge = computed(() =>
+    openapiFiles.value.length > 0 ? t('ai.badge.files', {count: openapiFiles.value.length}) : null
+)
 
 async function handleFind() {
   if (!projectInfo.value) {
@@ -28,7 +33,15 @@ async function handleFind() {
 </script>
 
 <template>
-  <a-card :title="t('ai.openapi.title')" size="small">
+  <a-card size="small">
+    <template #title>
+      <div class="card-title-row">
+        <span class="title-with-badge">
+          {{ t('ai.openapi.title') }}
+          <a-tag v-if="openapiBadge" color="green" class="status-badge">{{ openapiBadge }}</a-tag>
+        </span>
+      </div>
+    </template>
     <p class="step-desc">{{ t('ai.openapi.desc') }}</p>
     <a-button type="primary" :loading="openapiLoading" :disabled="!projectInfo" @click="handleFind">
       <SearchOutlined style="margin-right: 4px"/> {{ t('ai.openapi.searchBtn') }}
@@ -48,6 +61,24 @@ async function handleFind() {
 </template>
 
 <style scoped>
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.title-with-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge {
+  margin: 0;
+  font-weight: 400;
+}
+
 .step-desc {
   font-size: 13px;
   color: #8c8c8c;

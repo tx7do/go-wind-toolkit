@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {computed} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {EyeOutlined, CheckCircleOutlined, CloseCircleOutlined} from '@ant-design/icons-vue'
@@ -15,6 +16,15 @@ const {
   previewFile, previewContent, previewDrawerOpen,
   planBackend, applyBackend, discardBackendPlan, openPlanFile,
 } = useAI()
+
+// 计划待确认徽标
+const planBadge = computed(() => {
+  if (!backendPlan.value) return null
+  return t('ai.badge.planPending', {
+    newCount: backendPlan.value.newCount || 0,
+    overwriteCount: backendPlan.value.overwriteCount || 0,
+  })
+})
 
 // 预览阶段:主按钮是"预览变更";预览就绪后进入确认面板
 async function handlePlan() {
@@ -54,7 +64,15 @@ async function handleOpenFile(path: string) {
 </script>
 
 <template>
-  <a-card :title="t('ai.backend.title')" size="small">
+  <a-card size="small">
+    <template #title>
+      <div class="card-title-row">
+        <span class="title-with-badge">
+          {{ t('ai.backend.title') }}
+          <a-tag v-if="planBadge" color="orange" class="status-badge">{{ planBadge }}</a-tag>
+        </span>
+      </div>
+    </template>
     <a-form layout="vertical">
       <a-form-item :label="t('ai.backend.ormType')">
         <a-radio-group v-model:value="ormType" :disabled="!!backendPlan">
@@ -149,6 +167,24 @@ async function handleOpenFile(path: string) {
 </template>
 
 <style scoped>
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.title-with-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge {
+  margin: 0;
+  font-weight: 400;
+}
+
 .partition-summary {
   margin-bottom: 16px;
   padding: 12px;

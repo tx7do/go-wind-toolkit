@@ -16,6 +16,10 @@ const {
   scanForReview, runReview, viewReview, cancelTask,
 } = useAI()
 
+const reviewBadge = computed(() =>
+    reviewReports.value.length > 0 ? t('ai.badge.reports', {count: reviewReports.value.length}) : null
+)
+
 // 严重度 → 标签颜色与文案
 const severityMeta: Record<string, {color: string; key: string}> = {
   critical: {color: 'red', key: 'ai.review.sevCritical'},
@@ -75,7 +79,15 @@ async function handleViewReport(file: any) {
 </script>
 
 <template>
-  <a-card :title="t('ai.review.title')" size="small">
+  <a-card size="small">
+    <template #title>
+      <div class="card-title-row">
+        <span class="title-with-badge">
+          {{ t('ai.review.title') }}
+          <a-tag v-if="reviewBadge" color="green" class="status-badge">{{ reviewBadge }}</a-tag>
+        </span>
+      </div>
+    </template>
     <p class="step-desc">{{ t('ai.review.desc') }}</p>
 
     <div class="scan-bar">
@@ -170,6 +182,24 @@ async function handleViewReport(file: any) {
 </template>
 
 <style scoped>
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.title-with-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge {
+  margin: 0;
+  font-weight: 400;
+}
+
 .step-desc {
   font-size: 13px;
   color: #8c8c8c;

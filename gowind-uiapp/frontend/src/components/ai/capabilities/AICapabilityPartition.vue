@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed, ref} from 'vue'
+
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {EditOutlined, PlusOutlined, DeleteOutlined, TableOutlined} from '@ant-design/icons-vue'
@@ -12,6 +13,10 @@ const {
   partition, beginEditPartitions, cancelEditPartitions, savePartitions,
   removeTable, moveTable, assignTable, addService, removeService, cancelTask,
 } = useAI()
+
+const partitionBadge = computed(() =>
+    hasPartitions.value ? t('ai.badge.partitionReady', {count: partitions.value.length}) : null
+)
 
 const saving = ref(false)
 
@@ -87,7 +92,10 @@ const serviceIndexes = computed(() => partitions.value.map((_, i) => i))
   <a-card size="small">
     <template #title>
       <div class="card-title-row">
-        <span>{{ t('ai.partition.title') }}</span>
+        <span class="title-with-badge">
+          {{ t('ai.partition.title') }}
+          <a-tag v-if="partitionBadge && !editingPartitions" color="green" class="status-badge">{{ partitionBadge }}</a-tag>
+        </span>
         <div class="card-actions">
           <!-- 视图态才有"编辑";生成按钮在编辑态禁用,避免编辑中途被 AI 重跑覆盖 -->
           <a-button v-if="hasPartitions && !editingPartitions" @click="handleBeginEdit">
@@ -233,6 +241,17 @@ const serviceIndexes = computed(() => partitions.value.map((_, i) => i))
   justify-content: space-between;
   width: 100%;
   gap: 8px;
+}
+
+.title-with-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge {
+  margin: 0;
+  font-weight: 400;
 }
 
 .card-actions {

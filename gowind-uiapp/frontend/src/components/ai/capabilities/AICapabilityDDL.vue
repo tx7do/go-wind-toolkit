@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, watch} from 'vue'
+import {computed, ref, watch} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {RobotOutlined, SaveOutlined, SafetyCertificateOutlined} from '@ant-design/icons-vue'
@@ -19,6 +19,12 @@ const {
   requirements, ddlContent, ddlGenerating, ddlAttempt,
   generateDDL, saveArtifacts, cancelTask,
 } = useAI()
+
+// 标题徽标:DDL 就绪时显示行数
+const ddlBadge = computed(() => {
+  const lines = ddlContent.value.split('\n').filter(l => l.trim()).length
+  return lines > 0 ? t('ai.badge.ddlReady', {lines}) : null
+})
 
 // 编辑器语法诊断:校验按钮/生成失败时回填,内容一变即清(陈旧标记误导)
 const ddlDiagnostics = ref<EditorDiagnostic[]>([])
@@ -80,7 +86,10 @@ async function handleSave() {
   <a-card size="small">
     <template #title>
       <div class="card-title-row">
-        <span>{{ t('ai.ddl.title') }}</span>
+        <span class="title-with-badge">
+          {{ t('ai.ddl.title') }}
+          <a-tag v-if="ddlBadge && !ddlGenerating" color="green" class="status-badge">{{ ddlBadge }}</a-tag>
+        </span>
         <div class="card-actions">
           <a-button :disabled="ddlGenerating || !ddlContent" @click="handleValidate">
             <SafetyCertificateOutlined style="margin-right: 4px"/> {{ t('ai.ddl.validateBtn') }}
@@ -128,6 +137,17 @@ async function handleSave() {
   align-items: center;
   justify-content: space-between;
   width: 100%;
+}
+
+.title-with-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge {
+  margin: 0;
+  font-weight: 400;
 }
 
 .card-actions {

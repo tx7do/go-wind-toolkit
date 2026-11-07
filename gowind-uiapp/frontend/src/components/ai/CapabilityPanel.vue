@@ -16,7 +16,7 @@ const {t} = useI18n()
 <template>
   <div class="capability-panel">
     <a-row :gutter="[12, 12]">
-      <a-col :xs="24" :md="12"><AICapabilityConfig/></a-col>
+      <a-col id="ai-config-card" :xs="24" :md="12"><AICapabilityConfig/></a-col>
       <a-col :xs="24" :md="12"><AICapabilityDDL/></a-col>
       <a-col :xs="24" :md="12"><AICapabilityPartition/></a-col>
       <a-col :xs="24" :md="12"><AICapabilityBackend/></a-col>

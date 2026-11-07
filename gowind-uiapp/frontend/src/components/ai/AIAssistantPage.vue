@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {onMounted} from 'vue'
+import {nextTick, onMounted} from 'vue'
 import {useI18n} from 'vue-i18n'
-import {FolderOpenOutlined} from '@ant-design/icons-vue'
+import {FolderOpenOutlined, SettingOutlined} from '@ant-design/icons-vue'
 import {useProject} from '../../stores/project'
 import {useAI} from '../../stores/ai'
 import CapabilityPanel from './CapabilityPanel.vue'
@@ -13,15 +13,33 @@ const {t} = useI18n()
 const {projectInfo, hasProject, projectLoading, projectError, selectAndOpenProject} = useProject()
 
 // AI 能力状态:流事件绑定、换项目重置与产物恢复都收敛在 store 的 initAI 里
-const {mode, initAI} = useAI()
+const {mode, aiConfigured, initAI} = useAI()
 
 onMounted(() => {
   initAI()
 })
+
+// 首次运行引导:切到面板并滚动到配置卡
+function goToConfig() {
+  mode.value = 'panel'
+  nextTick(() => {
+    document.getElementById('ai-config-card')?.scrollIntoView({behavior: 'smooth', block: 'start'})
+  })
+}
 </script>
 
 <template>
   <div class="ai-assistant-page">
+    <!-- 首次运行引导:未配置 API Key 时所有生成类能力都不可用 -->
+    <a-alert v-if="aiConfigured === false" type="warning" show-icon class="setup-banner">
+      <template #message>{{ t('ai.banner.notConfigured') }}</template>
+      <template #action>
+        <a-button size="small" danger type="primary" @click="goToConfig">
+          <SettingOutlined style="margin-right: 4px"/> {{ t('ai.banner.goConfig') }}
+        </a-button>
+      </template>
+    </a-alert>
+
     <!-- 未打开项目时给出入口；已打开项目由顶栏全局展示，本页不重复 -->
     <div v-if="!hasProject" class="project-bar">
       <a-button type="primary" :loading="projectLoading" @click="selectAndOpenProject">
@@ -50,6 +68,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.setup-banner {
+  flex-shrink: 0;
+}
+
 .ai-assistant-page {
   display: flex;
   flex-direction: column;

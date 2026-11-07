@@ -11,6 +11,7 @@ import {
   AIFindOpenAPIFiles,
   AIReviewScan,
   AIReviewProject,
+  GetAIConfig,
   LoadAIArtifacts,
   SaveAIArtifact,
   LoadAIReviewReport,
@@ -75,6 +76,18 @@ const reviewBatchTotal = ref(0)
 const reviewIssues = ref<ai.ReviewIssue[]>([])
 
 const hasPartitions = computed(() => partitions.value.length > 0)
+
+// AI 服务是否已配置 API Key(null=尚未检测):首次运行横幅与配置卡徽标共用
+const aiConfigured = ref<boolean | null>(null)
+
+async function checkConfigured() {
+  try {
+    const cfg = await GetAIConfig()
+    aiConfigured.value = !!cfg && !!cfg.apiKey
+  } catch {
+    aiConfigured.value = false
+  }
+}
 
 // ==================== 流式事件 ====================
 // 后端在 DDL 校验失败自动重试时递增 attempt;前端见到变化必须清空
@@ -466,6 +479,7 @@ function initAI() {
   bindEvents()
   if (initialized) return
   initialized = true
+  checkConfigured()
   const {projectInfo} = useProject()
   // 换项目必须丢掉上一个项目的产物(生成直接写当前项目目录),
   // 并加载新项目里已保存的 .gowind/ai/ 产物恢复现场。
@@ -481,6 +495,7 @@ export function useAI() {
   return {
     // 状态
     mode,
+    aiConfigured, checkConfigured,
     requirements, ddlContent, ddlGenerating, ddlAttempt,
     partitions, partitionWarnings, partitionLoading, hasPartitions,
     editingPartitions, ddlTables, unassignedTables, partitionStreamContent,

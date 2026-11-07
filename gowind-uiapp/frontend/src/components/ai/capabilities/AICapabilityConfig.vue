@@ -1,12 +1,21 @@
 <script setup lang="ts">
-import {reactive, ref} from 'vue'
+import {computed, reactive, ref} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {SaveOutlined, ApiOutlined} from '@ant-design/icons-vue'
 import {GetAIConfig, SetAIConfig, GetAIProviderPresets, TestAIConnection} from '../../../../wailsjs/go/main/App'
 import type {ai} from '../../../../wailsjs/go/models'
+import {useAI} from '../../../stores/ai'
 
 const {t} = useI18n()
+const {aiConfigured, checkConfigured} = useAI()
+
+// 标题栏就绪徽标:aiConfigured 三态,null 时不显示
+const configBadge = computed(() => {
+  if (aiConfigured.value === true) return {color: 'green', text: t('ai.config.badgeReady')}
+  if (aiConfigured.value === false) return {color: 'orange', text: t('ai.config.badgeNotConfigured')}
+  return null
+})
 
 interface AIConfigData {
   provider: string
@@ -55,6 +64,7 @@ async function handleSaveConfig() {
   try {
     await SetAIConfig(aiConfig as any)
     message.success(t('ai.config.saved'))
+    checkConfigured()
   } catch (e) {
     message.error(t('ai.config.saveFailed'))
   }
@@ -70,6 +80,7 @@ async function handleTestConnection() {
     } else {
       message.error(result.error || t('ai.config.connectFailed'))
     }
+    checkConfigured()
   } catch (e) {
     message.error(t('ai.config.connectFailed'))
   } finally {
@@ -81,7 +92,13 @@ loadAIConfig()
 </script>
 
 <template>
-  <a-card :title="t('ai.config.title')" size="small">
+  <a-card size="small">
+    <template #title>
+      <div class="card-title-row">
+        <span>{{ t('ai.config.title') }}</span>
+        <a-tag v-if="configBadge" :color="configBadge.color" class="config-badge">{{ configBadge.text }}</a-tag>
+      </div>
+    </template>
     <a-form layout="vertical">
       <a-row :gutter="16">
         <a-col :span="12">
@@ -133,6 +150,17 @@ loadAIConfig()
 </template>
 
 <style scoped>
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.config-badge {
+  margin: 0;
+}
+
 .config-actions {
   display: flex;
   gap: 8px;
