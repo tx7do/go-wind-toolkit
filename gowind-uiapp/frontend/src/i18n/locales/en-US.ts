@@ -413,6 +413,17 @@ export default {
       wizardHint: 'A fixed path from requirements to backend code; switch to the panel to rerun any single step',
     },
     cancel: 'Cancel',
+    banner: {
+      notConfigured: 'AI service has no API Key configured; generation/partition/review are unavailable',
+      goConfig: 'Configure now',
+    },
+    badge: {
+      ddlReady: 'Ready · {lines} lines',
+      partitionReady: 'Ready · {count} service(s)',
+      planPending: 'Plan pending · {newCount} new / {overwriteCount} overwrite',
+      files: '{count} file(s)',
+      reports: '{count} report(s)',
+    },
     wizard: {
       hint: 'Complete the chain step by step; artifacts are saved automatically and you can switch to the panel anytime',
       configHint: 'AI settings live in the capability panel',
@@ -450,6 +461,8 @@ export default {
       testConnection: 'Test Connection',
       connectSuccess: 'AI connection successful',
       connectFailed: 'AI connection failed',
+      badgeReady: 'Ready',
+      badgeNotConfigured: 'Not configured',
     },
     requirements: {
       title: 'Input Requirements',

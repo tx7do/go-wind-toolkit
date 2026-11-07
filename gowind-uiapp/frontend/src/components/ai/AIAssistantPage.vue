@@ -19,12 +19,22 @@ onMounted(() => {
   initAI()
 })
 
-// 首次运行引导:切到面板并滚动到配置卡
-function goToConfig() {
+// 首次运行引导:切到面板,滚动到配置卡并高亮闪烁、聚焦 API Key 输入框。
+// 配置卡是面板第一张卡,通常已在视区——滚动无位移,必须另有可见反馈,
+// 否则按钮看起来"没有响应"。
+async function goToConfig() {
   mode.value = 'panel'
-  nextTick(() => {
-    document.getElementById('ai-config-card')?.scrollIntoView({behavior: 'smooth', block: 'start'})
-  })
+  await nextTick()
+  const card = document.getElementById('ai-config-card')
+  card?.scrollIntoView({behavior: 'smooth', block: 'start'})
+  if (card) {
+    card.classList.remove('ai-config-flash')
+    void (card as HTMLElement).offsetWidth // 强制重排,重启动画
+    card.classList.add('ai-config-flash')
+    window.setTimeout(() => card.classList.remove('ai-config-flash'), 1600)
+  }
+  const apiKeyInput = document.getElementById('ai-api-key-input') as HTMLInputElement | null
+  apiKeyInput?.focus({preventScroll: true})
 }
 </script>
 
@@ -113,5 +123,20 @@ function goToConfig() {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+</style>
+
+<style>
+/* goToConfig 的定位反馈:目标是 CapabilityPanel 渲染的 #ai-config-card(a-col),
+   跨组件作用域,必须放全局块。卡片通常已在视区,滚动无位移,闪烁给出"已定位"反馈。 */
+@keyframes aiConfigFlash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(250, 173, 20, 0); }
+  25% { box-shadow: 0 0 0 6px rgba(250, 173, 20, 0.45); }
+  60% { box-shadow: 0 0 0 2px rgba(250, 173, 20, 0.25); }
+}
+
+.ai-config-flash {
+  animation: aiConfigFlash 1.5s ease-in-out 1;
+  border-radius: 8px;
 }
 </style>

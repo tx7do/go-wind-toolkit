@@ -440,6 +440,17 @@ export default {
       wizardHint: '从需求到后端代码的固定链路，随时可在面板中单独重跑某一步',
     },
     cancel: '取消',
+    banner: {
+      notConfigured: 'AI 服务尚未配置 API Key，生成/划分/审查功能暂不可用',
+      goConfig: '去配置',
+    },
+    badge: {
+      ddlReady: '就绪 · {lines} 行',
+      partitionReady: '就绪 · {count} 服务',
+      planPending: '计划待确认 · 新增 {newCount} / 覆盖 {overwriteCount}',
+      files: '{count} 个文件',
+      reports: '{count} 份报告',
+    },
     wizard: {
       hint: '按链路逐步完成；产物自动落盘，可随时切到能力面板单独操作',
       configHint: 'AI 配置在能力面板中',
@@ -477,6 +488,8 @@ export default {
       testConnection: '测试连接',
       connectSuccess: 'AI 连接成功',
       connectFailed: 'AI 连接失败',
+      badgeReady: '已就绪',
+      badgeNotConfigured: '未配置',
     },
     requirements: {
       title: '输入需求文档',

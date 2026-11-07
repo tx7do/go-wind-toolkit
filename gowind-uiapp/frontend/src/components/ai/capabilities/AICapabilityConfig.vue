@@ -123,7 +123,7 @@ loadAIConfig()
         <a-input v-model:value="aiConfig.azureApiVersion" :placeholder="t('ai.config.azureApiVersionPlaceholder')"/>
       </a-form-item>
       <a-form-item :label="t('ai.config.apiKey')">
-        <a-input-password v-model:value="aiConfig.apiKey" :placeholder="t('ai.config.apiKeyPlaceholder')"/>
+        <a-input-password id="ai-api-key-input" v-model:value="aiConfig.apiKey" :placeholder="t('ai.config.apiKeyPlaceholder')"/>
       </a-form-item>
       <a-row :gutter="16">
         <a-col :span="12">
