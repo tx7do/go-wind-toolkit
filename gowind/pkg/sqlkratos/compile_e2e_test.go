@@ -56,13 +56,6 @@ func TestCompileE2E_GeneratedServiceCompilesAndTestsPass(t *testing.T) {
 		{name: "grpc-gorm", servers: []string{"grpc"}, orm: "gorm", useRepo: true, entCodegen: false, extraPlugins: []string{"protoc-gen-go-grpc"}},
 	}
 	for _, v := range variants {
-		if v.orm == "gorm" && os.Getenv("GOWIND_COMPILE_E2E_GORM") != "1" {
-			// 修复已落 kratos-bootstrap 8cf9ae7(签名对齐 bootstrap v0.1.17
-			// 的 logger.Helper + loggerBridge 适配 go-wind/log),但未经推送
-			// 与打 tag 前,scratch 的 go.mod 只能解析到断裂的 v0.1.6。
-			// 推送并打 database/gorm 新 tag 后,本变体无需任何环境变量即可绿。
-			t.Skip("待 kratos-bootstrap 8cf9ae7 推送并发布 database/gorm 新版本;本地验证可设 GOWIND_COMPILE_E2E_GORM=1 + go.mod replace 本地检出")
-		}
 		t.Run(v.name, func(t *testing.T) {
 			runCompileVariant(t, v)
 		})
