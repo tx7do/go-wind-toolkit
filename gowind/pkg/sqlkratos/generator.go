@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,110 +12,18 @@ import (
 	"github.com/jinzhu/inflection"
 	"github.com/tx7do/go-utils/code_generator"
 	"github.com/tx7do/go-utils/stringcase"
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/generators"
 
 	sqlorm "github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlorm"
 	sqlproto "github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlproto"
 )
 
-// ensureDSNScheme ensures the DSN has a valid scheme prefix based on the driver type.
-// If it already carries a scheme (or is DDL text, or driver is empty), it is returned as-is:
-// such sources describe their own type, so the driver must not gate them.
-// For PostgreSQL key-value format DSN (e.g. "host=localhost port=5432 user=postgres ..."),
-// it converts to URL format (e.g. "postgres://user:pass@host:port/dbname?sslmode=disable").
-// A driver we have no provider for is rejected here: passing it through would let the
-// source be reinterpreted as text:// and "succeed" while generating nothing.
+// ensureDSNScheme 按 driver 提示把数据源补成带 scheme 的形式——
+// 实现已收敛到 schemasource.NormalizeDSNWithDriver(含 PostgreSQL key-value
+// DSN 的 URL 转换与未知 driver 拒绝),这里只留调用点可读的薄壳。
 func ensureDSNScheme(dsn, driver string) (string, error) {
-	if strings.Contains(dsn, "://") {
-		return dsn, nil
-	}
-	if isDDLText(dsn) {
-		return dsn, nil
-	}
-	switch strings.ToLower(driver) {
-	case "":
-		return dsn, nil
-	case "mysql":
-		return "mysql://" + dsn, nil
-	case "postgresql", "postgres":
-		// PostgreSQL key-value DSN: "host=localhost port=5432 user=postgres password=xxx dbname=mydb sslmode=disable"
-		if isPostgresKeyValueDSN(dsn) {
-			return convertPostgresKeyValueToURL(dsn), nil
-		}
-		return "postgres://" + dsn, nil
-	default:
-		return "", fmt.Errorf("sqlkratos: unsupported driver: %q (supported: mysql, postgres, postgresql; leave it empty when the source carries its own scheme)", driver)
-	}
-}
-
-// isPostgresKeyValueDSN detects PostgreSQL key-value format DSN.
-// Key-value DSN contains space-separated key=value pairs like "host=localhost port=5432 user=postgres".
-func isPostgresKeyValueDSN(dsn string) bool {
-	return strings.Contains(dsn, "=") && strings.Contains(dsn, " ")
-}
-
-// isDDLText detects DDL text content (CREATE TABLE statements) passed as Source
-// instead of a DSN; such content must be handed to sqlproto's text:// handling as-is.
-func isDDLText(dsn string) bool {
-	return strings.Contains(strings.ToUpper(dsn), "CREATE TABLE")
-}
-
-// convertPostgresKeyValueToURL converts PostgreSQL key-value DSN to URL format.
-// Input:  "host=localhost port=5432 user=postgres password=xxx dbname=mydb sslmode=disable"
-// Output: "postgres://postgres:xxx@localhost:5432/mydb?sslmode=disable"
-//
-// 编码交给 url.URL:手写 url.QueryEscape 走的是表单规则,空格编成 "+",而 userinfo
-// 与 path 里的 "+" 是字面量,含空格或 "+" 的口令会被原样送到服务端。
-func convertPostgresKeyValueToURL(dsn string) string {
-	parts := strings.Fields(dsn)
-	vals := make(map[string]string)
-	for _, part := range parts {
-		kv := strings.SplitN(part, "=", 2)
-		if len(kv) == 2 {
-			vals[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-		}
-	}
-
-	host := vals["host"]
-	if host == "" {
-		host = "localhost"
-	}
-	port := vals["port"]
-	if port == "" {
-		port = "5432"
-	}
-	user := vals["user"]
-	password := vals["password"]
-	dbname := vals["dbname"]
-
-	u := &url.URL{
-		Scheme: "postgres",
-		Host:   host + ":" + port,
-	}
-	switch {
-	case user != "" && password != "":
-		u.User = url.UserPassword(user, password)
-	case user != "":
-		// 无口令时不能留 "user:" 的空冒号:那会被解成一个空口令。
-		u.User = url.User(user)
-	}
-	if dbname != "" {
-		u.Path = "/" + dbname
-	}
-
-	// Values.Encode 按键排序,同一份 DSN 每次得到同一个字符串。
-	params := url.Values{}
-	for k, v := range vals {
-		switch k {
-		case "host", "port", "user", "password", "dbname":
-			// already handled
-		default:
-			params.Set(k, v)
-		}
-	}
-	u.RawQuery = params.Encode()
-
-	return u.String()
+	return schemasource.NormalizeDSNWithDriver(dsn, driver)
 }
 
 func Generate(ctx context.Context, opts GeneratorOptions) error {

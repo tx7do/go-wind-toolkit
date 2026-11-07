@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -217,7 +216,8 @@ func TestGenerate_InvalidDriver(t *testing.T) {
 
 	err := Generate(ctx, opts)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported driver")
+	// 报错文案已随 ensureDSNScheme 收敛到 schemasource.NormalizeDSNWithDriver。
+	assert.Contains(t, err.Error(), "不支持的 driver")
 }
 
 // driver 只在 source 需要补 scheme 时才参与判定。GUI 的 ent:// 与 SQL 文本导入路径
@@ -236,10 +236,12 @@ func TestEnsureDSNScheme_IgnoresDriverForSelfDescribingSources(t *testing.T) {
 			want:   "ent://app/core/service/internal/data/ent/schema",
 		},
 		{
+			// SQL 正文类型被显式标注为 text://(下游管线无需再猜);关键契约是
+			// driver(sqlite)不参与门控,不会把正文当 DSN 拼前缀。
 			name:   "sqlite driver with ddl text",
 			source: "CREATE TABLE users (id bigint NOT NULL);",
 			driver: "sqlite",
-			want:   "CREATE TABLE users (id bigint NOT NULL);",
+			want:   "text://CREATE TABLE users (id bigint NOT NULL);",
 		},
 		{
 			name:   "bare source with empty driver",
@@ -277,40 +279,10 @@ func TestEnsureDSNScheme_RejectsUnsupportedDriver(t *testing.T) {
 		t.Run(driver, func(t *testing.T) {
 			got, err := ensureDSNScheme("some_bare_source", driver)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "unsupported driver")
+			assert.Contains(t, err.Error(), "不支持的 driver")
 			assert.Contains(t, err.Error(), driver)
 			assert.Empty(t, got)
 		})
-	}
-}
-
-// TestConvertPostgresKeyValueToURL_RoundTrips 转换后的 URL 必须能被解析回同样的
-// 分量——口令里带 / : @ # % + 这类字符时,拼出来的串很容易把 host 或 path 改掉。
-func TestConvertPostgresKeyValueToURL_RoundTrips(t *testing.T) {
-	for _, password := range []string{"plain", "p@ss", "p:ss", "p/ss", "p#ss", "p%ss", "p+ss", "p=ss&x=1"} {
-		t.Run(password, func(t *testing.T) {
-			dsn := convertPostgresKeyValueToURL("host=db.internal port=6000 user=app password=" + password + " dbname=mydb")
-
-			u, err := url.Parse(dsn)
-			require.NoError(t, err, "生成的 URL 无法解析: %s", dsn)
-			assert.Equal(t, "db.internal:6000", u.Host, "host 被口令里的字符改写掉了: %s", dsn)
-			assert.Equal(t, "/mydb", u.Path, "path 被改写掉了: %s", dsn)
-			require.NotNil(t, u.User)
-			assert.Equal(t, "app", u.User.Username())
-			got, ok := u.User.Password()
-			require.True(t, ok, "口令丢失: %s", dsn)
-			assert.Equal(t, password, got, "口令没有原样往返: %s", dsn)
-		})
-	}
-}
-
-// TestConvertPostgresKeyValueToURL_StableOrder 剩余参数来自 map 遍历,顺序必须稳定,
-// 否则同一份配置每次生成的 DSN 都不一样。
-func TestConvertPostgresKeyValueToURL_StableOrder(t *testing.T) {
-	in := "user=app dbname=mydb sslmode=disable search_path=public application_name=gow"
-	first := convertPostgresKeyValueToURL(in)
-	for i := 0; i < 30; i++ {
-		require.Equal(t, first, convertPostgresKeyValueToURL(in), "第 %d 次生成不一致", i+1)
 	}
 }
 
