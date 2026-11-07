@@ -179,6 +179,13 @@ func (s *Service) GenerateDDLValidated(requirements string, onDelta func(attempt
 		// 诊断已随 verr.Error() 带行列进入修复提示,这里无需单独取用
 		_, _, verr := ValidateDDLDetailed(cleaned)
 		if verr == nil {
+			// 语法之外再让真实生成管线当裁判:建表解析/列类型映射过不了的 DDL
+			// 同样打回重试,保证产物可被下游管线直接消费。
+			if convErr := trialConvertDDL(cleaned); convErr != nil {
+				lastErr = convErr
+				userPrompt = GetDDLConvertFixPrompt(requirements, cleaned, convErr.Error())
+				continue
+			}
 			return &StepResult{Success: true, Content: cleaned}, nil
 		}
 		lastErr = verr
@@ -187,7 +194,7 @@ func (s *Service) GenerateDDLValidated(requirements string, onDelta func(attempt
 		userPrompt = GetDDLFixPrompt(requirements, cleaned, verr.Error())
 	}
 
-	err := fmt.Errorf("DDL 连续 %d 次未通过解析校验: %v", maxDDLAttempts, lastErr)
+	err := fmt.Errorf("DDL 连续 %d 次未通过校验(解析或生成管线): %v", maxDDLAttempts, lastErr)
 	return &StepResult{Success: false, Error: err.Error()}, err
 }
 

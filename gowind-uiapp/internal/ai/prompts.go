@@ -37,6 +37,17 @@ func GetDDLFixPrompt(requirements string, previousDDL string, parseError string)
 		"the requirements and parses cleanly. Output ONLY raw SQL statements, no explanations."
 }
 
+// GetDDLConvertFixPrompt DDL 语法通过但生成管线(建表解析/列类型映射)拒绝时的
+// 修复重试提示:与解析错误的提示区分开,明确失败发生在消费侧。
+func GetDDLConvertFixPrompt(requirements string, previousDDL string, convertError string) string {
+	return "Here are the requirements for a software system:\n\n" + requirements +
+		"\n\nYou previously generated the following DDL. It parses, but the code generation pipeline cannot consume it:\n\n" + previousDDL +
+		"\n\nThe pipeline reported:\n" + convertError +
+		"\n\nPlease regenerate the COMPLETE corrected DDL (CREATE TABLE statements) that satisfies the requirements " +
+		"and is fully consumable by the pipeline. Output ONLY raw SQL statements, no explanations."
+}
+
+
 // GetPartitionFixPrompt 划分结果无效后的修复重试提示:附上被否决的原始响应与问题。
 func GetPartitionFixPrompt(ddl string, previousResponse string, problem string) string {
 	return "Here is the database DDL:\n\n" + ddl +
