@@ -135,6 +135,7 @@ func (g *Generator) writeEntRepoCode(
 			"Fields":                      fields,
 			"HasTimeConversionField":      fields.HasTimeConversionField(),
 			"HasStringNumConversionField": fields.HasStringNumConversionField(),
+			"HasNonNullStringNumField":    fields.HasNonNullStringNumField(),
 		},
 	}
 
