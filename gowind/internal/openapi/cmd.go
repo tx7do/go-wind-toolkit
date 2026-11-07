@@ -64,12 +64,7 @@ func Run(cmd *cobra.Command, args []string) error {
 	}
 
 	tmpl := filepath.Join(tmpDir, "buf.gen.yaml")
-	// managed 块只为满足 protogen 的 go_package 校验(很多项目靠 buf managed
-	// 模式统一注入 go_package,极简模板会报 "unable to determine Go import
-	// path");protoc-gen-openapi 的产物内容不受 go_package 影响。
-	tmplBody := "version: v2\n" +
-		"managed:\n  enabled: true\n  override:\n    - file_option: go_package_prefix\n      value: generated.openapi.local\n" +
-		"plugins:\n  - local: protoc-gen-openapi\n    out: " + filepath.ToSlash(tmpOut) + "\n    strategy: all\n"
+	tmplBody := buildBufTemplate(tmpOut)
 	if err := os.WriteFile(tmpl, []byte(tmplBody), 0o600); err != nil {
 		return fmt.Errorf("写入 buf 模板失败: %w", err)
 	}
@@ -84,14 +79,7 @@ func Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("插件未产出 openapi.yaml——确认目录内的 proto 服务带 google.api.http 注解")
 	}
 
-	// 目标路径:--out 为已存在目录时写入其中,否则视为文件路径;缺省 <api>/openapi.yaml。
-	target := openapiOut
-	if target == "" {
-		target = filepath.Join(apiPath, "openapi.yaml")
-	}
-	if st, serr := os.Stat(target); serr == nil && st.IsDir() {
-		target = filepath.Join(target, "openapi.yaml")
-	}
+	target := resolveTarget(apiPath, openapiOut)
 	data, err := os.ReadFile(generated)
 	if err != nil {
 		return fmt.Errorf("读取生成产物失败: %w", err)
@@ -103,6 +91,31 @@ func Run(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(out, "\033[32mSUCCESS: OpenAPI 文档已生成 -> %s\033[m\n", target)
 	fmt.Fprintf(out, "后续可运行: gow frontend gen --framework vue-vben --out <前端src目录>\n")
 	return nil
+}
+
+// buildBufTemplate 构造临时 buf.gen.yaml:
+//   - managed 块只为满足 protogen 的 go_package 校验(很多项目靠 buf managed
+//     模式统一注入 go_package,极简模板会报 "unable to determine Go import
+//     path");protoc-gen-openapi 的产物内容不受 go_package 影响。
+//   - strategy: all 必须——buf v2 缺省按文件并发调用插件,每次调用各自产出
+//     同名 openapi.yaml,buf 只保留第一个(往往是空文档)。
+func buildBufTemplate(tmpOut string) string {
+	return "version: v2\n" +
+		"managed:\n  enabled: true\n  override:\n    - file_option: go_package_prefix\n      value: generated.openapi.local\n" +
+		"plugins:\n  - local: protoc-gen-openapi\n    out: " + filepath.ToSlash(tmpOut) + "\n    strategy: all\n"
+}
+
+// resolveTarget 解析最终输出路径:out 为空 → <api>/openapi.yaml;
+// out 是已存在目录 → <out>/openapi.yaml;否则 out 原样作为文件路径。
+func resolveTarget(apiPath, out string) string {
+	target := out
+	if target == "" {
+		target = filepath.Join(apiPath, "openapi.yaml")
+	}
+	if st, serr := os.Stat(target); serr == nil && st.IsDir() {
+		target = filepath.Join(target, "openapi.yaml")
+	}
+	return target
 }
 
 func init() {
