@@ -5,11 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"regexp"
-	"strings"
-
-	"github.com/google/uuid"
-	ddlparser "github.com/tx7do/go-utils/ddl_parser"
 
 	"ariga.io/atlas/sql/mysql"
 	"ariga.io/atlas/sql/postgres"
@@ -19,6 +14,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/schema/field"
+
+	"github.com/google/uuid"
 
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
@@ -33,139 +30,11 @@ func NewText(i *ImportOptions) (*Text, error) {
 	}, nil
 }
 
-func (t *Text) toColumnType(tableName string, col ddlparser.ColumnDef, sqlContent string) (*schema.ColumnType, error) {
-	parsedType, err := schemasource.ParseType(col.Type)
-	if err != nil {
-		return nil, err
-	}
-
-	// ddl_parser 不把 unsigned 带进 col.Type(如 INT UNSIGNED 只返回 "int"),
-	// 需要从原始 SQL 中检测该列是否声明为 unsigned,再按无符号重新解析。
-	if intType, ok := parsedType.(*schema.IntegerType); ok && !intType.Unsigned {
-		if schemasource.ColumnIsUnsigned(tableName, col.Name, col.Type, sqlContent) {
-			unsignedType, uErr := schemasource.ParseType(col.Type + " unsigned")
-			if uErr == nil {
-				if uIntType, ok := unsignedType.(*schema.IntegerType); ok && uIntType.Unsigned {
-					parsedType = uIntType
-				}
-			}
-		}
-	}
-
-	return &schema.ColumnType{
-		Type: parsedType,
-		Raw:  col.Type,
-		Null: col.Nullable,
-	}, nil
-}
-
+// InspectSchema 把 SQL 文本解析为 atlas schema:表装配与列语义已收敛到
+// schemasource.ParseDDLText(与 sqlproto 共用同一实现),这里保留
+// SchemaImporter 接口形态,只做 sink(列 → ent.Field)。
 func (t *Text) InspectSchema(ctx context.Context, sqlContent string, opts *schema.InspectOptions, s *schema.Schema) (*schema.Schema, error) {
-	if sqlContent == "" {
-		return nil, fmt.Errorf("SQL 文本为空，无法解析")
-	}
-	if s == nil {
-		s = &schema.Schema{}
-	}
-
-	// 解析 SQL 文本
-	tables, err := ddlparser.ParseCreateTables(normalizeTableConstraints(sqlContent))
-	if err != nil {
-		return nil, fmt.Errorf("解析失败: %v", err)
-	}
-
-	columnComments, tableComments := extractCommentOn(sqlContent)
-
-	// 按 InspectOptions.Tables 过滤（nil/空 = 全部表），
-	// 与数据库直连路径的 atlas Inspector 行为一致
-	var includeTables map[string]bool
-	if opts != nil && len(opts.Tables) > 0 {
-		includeTables = make(map[string]bool, len(opts.Tables))
-		for _, name := range opts.Tables {
-			includeTables[name] = true
-		}
-	}
-
-	for _, tbl := range tables {
-		name := cleanTableName(tbl.Name)
-		if includeTables != nil && !includeTables[name] {
-			continue
-		}
-
-		table := &schema.Table{
-			Name:   name,
-			Schema: s,
-		}
-
-		tableComment := tbl.Comment
-		if tableComment == "" {
-			tableComment = tableComments[name]
-		}
-		if tableComment != "" {
-			table.Attrs = append(table.Attrs, &schema.Comment{
-				Text: tableComment,
-			})
-		}
-		if tbl.Collation != "" {
-			table.Attrs = append(table.Attrs, &schema.Collation{
-				V: tbl.Collation,
-			})
-		}
-		if tbl.Charset != "" {
-			table.Attrs = append(table.Attrs, &schema.Charset{
-				V: tbl.Charset,
-			})
-		}
-
-		for _, col := range tbl.Columns {
-			log.Printf("列名: %v, 类型: %v, NULL: %v\n", col.Name, col.Type, col.Nullable)
-
-			colType, err := t.toColumnType(name, col, sqlContent)
-			if err != nil {
-				log.Printf("解析失败: %v\n", err)
-				continue
-			}
-
-			column := &schema.Column{
-				Name: col.Name,
-				Type: colType,
-			}
-			colComment := col.Comment
-			if colComment == "" {
-				colComment = columnComments[name+"."+col.Name]
-			}
-			if colComment != "" {
-				column.SetComment(colComment)
-			}
-			if col.Default != "" {
-				column.SetDefault(&schema.NamedDefault{Expr: &schema.Literal{V: col.Default}})
-			}
-
-			if col.PrimaryKey {
-				table.PrimaryKey = &schema.Index{
-					Table: table,
-					Name:  col.Name,
-					Parts: []*schema.IndexPart{
-						{
-							C: column,
-						},
-					},
-				}
-			}
-
-			table.Columns = append(table.Columns, column)
-		}
-
-		for _, idx := range tbl.Indexes {
-			table.Indexes = append(table.Indexes, &schema.Index{
-				Table: table,
-				Name:  idx,
-			})
-		}
-
-		s.Tables = append(s.Tables, table)
-	}
-
-	return s, nil
+	return schemasource.ParseDDLText(sqlContent, opts, s)
 }
 
 // SchemaMutations 实现 SchemaImporter 接口，用于解析 SQL 文本
@@ -187,8 +56,8 @@ func (t *Text) SchemaMutations(ctx context.Context) ([]schemast.Mutator, error) 
 		return nil, err
 	}
 
-	// exclude 过滤统一走 schemasource.FilterTables(atlas 只吃 include,
-	// InspectOptions.Tables 已按 include 过滤,这里不再重复)。
+	// exclude 过滤统一走 schemasource.FilterTables(include 已由
+	// ParseDDLText 的 InspectOptions.Tables 过滤)。
 	tables := schemasource.FilterTables(s.Tables, nil, t.excludedTables)
 
 	return schemaMutations(t.field, tables)
@@ -327,62 +196,4 @@ func (t *Text) convertSerial(typ *postgres.SerialType, name string) ent.Field {
 		SchemaType(map[string]string{
 			dialect.Postgres: typ.T, // Override Postgres.
 		})
-}
-
-// constraintPKRe 匹配表级 `CONSTRAINT <名> PRIMARY KEY`。ddl_parser 只识别
-// 以 PRIMARY KEY 开头的分片,CONSTRAINT 名字头会被当作约束整体跳过,
-// 导致 Postgres 风格 DDL 丢失主键,解析前先归一化为 `PRIMARY KEY`。
-var constraintPKRe = regexp.MustCompile(`(?is)constraint\s+(?:"[^"]*"|` + "`[^`]*`" + `|\[[^\]]*\]|\S+)\s+primary\s+key`)
-
-func normalizeTableConstraints(sqlContent string) string {
-	return constraintPKRe.ReplaceAllString(sqlContent, "PRIMARY KEY")
-}
-
-// cleanTableName 去掉表名的引号与 schema/catalog 限定,只保留末端表名。
-// ddl_parser 对 "public"."addresses" 这类带引号限定名会解析出
-// `public"."addresses` 这样的残缺名。
-func cleanTableName(name string) string {
-	name = unquoteIdentifier(name)
-	if idx := strings.LastIndex(name, "."); idx != -1 {
-		name = name[idx+1:]
-	}
-	return strings.TrimSpace(name)
-}
-
-// unquoteIdentifier 去掉标识符的引号包裹,保留限定分隔符。
-func unquoteIdentifier(s string) string {
-	return strings.NewReplacer("\"", "", "`", "", "[", "", "]", "").Replace(s)
-}
-
-var (
-	// commentOnColumnRe 匹配 `COMMENT ON COLUMN <表路径>.<列> IS '<文本>'`,
-	// Postgres 的列注释是独立语句,不在 CREATE TABLE 内。
-	commentOnColumnRe = regexp.MustCompile(`(?is)comment\s+on\s+column\s+(.+?)\s+is\s+'((?:[^']|'')*)'`)
-	// commentOnTableRe 匹配 `COMMENT ON TABLE <表路径> IS '<文本>'`。
-	commentOnTableRe = regexp.MustCompile(`(?is)comment\s+on\s+table\s+(.+?)\s+is\s+'((?:[^']|'')*)'`)
-)
-
-// extractCommentOn 提取 COMMENT ON COLUMN/TABLE 独立语句的注释,
-// 返回 列注释(key: "表.列")与表注释(key: 表名),表/列名均已去限定去引号。
-func extractCommentOn(sqlContent string) (columnComments, tableComments map[string]string) {
-	columnComments = make(map[string]string)
-	tableComments = make(map[string]string)
-	for _, m := range commentOnColumnRe.FindAllStringSubmatch(sqlContent, -1) {
-		parts := strings.Split(unquoteIdentifier(m[1]), ".")
-		if len(parts) < 2 {
-			continue
-		}
-		table := parts[len(parts)-2]
-		column := parts[len(parts)-1]
-		columnComments[table+"."+column] = unescapeSQLString(m[2])
-	}
-	for _, m := range commentOnTableRe.FindAllStringSubmatch(sqlContent, -1) {
-		tableComments[cleanTableName(m[1])] = unescapeSQLString(m[2])
-	}
-	return columnComments, tableComments
-}
-
-// unescapeSQLString 还原 SQL 字符串字面量中的 '' 转义。
-func unescapeSQLString(s string) string {
-	return strings.ReplaceAll(s, "''", "'")
 }

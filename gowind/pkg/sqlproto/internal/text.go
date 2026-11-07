@@ -3,11 +3,8 @@ package internal
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"ariga.io/atlas/sql/schema"
-
-	ddlparser "github.com/tx7do/go-utils/ddl_parser"
 
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
@@ -22,121 +19,12 @@ func NewText(i *ConvertOptions) (*Text, error) {
 	}, nil
 }
 
-func (t *Text) toColumnType(tableName string, col ddlparser.ColumnDef, sqlContent string) (*schema.ColumnType, error) {
-	parsedType, err := schemasource.ParseType(col.Type)
-	if err != nil {
-		return nil, err
-	}
-
-	// ddl_parser 不把 unsigned 带进 col.Type(如 INT UNSIGNED 只返回 "int"),
-	// 需要回原文确认该列声明后再按 unsigned 重新解析一次。
-	raw := col.Type
-	if intType, ok := parsedType.(*schema.IntegerType); ok && !intType.Unsigned {
-		if schemasource.ColumnIsUnsigned(tableName, col.Name, col.Type, sqlContent) {
-			unsignedType, uErr := schemasource.ParseType(col.Type + " unsigned")
-			if uErr == nil {
-				if uIntType, ok := unsignedType.(*schema.IntegerType); ok && uIntType.Unsigned {
-					parsedType = uIntType
-					// Raw 是下游字符串映射(MySQLFieldType)的唯一输入,unsigned 必须留在里面。
-					raw = col.Type + " unsigned"
-				}
-			}
-		}
-	}
-
-	// PRIMARY KEY columns are always NOT NULL
-	isNullable := col.Nullable
-	if col.PrimaryKey {
-		isNullable = false
-	}
-
-	return &schema.ColumnType{
-		Type: parsedType,
-		Raw:  raw,
-		Null: isNullable,
-	}, nil
-}
-
+// InspectSchema 把 SQL 文本解析为 atlas schema:表装配与列语义已收敛到
+// schemasource.ParseDDLText(与 entimport 共用同一实现),这里只保留
+// 列类型 → proto 字符串映射的 sink。include/exclude 过滤由 SchemaTables
+// 统一走 schemasource.FilterTables。
 func (t *Text) InspectSchema(sqlContent string, s *schema.Schema) (*schema.Schema, error) {
-	if sqlContent == "" {
-		return nil, fmt.Errorf("SQL 内容为空，无法解析")
-	}
-	if s == nil {
-		s = &schema.Schema{}
-	}
-
-	// 解析 SQL 文本
-	tables, err := ddlparser.ParseCreateTables(sqlContent)
-	if err != nil {
-		return nil, fmt.Errorf("解析失败: %v", err)
-	}
-
-	for _, tbl := range tables {
-		table := &schema.Table{
-			Name:   tbl.Name,
-			Schema: s,
-		}
-
-		if tbl.Comment != "" {
-			table.Attrs = append(table.Attrs, &schema.Comment{
-				Text: tbl.Comment,
-			})
-		}
-		if tbl.Collation != "" {
-			table.Attrs = append(table.Attrs, &schema.Collation{
-				V: tbl.Collation,
-			})
-		}
-		if tbl.Charset != "" {
-			table.Attrs = append(table.Attrs, &schema.Charset{
-				V: tbl.Charset,
-			})
-		}
-
-		for _, col := range tbl.Columns {
-			colType, err := t.toColumnType(tbl.Name, col, sqlContent)
-			if err != nil {
-				log.Printf("sqlproto: 表 %s 的列 %s 解析失败: %v\n", tbl.Name, col.Name, err)
-				continue
-			}
-
-			column := &schema.Column{
-				Name: col.Name,
-				Type: colType,
-			}
-			if col.Comment != "" {
-				column.SetComment(col.Comment)
-			}
-			if col.Default != "" {
-				column.SetDefault(&schema.NamedDefault{Expr: &schema.Literal{V: col.Default}})
-			}
-
-			if col.PrimaryKey {
-				table.PrimaryKey = &schema.Index{
-					Table: table,
-					Name:  col.Name,
-					Parts: []*schema.IndexPart{
-						{
-							C: column,
-						},
-					},
-				}
-			}
-
-			table.Columns = append(table.Columns, column)
-		}
-
-		for _, idx := range tbl.Indexes {
-			table.Indexes = append(table.Indexes, &schema.Index{
-				Table: table,
-				Name:  idx,
-			})
-		}
-
-		s.Tables = append(s.Tables, table)
-	}
-
-	return s, nil
+	return schemasource.ParseDDLText(sqlContent, nil, s)
 }
 
 func (t *Text) SchemaTables(_ context.Context) ([]*TableData, error) {
