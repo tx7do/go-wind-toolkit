@@ -44,6 +44,9 @@ type check struct {
 	// 只会得到 flag 错误,没有可用的版本探针)。
 	probe []string
 	hint  string
+	// minVersion 语义版本地板:探测到的版本低于它时降级为 WARN
+	// (工具在但不达标,典型:生成的前端产物用 Vite 7,node 须 >= 20.19)。
+	minVersion string
 }
 
 func checks() []check {
@@ -53,7 +56,7 @@ func checks() []check {
 		{name: "protoc", kind: kindPipeline, probe: []string{"--version"}, hint: "https://protobuf.dev/install/"},
 		{name: "buf", kind: kindPipeline, probe: []string{"--version"}, hint: "https://buf.build/docs/installation"},
 		{name: "wire", kind: kindPipeline, hint: "go install github.com/google/wire/cmd/wire@latest"},
-		{name: "node", kind: kindPipeline, probe: []string{"--version"}, hint: "https://nodejs.org(前端生成产物联调需要)"},
+		{name: "node", kind: kindPipeline, probe: []string{"--version"}, minVersion: "20.19.0", hint: "https://nodejs.org(前端生成产物联调需要;Vite 7 要求 >= 20.19)"},
 		{name: "pnpm", kind: kindPipeline, probe: []string{"--version"}, hint: "npm i -g pnpm(可选,前端项目包管理)"},
 		{name: "protoc-gen-go", kind: kindPlugin},
 		{name: "protoc-gen-go-grpc", kind: kindPlugin},
@@ -93,6 +96,11 @@ func RunCheck(cmd *cobra.Command, _ []string) error {
 		if version == "" {
 			version = shortPath(path)
 		}
+		if c.minVersion != "" && versionTooLow(version, c.minVersion) {
+			missingOptional++
+			fmt.Fprintf(out, "  \033[33mOLD\033[m   %-28s %s — 低于地板 %s,%s\n", c.name, version, c.minVersion, c.hint)
+			continue
+		}
 		fmt.Fprintf(out, "  \033[32mOK\033[m    %-28s %s\n", c.name, version)
 	}
 
@@ -112,6 +120,42 @@ func RunCheck(cmd *cobra.Command, _ []string) error {
 		fmt.Fprintln(out, "\033[32mAll checks passed.\033[m")
 	}
 	return nil
+}
+
+// versionTooLow 尽力比较语义版本:解析失败(非 vX.Y.Z 形态)不告警,
+// 宁可放过也不误报。
+func versionTooLow(got, floor string) bool {
+	parse := func(v string) (int, int, int, bool) {
+		v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+		if i := strings.IndexByte(v, '-'); i >= 0 {
+			v = v[:i]
+		}
+		parts := strings.Split(v, ".")
+		var nums [3]int
+		for i := 0; i < 3 && i < len(parts); i++ {
+			n := 0
+			for _, r := range parts[i] {
+				if r < '0' || r > '9' {
+					return 0, 0, 0, false
+				}
+				n = n*10 + int(r-'0')
+			}
+			nums[i] = n
+		}
+		return nums[0], nums[1], nums[2], true
+	}
+	gm, gn, gp, ok1 := parse(got)
+	fm, fn, fp, ok2 := parse(floor)
+	if !ok1 || !ok2 {
+		return false
+	}
+	if gm != fm {
+		return gm < fm
+	}
+	if gn != fn {
+		return gn < fn
+	}
+	return gp < fp
 }
 
 // probe 尽力跑一次版本探针:失败(不存在该 flag/无输出/超时)就返回空串,不报错。

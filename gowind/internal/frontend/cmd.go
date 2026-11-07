@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -108,7 +109,18 @@ var frontendParseCmd = &cobra.Command{
 	Use:   "parse",
 	Short: "解析 OpenAPI 规范，列出可生成的服务（tag）",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		spec, err := loadOpenAPISpec(frontendOpenAPI)
+		openapiRef := frontendOpenAPI
+		if openapiRef == "" {
+			found, err := findOpenAPIFiles(".")
+			if err != nil {
+				return err
+			}
+			if len(found) == 0 {
+				return fmt.Errorf("必须指定 --openapi（OpenAPI YAML 文件路径或 http(s) URL；当前目录未找到 openapi.yaml）")
+			}
+			openapiRef = found[0]
+		}
+		spec, err := loadOpenAPISpec(openapiRef)
 		if err != nil {
 			return err
 		}
@@ -134,14 +146,24 @@ var frontendParseCmd = &cobra.Command{
 
 // buildOptions 校验公共参数并组装 frontendgen.Options。
 func buildOptions() (frontendgen.Options, error) {
-	if frontendOpenAPI == "" {
-		return frontendgen.Options{}, fmt.Errorf("必须指定 --openapi（OpenAPI YAML 文件路径或 http(s) URL）")
+	openapiRef := frontendOpenAPI
+	if openapiRef == "" {
+		// 缺省自动发现:与 MCP generate_frontend 的行为一致。
+		found, err := findOpenAPIFiles(".")
+		if err != nil {
+			return frontendgen.Options{}, err
+		}
+		if len(found) == 0 {
+			return frontendgen.Options{}, fmt.Errorf("必须指定 --openapi（OpenAPI YAML 文件路径或 http(s) URL；当前目录未找到 openapi.yaml）")
+		}
+		openapiRef = found[0]
+		fmt.Fprintf(os.Stderr, "使用自动发现的 OpenAPI: %s\n", openapiRef)
 	}
 	framework, ok := frontendgen.ParseFramework(frontendFramework)
 	if !ok {
 		return frontendgen.Options{}, fmt.Errorf("无效的 --framework %q（可选 vue-element / vue-vben / react）", frontendFramework)
 	}
-	spec, err := loadOpenAPISpec(frontendOpenAPI)
+	spec, err := loadOpenAPISpec(openapiRef)
 	if err != nil {
 		return frontendgen.Options{}, err
 	}
@@ -164,6 +186,32 @@ func buildOptions() (frontendgen.Options, error) {
 		AutoRouterModules: true,
 	}
 	return opts, nil
+}
+
+// findOpenAPIFiles 在 root 下查找 openapi.yaml/yml(大小写不敏感),
+// 返回相对 root 的路径清单。与桌面端 AI 能力的查找约定一致
+// (cmd/server/assets 优先,任意子目录的 openapi.yaml 亦命中)。
+func findOpenAPIFiles(root string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			if name := info.Name(); name == ".git" || name == "node_modules" || name == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.EqualFold(info.Name(), "openapi.yaml") || strings.EqualFold(info.Name(), "openapi.yml") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("搜索 OpenAPI 文件失败: %w", err)
+	}
+	return files, nil
 }
 
 // openAPISpecClient 带超时的拉取客户端:http.Get 用的是无超时的 DefaultClient,
@@ -261,7 +309,7 @@ func emitJSON(v any) error {
 }
 
 func init() {
-	frontendGenCmd.Flags().StringVar(&frontendOpenAPI, "openapi", "", "OpenAPI 3.0 YAML 文件路径或 http(s) URL（必填）")
+	frontendGenCmd.Flags().StringVar(&frontendOpenAPI, "openapi", "", "OpenAPI 3.0 YAML 文件路径或 http(s) URL（缺省自动查找当前目录）")
 	frontendGenCmd.Flags().StringVar(&frontendFramework, "framework", "", "目标框架: vue-element | vue-vben | react（必填）")
 	frontendGenCmd.Flags().StringSliceVar(&frontendTags, "tags", nil, "要生成的服务 tag 名（缺省=全部服务）")
 	frontendGenCmd.Flags().StringSliceVar(&frontendTypes, "types", nil, "文件类型: composable,page,drawer,router,locale（缺省=全部；react 的 composable 自动映射为 hooks）")
