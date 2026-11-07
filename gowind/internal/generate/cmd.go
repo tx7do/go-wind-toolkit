@@ -1,6 +1,8 @@
 package generate
 
-import (
+import (	"path/filepath"
+	"bytes"
+
 	"fmt"
 	"os"
 	"strings"
@@ -35,6 +37,7 @@ var (
 	genSkipORM       bool
 	genSkipConfig    bool
 	genTests       bool
+	genCheck       bool
 	genSkipMakefile  bool
 	genSourceModule  string
 	genDryRun        bool
@@ -53,6 +56,7 @@ func init() {
 	CmdGenerate.Flags().BoolVarP(&genSkipORM, "skip-orm", "", false, "Skip ORM code generation")
 	CmdGenerate.Flags().BoolVarP(&genSkipConfig, "skip-config", "", false, "Skip config file generation")
 	CmdGenerate.Flags().BoolVarP(&genTests, "tests", "", false, "Generate unit test scaffolds (fake repo) for CRUD services")
+	CmdGenerate.Flags().BoolVarP(&genCheck, "check", "", false, "Drift guard: generate into a temp dir and diff against the target, exit non-zero on drift")
 	CmdGenerate.Flags().BoolVarP(&genSkipMakefile, "skip-makefile", "", false, "Skip Makefile generation")
 	CmdGenerate.Flags().StringVarP(&genSourceModule, "source-module", "", "", "Source module name for REST service")
 	CmdGenerate.Flags().BoolVarP(&genDryRun, "dry-run", "n", false, "Validate the data source, resolve tables and preview the plan without writing anything")
@@ -181,12 +185,100 @@ func Run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if genCheck {
+		return runDriftCheck(cmd, opts)
+	}
+
 	if err := sqlkratos.Generate(cmd.Context(), opts); err != nil {
 		return err
 	}
 
 	fmt.Printf("\033[32mService [%s] generated successfully!\033[m\n", genServiceName)
 	return nil
+}
+
+// runDriftCheck 把同一份生成参数跑进临时目录,与目标工作区逐文件比对:
+// 生成侧有而工作区没有 = 漏改;两侧都有但内容不同 = 手改或过期。
+// wiring.go 不参与比对——真实项目会在其上注入装配行,与全新生成必然不同。
+// 有任何漂移时返回错误(退出码非 0),供 CI 门禁使用。
+func runDriftCheck(cmd *cobra.Command, opts sqlkratos.GeneratorOptions) error {
+	out := cmd.OutOrStdout()
+
+	tmpDir, err := os.MkdirTemp("", "gowind-gen-check-")
+	if err != nil {
+		return fmt.Errorf("创建临时目录失败: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	// ent ORM 生成要求 schema 目录位于 Go 模块内(WriteSchema 做 packages
+	// 加载),临时目录补一个桩 go.mod——生成完即弃,不影响任何产物。
+	if werr := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module check.local\n\ngo 1.24\n"), 0o644); werr != nil {
+		return fmt.Errorf("写入桩 go.mod 失败: %w", werr)
+	}
+
+	checkOpts := opts
+	checkOpts.OutputPath = tmpDir
+	checkOpts.GenerateTests = genTests
+	if err := sqlkratos.Generate(cmd.Context(), checkOpts); err != nil {
+		return fmt.Errorf("漂移检查的基准生成失败: %w", err)
+	}
+
+	type drift struct {
+		rel  string
+		kind string // missing / modified
+	}
+	var drifts []drift
+
+	err = filepath.WalkDir(tmpDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, rerr := filepath.Rel(tmpDir, path)
+		if rerr != nil {
+			return rerr
+		}
+		rel = filepath.ToSlash(rel)
+		// 桩 go.mod 与装配注入过的 wiring.go 都不是可比产物。
+		if rel == "go.mod" || filepath.Base(rel) == "wiring.go" {
+			return nil
+		}
+
+		target := filepath.Join(opts.OutputPath, filepath.FromSlash(rel))
+		tdata, terr := os.ReadFile(target)
+		if terr != nil {
+			if os.IsNotExist(terr) {
+				drifts = append(drifts, drift{rel: rel, kind: "missing"})
+				return nil
+			}
+			return terr
+		}
+		gdata, gerr := os.ReadFile(path)
+		if gerr != nil {
+			return gerr
+		}
+		if !bytes.Equal(tdata, gdata) {
+			drifts = append(drifts, drift{rel: rel, kind: "modified"})
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(drifts) == 0 {
+		fmt.Fprintf(out, "\033[32mSUCCESS: no drift — generated output matches the working tree.\033[m\n")
+		return nil
+	}
+
+	fmt.Fprintf(out, "\033[33mDRIFT detected (%d file(s)) — generation output differs from the working tree:\033[m\n", len(drifts))
+	for _, d := range drifts {
+		if d.kind == "missing" {
+			fmt.Fprintf(out, "  \033[33m~\033[m %s (generated file missing in the working tree)\n", d.rel)
+		} else {
+			fmt.Fprintf(out, "  \033[31m!\033[m %s (differs from fresh generation — hand-edited or outdated?)\n", d.rel)
+		}
+	}
+	return fmt.Errorf("%d 个生成文件与工作区不一致,请重新生成或回退手改", len(drifts))
 }
 
 func extractProjectName(module string) string {
