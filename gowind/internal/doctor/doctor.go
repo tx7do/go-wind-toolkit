@@ -65,6 +65,7 @@ func checks() []check {
 		{name: "protoc-gen-go-redact", kind: kindPlugin},
 		{name: "protoc-gen-fieldmap", kind: kindPlugin},
 		{name: "protoc-gen-typescript-http", kind: kindPlugin},
+		{name: "protoc-gen-openapi", kind: kindPlugin, hint: "openapi 生成(gow openapi): go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest"},
 		{name: "protoc-gen-dart-http", kind: kindPlugin},
 	}
 }
