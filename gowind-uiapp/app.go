@@ -10,7 +10,7 @@ import (
 
 	"github.com/tx7do/go-utils/ddl_parser"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/ai"
-	ce "github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/configexporter"
+	ce "github.com/tx7do/go-wind-toolkit/gowind/pkg/configexporter"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/detect"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/devtools"
@@ -18,7 +18,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
-	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/svcname"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlkratos"
 )

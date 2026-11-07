@@ -18,8 +18,8 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/redirect"
-	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/redirect"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/svcname"
 )
 
 // ConfigType 远程配置中心类型

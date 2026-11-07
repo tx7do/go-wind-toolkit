@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/svcname"
 )
 
 // 任务键:同一时刻 UI 对每种任务只跑一个,取消按任务粒度进行。

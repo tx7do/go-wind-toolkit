@@ -12,7 +12,7 @@ import (
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/detect"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/devtools"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
-	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/svcname"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
 )
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/redirect"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/redirect"
 )
 
 const (

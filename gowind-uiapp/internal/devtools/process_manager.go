@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/svcname"
 )
 
 // RunServiceInTerminal 在系统终端中启动服务（不追踪状态，不监控进程）
