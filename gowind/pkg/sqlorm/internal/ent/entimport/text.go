@@ -1,7 +1,6 @@
 package entimport
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,60 +9,17 @@ import (
 	"ariga.io/atlas/sql/postgres"
 	"ariga.io/atlas/sql/schema"
 
-	"entgo.io/contrib/schemast"
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/schema/field"
 
 	"github.com/google/uuid"
-
-	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
-type Text struct {
-	*ImportOptions
-}
-
-func NewText(i *ImportOptions) (*Text, error) {
-	return &Text{
-		ImportOptions: i,
-	}, nil
-}
-
-// InspectSchema 把 SQL 文本解析为 atlas schema:表装配与列语义已收敛到
-// schemasource.ParseDDLText(与 sqlproto 共用同一实现),这里保留
-// SchemaImporter 接口形态,只做 sink(列 → ent.Field)。
-func (t *Text) InspectSchema(ctx context.Context, sqlContent string, opts *schema.InspectOptions, s *schema.Schema) (*schema.Schema, error) {
-	return schemasource.ParseDDLText(sqlContent, opts, s)
-}
-
-// SchemaMutations 实现 SchemaImporter 接口，用于解析 SQL 文本
-func (t *Text) SchemaMutations(ctx context.Context) ([]schemast.Mutator, error) {
-	// 加载 SQL 文本
-	sqlText := schemasource.LoadSQLFromFile(t.schemaPath)
-	if sqlText == "" {
-		return nil, fmt.Errorf("无法加载 SQL 文件: %v", t.schemaPath)
-	}
-
-	inspectOptions := &schema.InspectOptions{
-		Tables: t.tables,
-	}
-
-	var s schema.Schema
-
-	_, err := t.InspectSchema(ctx, sqlText, inspectOptions, &s)
-	if err != nil {
-		return nil, err
-	}
-
-	// exclude 过滤统一走 schemasource.FilterTables(include 已由
-	// ParseDDLText 的 InspectOptions.Tables 过滤)。
-	tables := schemasource.FilterTables(s.Tables, nil, t.excludedTables)
-
-	return schemaMutations(t.field, tables)
-}
-
-func (t *Text) field(column *schema.Column) (f ent.Field, err error) {
+// textField 把 atlas 列转换为 ent 字段——DDL 文本驱动专用:DDL 里的类型
+// 可能来自 MySQL 或 Postgres 方言,故为两方言映射的并集
+// (mysql 的类型全集 + postgres 的 SerialType/UUIDType 扩展)。
+func textField(column *schema.Column) (f ent.Field, err error) {
 	name := column.Name
 	log.Printf("[entimport/text] column: %s, Type: %T, Raw: %s", name, column.Type.Type, column.Type.Raw)
 	switch typ := column.Type.Type.(type) {
@@ -72,13 +28,13 @@ func (t *Text) field(column *schema.Column) (f ent.Field, err error) {
 	case *schema.BoolType:
 		f = field.Bool(name)
 	case *schema.DecimalType:
-		f = t.convertDecimal(typ, name)
+		f = textConvertDecimal(typ, name)
 	case *schema.EnumType:
 		f = field.Enum(name).Values(typ.Values...)
 	case *schema.FloatType:
-		f = t.convertFloat(typ, name)
+		f = textConvertFloat(typ, name)
 	case *schema.IntegerType:
-		f = t.convertInteger(typ, name)
+		f = textConvertInteger(typ, name)
 	case *schema.JSONType:
 		f = field.JSON(name, json.RawMessage{})
 	case *schema.StringType:
@@ -87,7 +43,7 @@ func (t *Text) field(column *schema.Column) (f ent.Field, err error) {
 		f = field.Time(name)
 
 	case *postgres.SerialType:
-		f = t.convertSerial(typ, name)
+		f = textConvertSerial(typ, name)
 	case *postgres.UUIDType:
 		f = field.UUID(name, uuid.New())
 
@@ -98,7 +54,7 @@ func (t *Text) field(column *schema.Column) (f ent.Field, err error) {
 	return f, err
 }
 
-func (t *Text) convertFloat(typ *schema.FloatType, name string) (f ent.Field) {
+func textConvertFloat(typ *schema.FloatType, name string) (f ent.Field) {
 	// Precision from 0 to 23 results in a 4-byte single-precision FLOAT column.
 	// Precision from 24 to 53 results in an 8-byte double-precision DOUBLE column:
 	// https://dev.mysql.com/doc/refman/8.0/en/floating-point-types.html
@@ -144,7 +100,7 @@ func (t *Text) convertFloat(typ *schema.FloatType, name string) (f ent.Field) {
 	return field.Float32(name)
 }
 
-func (t *Text) convertInteger(typ *schema.IntegerType, name string) (f ent.Field) {
+func textConvertInteger(typ *schema.IntegerType, name string) (f ent.Field) {
 	if typ.Unsigned {
 		switch typ.T {
 		case mTinyInt:
@@ -184,14 +140,14 @@ func (t *Text) convertInteger(typ *schema.IntegerType, name string) (f ent.Field
 	return f
 }
 
-func (t *Text) convertDecimal(typ *schema.DecimalType, name string) ent.Field {
+func textConvertDecimal(typ *schema.DecimalType, name string) ent.Field {
 	return field.Float(name)
 }
 
 // smallserial- 2 bytes - small autoincrementing integer 1 to 32767
 // serial - 4 bytes autoincrementing integer 1 to 2147483647
 // bigserial - 8 bytes large autoincrementing integer	1 to 9223372036854775807
-func (t *Text) convertSerial(typ *postgres.SerialType, name string) ent.Field {
+func textConvertSerial(typ *postgres.SerialType, name string) ent.Field {
 	return field.Uint(name).
 		SchemaType(map[string]string{
 			dialect.Postgres: typ.T, // Override Postgres.

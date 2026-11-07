@@ -1,16 +1,12 @@
 package entimport
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
 	"ariga.io/atlas/sql/mysql"
 	"ariga.io/atlas/sql/schema"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
-
-	"entgo.io/contrib/schemast"
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
 )
@@ -23,34 +19,8 @@ const (
 	mBigInt    = "bigint"    // MYSQL_TYPE_LONGLONG
 )
 
-// MySQL holds the schema import options and an Atlas inspector instance
-type MySQL struct {
-	*ImportOptions
-}
-
-// NewMySQL - create aמ import structure for MySQL.
-func NewMySQL(i *ImportOptions) (*MySQL, error) {
-	return &MySQL{
-		ImportOptions: i,
-	}, nil
-}
-
-// SchemaMutations implements SchemaImporter.
-func (m *MySQL) SchemaMutations(ctx context.Context) ([]schemast.Mutator, error) {
-	inspectOptions := &schema.InspectOptions{
-		Tables: m.tables,
-	}
-	s, err := m.driver.InspectSchema(ctx, m.driver.SchemaName, inspectOptions)
-	if err != nil {
-		return nil, err
-	}
-	// exclude 过滤统一走 schemasource.FilterTables(atlas 只吃 include,
-	// InspectOptions.Tables 已按 include 过滤,这里不再重复)。
-	tables := schemasource.FilterTables(s.Tables, nil, m.excludedTables)
-	return schemaMutations(m.field, tables)
-}
-
-func (m *MySQL) field(column *schema.Column) (f ent.Field, err error) {
+// mysqlField 把 atlas 列转换为 MySQL 语义的 ent 字段。
+func mysqlField(column *schema.Column) (f ent.Field, err error) {
 	name := column.Name
 	switch typ := column.Type.Type.(type) {
 	case *schema.BinaryType:
@@ -62,9 +32,9 @@ func (m *MySQL) field(column *schema.Column) (f ent.Field, err error) {
 	case *schema.EnumType:
 		f = field.Enum(name).Values(typ.Values...)
 	case *schema.FloatType:
-		f = m.convertFloat(typ, name)
+		f = mysqlConvertFloat(typ, name)
 	case *schema.IntegerType:
-		f = m.convertInteger(typ, name)
+		f = mysqlConvertInteger(typ, name)
 	case *schema.JSONType:
 		f = field.JSON(name, json.RawMessage{})
 	case *schema.StringType:
@@ -78,7 +48,7 @@ func (m *MySQL) field(column *schema.Column) (f ent.Field, err error) {
 	return f, err
 }
 
-func (m *MySQL) convertFloat(typ *schema.FloatType, name string) (f ent.Field) {
+func mysqlConvertFloat(typ *schema.FloatType, name string) (f ent.Field) {
 	// Precision from 0 to 23 results in a 4-byte single-precision FLOAT column.
 	// Precision from 24 to 53 results in an 8-byte double-precision DOUBLE column:
 	// https://dev.mysql.com/doc/refman/8.0/en/floating-point-types.html
@@ -88,7 +58,7 @@ func (m *MySQL) convertFloat(typ *schema.FloatType, name string) (f ent.Field) {
 	return field.Float32(name)
 }
 
-func (m *MySQL) convertInteger(typ *schema.IntegerType, name string) (f ent.Field) {
+func mysqlConvertInteger(typ *schema.IntegerType, name string) (f ent.Field) {
 	if typ.Unsigned {
 		switch typ.T {
 		case mTinyInt:

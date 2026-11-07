@@ -1,10 +1,7 @@
 package internal
 
 import (
-	"context"
 	"strings"
-
-	"ariga.io/atlas/sql/schema"
 
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
@@ -78,34 +75,6 @@ var mysqlTypeMapping = map[string]string{
 	// 其他类型
 	"ENUM": "string", // 通常映射为字符串
 	"SET":  "string", // 通常映射为字符串
-}
-
-// MySQL holds the schema import options and an Atlas inspector instance
-type MySQL struct {
-	*ConvertOptions
-}
-
-// NewMySQL - create aמ import structure for MySQL.
-func NewMySQL(i *ConvertOptions) (*MySQL, error) {
-	return &MySQL{
-		ConvertOptions: i,
-	}, nil
-}
-
-func (m *MySQL) SchemaTables(ctx context.Context) ([]*TableData, error) {
-	inspectOptions := &schema.InspectOptions{
-		Tables: m.includedTables,
-	}
-	s, err := m.driver.InspectSchema(ctx, m.driver.SchemaName, inspectOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	// exclude 过滤统一走 schemasource.FilterTables(include 已由
-	// InspectOptions.Tables 在 inspect 期过滤)。
-	tables := schemasource.FilterTables(s.Tables, nil, m.excludedTables)
-
-	return schemaTables(MySQLFieldType, tables)
 }
 
 func MySQLFieldType(sqlType string) (f string) {

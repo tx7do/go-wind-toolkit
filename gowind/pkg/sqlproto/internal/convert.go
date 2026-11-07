@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -14,45 +15,69 @@ import (
 )
 
 func NewConvert(opts ...ConvertOption) (SchemaConverter, error) {
-	var (
-		si  SchemaConverter
-		err error
-	)
 	i := &ConvertOptions{}
 	for _, apply := range opts {
 		apply(i)
 	}
 
+	var fnc fieldTypeFunc
 	switch i.driver.Dialect {
 	case dialect.MySQL:
-		si, err = NewMySQL(i)
-		if err != nil {
-			return nil, err
-		}
-
+		fnc = MySQLFieldType
 	case dialect.Postgres:
-		si, err = NewPostgreSQL(i)
-		if err != nil {
-			return nil, err
-		}
-
+		fnc = PostgresFieldType
 	case "text":
-		si, err = NewText(i)
-		if err != nil {
-			return nil, err
-		}
-
+		fnc = textFieldType
 	case schemasource.DialectEntSchema, schemasource.DialectGormSchema:
-		si, err = NewGoSchema(i)
-		if err != nil {
-			return nil, err
-		}
-
+		fnc = goSchemaFieldType
 	default:
 		return nil, fmt.Errorf("sqlproto: unsupported dialect %q", i.driver.Dialect)
 	}
 
-	return si, err
+	return &converterFunc{opts: i, fnc: fnc}, nil
+}
+
+// converterFunc 是四种方言(mysql/postgres/text/ent|gorm 源码)共用的
+// SchemaConverter 泛型实现:驱动带 Inspector(数据库直连与 Go 源码源)时走
+// atlas 内省;schemaPath 持有 SQL 正文(text 驱动,mux 的 textProvider 不带
+// Inspector)时走 ParseDDLText。方言差异只剩类型映射函数(fieldTypeFunc),
+// 骨架不再四写。
+type converterFunc struct {
+	opts *ConvertOptions
+	fnc  fieldTypeFunc
+}
+
+// SchemaTables implements SchemaConverter.
+func (c *converterFunc) SchemaTables(ctx context.Context) ([]*TableData, error) {
+	if c.opts.driver.Inspector != nil {
+		s, err := c.opts.driver.InspectSchema(ctx, c.opts.driver.SchemaName, &schema.InspectOptions{
+			Tables: c.opts.includedTables,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("sqlproto: inspect schema: %w", err)
+		}
+		// exclude 过滤统一走 schemasource.FilterTables(include 已由
+		// InspectOptions.Tables 在 inspect 期过滤,这里不再重复)。
+		tables := schemasource.FilterTables(s.Tables, nil, c.opts.excludedTables)
+		return schemaTables(c.fnc, tables)
+	}
+
+	// text 驱动:schemaPath 是 SQL 文本路径或 text:// 内联正文。
+	sqlText := schemasource.LoadSQLFromFile(c.opts.schemaPath)
+	if sqlText == "" {
+		return nil, fmt.Errorf("无法加载 SQL 文件: %v", c.opts.schemaPath)
+	}
+	var s schema.Schema
+	if _, err := schemasource.ParseDDLText(sqlText, nil, &s); err != nil {
+		return nil, err
+	}
+	if len(s.Tables) == 0 {
+		return nil, fmt.Errorf("无效的 SQL: 无法解析任何有效的表")
+	}
+	// text 路径的 include 由 ParseDDLText 的 InspectOptions 承担不了
+	// (这里 opts 传 nil),与 exclude 一起统一走 FilterTables。
+	tables := schemasource.FilterTables(s.Tables, c.opts.includedTables, c.opts.excludedTables)
+	return schemaTables(c.fnc, tables)
 }
 
 func schemaTables(fnc fieldTypeFunc, tables []*schema.Table) ([]*TableData, error) {

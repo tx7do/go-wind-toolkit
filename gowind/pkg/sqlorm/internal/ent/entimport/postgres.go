@@ -1,17 +1,12 @@
 package entimport
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"ariga.io/atlas/sql/postgres"
 	"ariga.io/atlas/sql/schema"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
-
-	"entgo.io/contrib/schemast"
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/schema/field"
@@ -31,49 +26,22 @@ const (
 	pInt8 = "int8"
 )
 
-// Postgres implements SchemaImporter for PostgreSQL databases.
-type Postgres struct {
-	*ImportOptions
-}
-
-// NewPostgreSQL - returns a new *Postgres.
-func NewPostgreSQL(i *ImportOptions) (SchemaImporter, error) {
-	return &Postgres{
-		ImportOptions: i,
-	}, nil
-}
-
-// SchemaMutations implements SchemaImporter.
-func (p *Postgres) SchemaMutations(ctx context.Context) ([]schemast.Mutator, error) {
-	inspectOptions := &schema.InspectOptions{
-		Tables: p.tables,
-	}
-	s, err := p.driver.InspectSchema(ctx, p.driver.SchemaName, inspectOptions)
-	if err != nil {
-		return nil, err
-	}
-	// exclude 过滤统一走 schemasource.FilterTables(atlas 只吃 include,
-	// InspectOptions.Tables 已按 include 过滤,这里不再重复)。
-	tables := schemasource.FilterTables(s.Tables, nil, p.excludedTables)
-	return schemaMutations(p.field, tables)
-}
-
-func (p *Postgres) field(column *schema.Column) (f ent.Field, err error) {
+// postgresField 把 atlas 列转换为 PostgreSQL 语义的 ent 字段。
+func postgresField(column *schema.Column) (f ent.Field, err error) {
 	name := column.Name
-	log.Printf("[entimport/postgres] column: %s, Type: %T, Raw: %s", name, column.Type.Type, column.Type.Raw)
 	switch typ := column.Type.Type.(type) {
 	case *schema.BinaryType:
 		f = field.Bytes(name)
 	case *schema.BoolType:
 		f = field.Bool(name)
 	case *schema.DecimalType:
-		f = p.convertDecimal(typ, name)
+		f = postgresConvertDecimal(typ, name)
 	case *schema.EnumType:
 		f = field.Enum(name).Values(typ.Values...)
 	case *schema.FloatType:
-		f = p.convertFloat(typ, name)
+		f = postgresConvertFloat(typ, name)
 	case *schema.IntegerType:
-		f = p.convertInteger(typ, name)
+		f = postgresConvertInteger(typ, name)
 	case *schema.JSONType:
 		f = field.JSON(name, json.RawMessage{})
 	case *schema.StringType:
@@ -82,7 +50,7 @@ func (p *Postgres) field(column *schema.Column) (f ent.Field, err error) {
 		f = field.Time(name)
 
 	case *postgres.SerialType:
-		f = p.convertSerial(typ, name)
+		f = postgresConvertSerial(typ, name)
 	case *postgres.UUIDType:
 		f = field.UUID(name, uuid.New())
 
@@ -93,11 +61,12 @@ func (p *Postgres) field(column *schema.Column) (f ent.Field, err error) {
 	return f, err
 }
 
+// postgresConvertFloat handles decimal/numeric types.
 // decimal, numeric - user-specified precision, exact up to 131072 digits before the decimal point;
 // up to 16383 digits after the decimal point.
 // real - 4 bytes variable-precision, inexact 6 decimal digits precision.
 // double -	8 bytes	variable-precision, inexact	15 decimal digits precision.
-func (p *Postgres) convertFloat(typ *schema.FloatType, name string) (f ent.Field) {
+func postgresConvertFloat(typ *schema.FloatType, name string) (f ent.Field) {
 	switch typ.T {
 	case postgres.TypeReal:
 		return field.Float32(name)
@@ -110,9 +79,9 @@ func (p *Postgres) convertFloat(typ *schema.FloatType, name string) (f ent.Field
 	}
 }
 
-// convertDecimal handles decimal/numeric types.
+// postgresConvertDecimal handles decimal/numeric types.
 // numeric/decimal with precision and scale.
-func (p *Postgres) convertDecimal(typ *schema.DecimalType, name string) ent.Field {
+func postgresConvertDecimal(typ *schema.DecimalType, name string) ent.Field {
 	if typ.Precision <= 18 {
 		// 小精度用 float64 足够
 		return field.Float(name)
@@ -121,7 +90,7 @@ func (p *Postgres) convertDecimal(typ *schema.DecimalType, name string) ent.Fiel
 	return field.Float(name)
 }
 
-func (p *Postgres) convertInteger(typ *schema.IntegerType, name string) (f ent.Field) {
+func postgresConvertInteger(typ *schema.IntegerType, name string) (f ent.Field) {
 	switch typ.T {
 	case pSmallInt:
 		f = field.Int16(name)
@@ -142,7 +111,7 @@ func (p *Postgres) convertInteger(typ *schema.IntegerType, name string) (f ent.F
 // smallserial- 2 bytes - small autoincrementing integer 1 to 32767
 // serial - 4 bytes autoincrementing integer 1 to 2147483647
 // bigserial - 8 bytes large autoincrementing integer	1 to 9223372036854775807
-func (p *Postgres) convertSerial(typ *postgres.SerialType, name string) ent.Field {
+func postgresConvertSerial(typ *postgres.SerialType, name string) ent.Field {
 	switch typ.T {
 	case "bigserial":
 		return field.Int64(name).

@@ -1,6 +1,7 @@
 package entimport
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,39 +24,77 @@ import (
 
 // NewImport calls the relevant data source importer based on a given dialect.
 func NewImport(opts ...ImportOption) (SchemaImporter, error) {
-	var (
-		si  SchemaImporter
-		err error
-	)
 	i := &ImportOptions{}
 	for _, apply := range opts {
 		apply(i)
 	}
 
+	var field fieldFunc
 	switch i.driver.Dialect {
 	case dialect.MySQL:
-		si, err = NewMySQL(i)
-		if err != nil {
-			return nil, err
-		}
-
+		field = mysqlField
 	case dialect.Postgres:
-		si, err = NewPostgreSQL(i)
-		if err != nil {
-			return nil, err
-		}
-
+		field = postgresField
 	case "text":
-		si, err = NewText(i)
-		if err != nil {
-			return nil, err
-		}
-
+		field = textField
 	default:
 		return nil, fmt.Errorf("entimport: unsupported dialect %q", i.driver.Dialect)
 	}
 
-	return si, err
+	return &importerFunc{opts: i, field: field}, nil
+}
+
+// NewMySQL 返回 MySQL 方言 sink 的导入器。
+func NewMySQL(i *ImportOptions) (SchemaImporter, error) {
+	return &importerFunc{opts: i, field: mysqlField}, nil
+}
+
+// NewPostgreSQL 返回 PostgreSQL 方言 sink 的导入器。
+func NewPostgreSQL(i *ImportOptions) (SchemaImporter, error) {
+	return &importerFunc{opts: i, field: postgresField}, nil
+}
+
+// NewText 返回 DDL 文本驱动 sink 的导入器。
+func NewText(i *ImportOptions) (SchemaImporter, error) {
+	return &importerFunc{opts: i, field: textField}, nil
+}
+
+// importerFunc 是三种方言(mysql/postgres/text)共用的 SchemaImporter 泛型实现:
+// 驱动带 Inspector(数据库直连)时走 atlas 内省,schemaPath 持有 SQL 正文
+// (text 驱动,mux 的 textProvider 不带 Inspector)时走 ParseDDLText;
+// exclude 过滤统一走 schemasource.FilterTables,列转换交给方言 fieldFunc。
+// 方言差异只剩 sink(mysqlField/postgresField/textField),骨架不再三写。
+type importerFunc struct {
+	opts  *ImportOptions
+	field fieldFunc
+}
+
+// SchemaMutations implements SchemaImporter.
+func (d *importerFunc) SchemaMutations(ctx context.Context) ([]schemast.Mutator, error) {
+	if d.opts.driver != nil && d.opts.driver.Inspector != nil {
+		s, err := d.opts.driver.InspectSchema(ctx, d.opts.driver.SchemaName, &schema.InspectOptions{
+			Tables: d.opts.tables,
+		})
+		if err != nil {
+			return nil, err
+		}
+		// exclude 过滤统一走 schemasource.FilterTables(include 已由
+		// InspectOptions.Tables 在 inspect 期过滤,这里不再重复)。
+		tables := schemasource.FilterTables(s.Tables, nil, d.opts.excludedTables)
+		return schemaMutations(d.field, tables)
+	}
+
+	// text 驱动:schemaPath 是 SQL 文本路径或 text:// 内联正文。
+	sqlText := schemasource.LoadSQLFromFile(d.opts.schemaPath)
+	if sqlText == "" {
+		return nil, fmt.Errorf("无法加载 SQL 文件: %v", d.opts.schemaPath)
+	}
+	var s schema.Schema
+	if _, err := schemasource.ParseDDLText(sqlText, &schema.InspectOptions{Tables: d.opts.tables}, &s); err != nil {
+		return nil, err
+	}
+	tables := schemasource.FilterTables(s.Tables, nil, d.opts.excludedTables)
+	return schemaMutations(d.field, tables)
 }
 
 // WriteSchema receives a list of mutators, and writes an ent schema to a given location in the file system.

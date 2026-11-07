@@ -1,12 +1,7 @@
 package internal
 
 import (
-	"context"
 	"strings"
-
-	"ariga.io/atlas/sql/schema"
-
-	_ "github.com/lib/pq"
 
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
@@ -98,32 +93,6 @@ var postgresqlTypeMapping = map[string]string{
 
 	// 数组类型（PostgreSQL特有，通常映射为JSON字符串）
 	"ARRAY": "string",
-}
-
-// Postgres implements SchemaConverter for PostgreSQL databases.
-type Postgres struct {
-	*ConvertOptions
-}
-
-// NewPostgreSQL - returns a new *Postgres.
-func NewPostgreSQL(i *ConvertOptions) (SchemaConverter, error) {
-	return &Postgres{
-		ConvertOptions: i,
-	}, nil
-}
-
-func (p *Postgres) SchemaTables(ctx context.Context) ([]*TableData, error) {
-	inspectOptions := &schema.InspectOptions{
-		Tables: p.includedTables,
-	}
-	s, err := p.driver.InspectSchema(ctx, p.driver.SchemaName, inspectOptions)
-	if err != nil {
-		return nil, err
-	}
-	// exclude 过滤统一走 schemasource.FilterTables(include 已由
-	// InspectOptions.Tables 在 inspect 期过滤)。
-	tables := schemasource.FilterTables(s.Tables, nil, p.excludedTables)
-	return schemaTables(PostgresFieldType, tables)
 }
 
 func PostgresFieldType(sqlType string) (f string) {
