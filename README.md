@@ -245,6 +245,21 @@ gow frontend gen --openapi ./api/openapi.yaml --framework react \
   --out ./admin-web/src --tags RoleService --types composable,page,drawer
 ```
 
+### OpenAPI 文档生成（gow openapi）
+
+用 gnostic 的 protoc-gen-openapi 从 proto 定义（google.api.http 注解）一键产出合并的 OpenAPI 3.0 文档，为 `gow frontend` 供料：
+
+```shell
+# 在项目根目录运行(默认 ./api),产物写 api/openapi.yaml
+gow openapi
+
+# 指定 api 目录与输出位置(目录时写入 <out>/openapi.yaml)
+gow openapi api --out app/admin/service/cmd/server/assets
+
+# 依赖: buf 与 protoc-gen-openapi(可用 gow doctor 体检)
+go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+```
+
 ### Ent 代码生成
 
 ```shell

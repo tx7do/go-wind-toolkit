@@ -241,6 +241,21 @@ gow frontend gen --openapi ./api/openapi.yaml   --framework vue-element --out ./
 gow frontend gen --openapi ./api/openapi.yaml --framework react   --out ./admin-web/src --tags RoleService --types composable,page,drawer
 ```
 
+### OpenAPI Document Generation (gow openapi)
+
+Produce a merged OpenAPI 3.0 document from your proto definitions (google.api.http annotations) via gnostic's protoc-gen-openapi, feeding `gow frontend`:
+
+```shell
+# Run at the project root (defaults to ./api); writes api/openapi.yaml
+gow openapi
+
+# Pick the api dir and output location (a directory target becomes <out>/openapi.yaml)
+gow openapi api --out app/admin/service/cmd/server/assets
+
+# Dependencies: buf and protoc-gen-openapi (check with gow doctor)
+go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+```
+
 ### Ent Code Generation
 
 ```shell
