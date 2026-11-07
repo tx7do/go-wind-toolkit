@@ -27,6 +27,18 @@ import (
 // 依赖:buf 与 protoc 插件在 PATH;Go 模块缓存温热(离线也可)。buf 依赖
 // 解析需要网络;不可用时可用 GOWIND_COMPILE_E2E_BUF_LOCK 指向一份现成的
 // buf.lock(依赖集合一致即可),否则跳过。
+// compileVariant 门禁变体:同一份 DDL,不同 传输层×ORM 组合的生成物都要
+// 编译通过——server/service 模板在 bLogger 迁移这类横切改动时最容易只有
+// 一条路径被人工验证。
+type compileVariant struct {
+	name        string
+	servers     []string
+	orm         string
+	useRepo     bool // false = BFF(service 消费 proto client 接口,无 data 层)
+	entCodegen  bool // 是否需要 ent client 代码生成(entgen 模块流程)
+	extraPlugins []string
+}
+
 func TestCompileE2E_GeneratedServiceCompilesAndTestsPass(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping compile e2e in -short mode")
@@ -37,16 +49,39 @@ func TestCompileE2E_GeneratedServiceCompilesAndTestsPass(t *testing.T) {
 	if _, err := exec.LookPath("buf"); err != nil {
 		t.Skip("buf not found in PATH; skipping compile e2e")
 	}
-	for _, plugin := range []string{"protoc-gen-go", "protoc-gen-go-grpc"} {
-		if _, err := exec.LookPath(plugin); err != nil {
-			t.Skipf("%s not found in PATH; skipping compile e2e", plugin)
-		}
-	}
 
+	variants := []compileVariant{
+		{name: "grpc-ent", servers: []string{"grpc"}, orm: "ent", useRepo: true, entCodegen: true, extraPlugins: []string{"protoc-gen-go-grpc"}},
+		{name: "rest-ent", servers: []string{"grpc", "rest"}, orm: "ent", useRepo: true, entCodegen: true, extraPlugins: []string{"protoc-gen-go-grpc", "protoc-gen-go-http"}},
+		{name: "grpc-gorm", servers: []string{"grpc"}, orm: "gorm", useRepo: true, entCodegen: false, extraPlugins: []string{"protoc-gen-go-grpc"}},
+	}
+	for _, v := range variants {
+		if v.orm == "gorm" && os.Getenv("GOWIND_COMPILE_E2E_GORM") != "1" {
+			// 上游依赖矩阵断裂(2026-11-07):kratos-bootstrap/database/gorm@v0.1.6
+			// 的 client.go 把 kratos log.Helper 传给新版 go-wind/log.Logger
+			// (方法签名已是 ctx 首参),任何 scratch 侧版本组合都无法编译。
+			// 生成的 gorm 项目今天对使用固定旧 go.sum 的存量可编译,新树不行——
+			// 等 tx7do 上游对齐后放开 GOWIND_COMPILE_E2E_GORM=1 门禁。
+			t.Skip("上游 kratos-bootstrap/database/gorm × go-wind/log 不兼容;设 GOWIND_COMPILE_E2E_GORM=1 强制尝试")
+		}
+		t.Run(v.name, func(t *testing.T) {
+			runCompileVariant(t, v)
+		})
+	}
+}
+
+func runCompileVariant(t *testing.T, v compileVariant) {
 	const (
 		module  = "scratch.local"
 		service = "core"
 	)
+
+	for _, plugin := range append([]string{"protoc-gen-go"}, v.extraPlugins...) {
+		if _, err := exec.LookPath(plugin); err != nil {
+			t.Skipf("%s not found in PATH; skipping %s variant", plugin, v.name)
+		}
+	}
+
 
 	ctx := context.Background()
 	// 失败时保留现场供排查(GOWIND_COMPILE_E2E_KEEP=1),默认自动清理。
@@ -58,9 +93,13 @@ func TestCompileE2E_GeneratedServiceCompilesAndTestsPass(t *testing.T) {
 		t.Cleanup(func() { _ = os.RemoveAll(scratch) })
 	}
 
-	// go.mod 先行:后续 tidy/ent generate 都发生在模块内。
-	writeFile(t, filepath.Join(scratch, "go.mod"),
-		"module "+module+"\n\ngo 1.24\n\nrequire entgo.io/ent v0.14.5\n")
+	// go.mod 先行:ent 变体预置 entgo require(ent 代码生成经 `go run
+	// entgo.io/ent/cmd/ent`,无 require 时在 tidy 之前跑不了)。
+	gomod := "module " + module + "\n\ngo 1.24\n"
+	if v.entCodegen {
+		gomod += "\nrequire entgo.io/ent v0.14.5\n"
+	}
+	writeFile(t, filepath.Join(scratch, "go.mod"), gomod)
 
 	ddl := `CREATE TABLE users (
 	id bigint(20) NOT NULL AUTO_INCREMENT,
@@ -79,20 +118,20 @@ CREATE TABLE orders (
 
 	require.NoError(t, sqlkratos.Generate(ctx, sqlkratos.GeneratorOptions{
 		Source:           ddl,
-		OrmType: "ent",
-		UseRepo: true,
+		OrmType:          v.orm,
+		UseRepo:          v.useRepo,
 		// proto/ORM/data/service/server/tests 是可独立编译的产物;main/config/
 		// makefile 依赖模板仓的 pkg/serviceid 与手写装配,scratch 里没有,剔除。
 		GenerateProto:    true,
-		GenerateORM:      true,
-		GenerateData:     true,
+		GenerateORM:      v.useRepo,
+		GenerateData:     v.useRepo,
 		GenerateService:  true,
 		GenerateServer:   true,
-		GenerateTests:    true,
+		GenerateTests:    v.useRepo,
 		GenerateMain:     false,
 		GenerateConfig:   false,
 		GenerateMakefile: false,
-		Servers:          []string{"grpc"},
+		Servers:          v.servers,
 		ProjectName:      module,
 		ServiceName:      service,
 		ModuleName:       service,
@@ -100,17 +139,20 @@ CREATE TABLE orders (
 		OutputPath:       scratch,
 	}))
 
-	// 生成的测试骨架必须在场(门禁主对象之一)。
-	testFile := filepath.Join(scratch, "app", service, "service", "internal", "service", "user_service_test.go")
-	assert.FileExists(t, testFile, "service 单测骨架应已生成")
+	// 生成的测试骨架必须在场(门禁主对象之一,仅 repo 形态产出)。
+	if v.useRepo {
+		testFile := filepath.Join(scratch, "app", service, "service", "internal", "service", "user_service_test.go")
+		assert.FileExists(t, testFile, "service 单测骨架应已生成")
+	}
 
 	// 顺序必须是 buf → ent → tidy:新鲜产物没有 gen/go 与 ent client 时,
 	// tidy 会把 scratch.local/<缺失包> 当外部模块去网上解析,必挂。
 	// (真实项目能 tidy 先行,是因为模板仓的 gen/go 是提交在库里的。)
 	protoDir := filepath.Join(scratch, "api", "protos")
 	prepareBufModule(t, protoDir)
-	bufGenerate(t, protoDir, module)
+	bufGenerate(t, protoDir, module, v.extraPlugins...)
 
+	if v.entCodegen {
 	// ent 代码生成:entc/load 需要**完全健康**的模块图才能加载 schema 包,
 	// 而 scratch 此刻缺 ent client/sum 链,加载必残缺——把 schema 拷进一次性
 	// 临时模块(依赖只有 entgo,tidy 可完整解析),在那里生成,再把产物回拷。
@@ -188,6 +230,7 @@ CREATE TABLE orders (
 		}
 		return os.WriteFile(target, data, 0o644)
 	}), "回拷生成的 ent client")
+	}
 
 	// ent client 就位后 tidy:data/server 对它的导入才有 sum 可依。
 	require.NoError(t, pkg.GoModTidy(ctx, scratch), "go mod tidy (post-ent)")
@@ -242,32 +285,14 @@ deps:
 
 // bufGenerate 用临时模板生成 pb 代码:managed 注入 go_package 前缀,
 // paths=source_relative 落到 api/gen/go/<包路径>,与 service 模板的导入一致。
-func bufGenerate(t *testing.T, protoDir, module string) {
+// extraPlugins 随传输层变化:grpc 追加 go-grpc,rest 追加 go-http。
+func bufGenerate(t *testing.T, protoDir, module string, extraPlugins ...string) {
 	t.Helper()
 
 	tmpDir := t.TempDir()
 	tmpl := filepath.Join(tmpDir, "buf.gen.yaml")
 	out := filepath.Join(protoDir, "..", "gen", "go")
-	writeFile(t, tmpl, `version: v2
-managed:
-  enabled: true
-  disable:
-    # 与真实项目(buf 模板)一致:依赖模块的 pb 走各自的 Go 模块
-    # (分页 = github.com/tx7do/go-crud),不用本模块前缀重写
-    - module: buf.build/googleapis/googleapis
-    - module: buf.build/gnostic/gnostic
-    - module: buf.build/tx7do/pagination
-  override:
-    - file_option: go_package_prefix
-      value: `+module+`/api/gen/go
-plugins:
-  - local: protoc-gen-go
-    out: `+filepath.ToSlash(out)+`
-    opt: paths=source_relative
-  - local: protoc-gen-go-grpc
-    out: `+filepath.ToSlash(out)+`
-    opt: paths=source_relative
-`)
+	writeFile(t, tmpl, compileBufTemplate(module, filepath.ToSlash(out), extraPlugins...))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -275,6 +300,16 @@ plugins:
 	cmd.Dir = protoDir
 	if out2, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("buf generate: %v\n%s", err, truncateLog(out2))
+	}
+
+	// 环境补齐:REST 产物的 assets.go embed openapi.yaml——真实项目该文件
+	// 由 openapi 管线(gow openapi)产出,scratch 里写最小占位让 embed 通过。
+	if serversHasRest(extraPlugins) {
+		assetsDir := filepath.Join(protoDir, "..", "..",
+			"app", "core", "service", "cmd", "server", "assets")
+		_ = os.MkdirAll(assetsDir, 0o755)
+		_ = os.WriteFile(filepath.Join(assetsDir, "openapi.yaml"),
+			[]byte("openapi: 3.0.3\ninfo:\n  title: placeholder\n  version: \"0.0.1\"\npaths: {}\n"), 0o644)
 	}
 
 	// 环境补齐:repo 模板调用包级 ErrorXxx 助手,真实项目由其错误码方案
@@ -327,4 +362,42 @@ func truncateLog(b []byte) string {
 		return string(b[:max]) + "...(truncated)"
 	}
 	return string(b)
+}
+
+// compileBufTemplate 构造门禁的临时 buf.gen.yaml:
+//   - managed 兜底无 go_package 的 proto(与真实项目一致);
+//   - disable 清单与真实 buf 模板一致——依赖模块的 pb 走各自的 Go 模块
+//     (分页 = github.com/tx7do/go-crud),不用本模块前缀重写;
+//   - extraPlugins 按传输层追加(grpc→go-grpc,rest→go-http)。
+func compileBufTemplate(module, out string, extraPlugins ...string) string {
+	b := "version: v2\n" +
+		"managed:\n" +
+		"  enabled: true\n" +
+		"  disable:\n" +
+		"    - module: buf.build/googleapis/googleapis\n" +
+		"    - module: buf.build/gnostic/gnostic\n" +
+		"    - module: buf.build/tx7do/pagination\n" +
+		"  override:\n" +
+		"    - file_option: go_package_prefix\n" +
+		"      value: " + module + "/api/gen/go\n" +
+		"plugins:\n" +
+		"  - local: protoc-gen-go\n" +
+		"    out: " + out + "\n" +
+		"    opt: paths=source_relative\n"
+	for _, plug := range extraPlugins {
+		b += "  - local: " + plug + "\n" +
+			"    out: " + out + "\n" +
+			"    opt: paths=source_relative\n"
+	}
+	return b
+}
+
+// serversHasRest 通过插件清单判断本次是否包含 REST 传输(go-http 插件)。
+func serversHasRest(extraPlugins []string) bool {
+	for _, p := range extraPlugins {
+		if p == "protoc-gen-go-http" {
+			return true
+		}
+	}
+	return false
 }

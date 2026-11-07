@@ -77,6 +77,15 @@ jobs:
       - name: Setup buf
         uses: ./.github/actions/setup-buf
 
+      # 编译门禁(TestCompileE2E)的 buf 模板会调用本地 protoc 插件:
+      # 缺任何一个,门禁对应变体都会静默 Skip,等于没有门禁。
+      # ent/gen 走的是独立 entgen 模块(见 compile_e2e_test.go),不受此影响。
+      - name: Setup protoc plugins for compile gate
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install github.com/tx7do/go-wind-toolkit/protoc-gen-go-http@latest
+
       # 本仓库是多个独立 Go 模块,没有 go.work 把它们串起来,故逐模块跑。
       # 只取仓库根下一层的 go.mod,自动排除 .sage/、examples/ 等嵌套模块。
       - name: Build, vet and test each module
