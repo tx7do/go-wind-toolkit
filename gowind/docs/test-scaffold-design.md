@@ -50,3 +50,13 @@ wire/后处理链不回归,再上模板。
   `gow generate --tests` 开启
 - 契约测试：TestWriteServicePackageCode 断言接口接缝与 fake 产物,
   GormDeleteContract 用例锁 (bool, error) 契约
+
+## REST/BFF 形态——暂缓（2026-11-07 评估）
+
+REST 服务消费的是 protoc 插件产出的**完整** client 接口
+(`<Model>ServiceHTTPClient`,含 IssueToken/ResetSecret 等自定义 RPC,
+方法集因 proto 而异)——模板无法预知方法集,fake 只能靠接口嵌入
+(embed + 未覆写方法调用即 panic)。且 client 类型名与签名在
+protoc-gen-go-http 与 kratos 脏分叉两谱系间存在差异,未经真实生成
+项目核对前不盲发。gRPC+本地仓储(主力形态)已完整覆盖;待有生成项目
+基线后按 admin 的 i_access_key_http.pb.go 形状补齐。
