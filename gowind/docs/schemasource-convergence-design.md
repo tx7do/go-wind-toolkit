@@ -80,11 +80,16 @@ func Inspect(ctx context.Context, dsn string,
 
 ## 4. 实施顺序（每步独立可回滚）
 
-1. **R1** FilterTables（纯去重，最低风险）
-2. **R5** 死代码删除 + formatSchemaFiles 下沉
-3. **R4** NormalizeDSN 吸收 ensureDSNScheme（改 sqlkratos 一处调用）
-4. **R2** ParseDDLText 上移（先逐字节验证两侧产物不变）
-5. **R3** Inspect 管线参数化（最后做，前四步已把差异压到 sink 内）
+1. ✅ **R1** FilterTables（2026-11-07 完成：6 处替换 + 8 例表驱动单测）
+2. ✅ **R5** 死代码删除（sqlorm/internal/options.go 零引用已删；
+   formatSchemaFiles 仅 entimport 单侧使用，评估后不上移）
+3. ✅ **R4** NormalizeDSNWithDriver 吸收 ensureDSNScheme（driver 为空且
+   未命中时原样放行的契约由测试钉死——gorm 分支接受面更宽）
+4. ⬜ **R2** ParseDDLText 上移——**实施前必须先定基准语义**：两侧
+   toColumnType 并非逐行同构，sqlproto 侧有两个承重扩展（unsigned 留在
+   Raw 供类型字符串映射、PRIMARY KEY 强制 NOT NULL），entimport 侧没有。
+   统一后需按设计门禁做两侧产物逐字节 diff 验证
+5. ⬜ **R3** Inspect 管线参数化（最后做，前四步已把差异压到 sink 内）
 
 ## 5. 附带发现（顺手修）
 
