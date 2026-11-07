@@ -85,11 +85,21 @@ func Inspect(ctx context.Context, dsn string,
    formatSchemaFiles 仅 entimport 单侧使用，评估后不上移）
 3. ✅ **R4** NormalizeDSNWithDriver 吸收 ensureDSNScheme（driver 为空且
    未命中时原样放行的契约由测试钉死——gorm 分支接受面更宽）
-4. ⬜ **R2** ParseDDLText 上移——**实施前必须先定基准语义**：两侧
-   toColumnType 并非逐行同构，sqlproto 侧有两个承重扩展（unsigned 留在
-   Raw 供类型字符串映射、PRIMARY KEY 强制 NOT NULL），entimport 侧没有。
-   统一后需按设计门禁做两侧产物逐字节 diff 验证
-5. ⬜ **R3** Inspect 管线参数化（最后做，前四步已把差异压到 sink 内）
+4. ✅ **R2** ParseDDLText 上移（2026-11-07 完成）：基准语义 = 两侧并集
+   （表装配取 entimport 超集、列语义取 sqlproto 超集）；消费面核实后
+   entimport 侧行为变化仅 PK 列 Optional=false（SQL 语义正确性修复），
+   sqlproto 侧干净 MySQL DDL 零漂移。entimport/sqlproto 两侧 InspectSchema
+   均变薄委托，net -79 行
+5. ✅ **R3** 管线参数化（2026-11-07 完成）：entimport 三类→importerFunc、
+   sqlproto 四类→converterFunc，方言差异只剩 sink 函数（fieldFunc /
+   fieldTypeFunc）；NewXxx 构造器保留为薄壳，净 -179 行
+
+## 6. 全部完成（2026-11-07）
+
+R1-R5 全部落地，共 5 个独立提交。遗留环境问题（非本设计范围）：
+entimport 的 TestMySQL/TestPostgres 在本开发机挂起——scratch 模块缺
+go.sum 时 packages.Load 回退 gopathwalk 全量扫描模块缓存（goroutine 栈
+证实）；干净树对照实验复现，与收敛改动无关，CI（正常网络）历史上全绿。
 
 ## 5. 附带发现（顺手修）
 
