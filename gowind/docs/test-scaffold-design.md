@@ -32,3 +32,21 @@
 再产 `service_test.tpl`（fake repo + 表驱动 CRUD 用例,不引入新外部依赖）。
 动工顺序：先给 sqlkratos 的一张 scratch 全量产物加接口改造 e2e,验证
 wire/后处理链不回归,再上模板。
+
+## 实施（2026-11-07，路线 A 已落地）
+
+- **接缝选型修正**：接口定义在**消费方**（service 包内声明 `<Model>Repo`
+  接口），而非 data 包——Go 惯例"accept interfaces, return structs",
+  data 包零改动、wiring 零改动（具体 `*data.XxxRepo` 隐式满足接口）
+- **签名契约**：接口五方法逐字对齐 ent_repo.tpl / gorm_repo.tpl 的
+  wrapper 签名；发现两 ORM 的 `Delete` 返回不同（ent `error`,
+  gorm `(bool, error)`）——模板按 `OrmType` 分化,顺带修复 service.tpl
+  gorm 分支 Delete 单值接收的潜在编译错
+- **产物**：service.tpl（接口+字段接口化）、service_test.tpl（fake 仓储
+  +List/Get/nil 守卫/Delete 达仓用例,零外部依赖,同包可测未导出字段）、
+  `GoGenerator.GenerateServiceTest`（REST/无仓储形态静默跳过）
+- **管道**：`GeneratorOptions.GenerateTests`（默认关）贯穿
+  generateServicePackageCode → WriteServicePackageCode；CLI
+  `gow generate --tests` 开启
+- 契约测试：TestWriteServicePackageCode 断言接口接缝与 fake 产物,
+  GormDeleteContract 用例锁 (bool, error) 契约

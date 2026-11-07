@@ -34,6 +34,7 @@ var (
 	genProtoOnly     bool
 	genSkipORM       bool
 	genSkipConfig    bool
+	genTests       bool
 	genSkipMakefile  bool
 	genSourceModule  string
 	genDryRun        bool
@@ -51,6 +52,7 @@ func init() {
 	CmdGenerate.Flags().BoolVarP(&genProtoOnly, "proto-only", "", false, "Only generate proto files")
 	CmdGenerate.Flags().BoolVarP(&genSkipORM, "skip-orm", "", false, "Skip ORM code generation")
 	CmdGenerate.Flags().BoolVarP(&genSkipConfig, "skip-config", "", false, "Skip config file generation")
+	CmdGenerate.Flags().BoolVarP(&genTests, "tests", "", false, "Generate unit test scaffolds (fake repo) for CRUD services")
 	CmdGenerate.Flags().BoolVarP(&genSkipMakefile, "skip-makefile", "", false, "Skip Makefile generation")
 	CmdGenerate.Flags().StringVarP(&genSourceModule, "source-module", "", "", "Source module name for REST service")
 	CmdGenerate.Flags().BoolVarP(&genDryRun, "dry-run", "n", false, "Validate the data source, resolve tables and preview the plan without writing anything")
@@ -135,6 +137,7 @@ func Run(cmd *cobra.Command, args []string) error {
 		GenerateMain:     !genProtoOnly,
 		GenerateConfig:   !genProtoOnly && !genSkipConfig,
 		GenerateMakefile: !genProtoOnly && !genSkipMakefile,
+		GenerateTests:    genTests && !genProtoOnly,
 	}
 
 	fmt.Printf("Generating code for service [%s] with ORM [%s]...\n", genServiceName, genOrmType)

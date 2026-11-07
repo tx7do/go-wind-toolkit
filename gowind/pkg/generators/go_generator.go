@@ -303,6 +303,38 @@ func (g *GoGenerator) GenerateService(ctx context.Context, opts code_generator.O
 		return "", os.ErrInvalid
 	}
 
+	applyServiceDefaults(opts)
+
+	if opts.OutputName == "" {
+		modelName, _ := opts.Vars["Model"].(string)
+		opts.OutputName = stringcase.ToSnakeCase(modelName) + "_service.go"
+	}
+
+	return g.Generate(ctx, opts, "service.tpl")
+}
+
+// GenerateServiceTest 渲染 service 的单测骨架(fake 仓储 + 参数守卫用例)。
+// 仅在 UseRepo(gRPC + 本地仓储)形态下有意义;其余形态静默跳过——
+// REST 服务消费的 proto client 本身就是接口,无需 fake 接缝。
+func (g *GoGenerator) GenerateServiceTest(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {
+	if g.CodeGenerator == nil {
+		return "", os.ErrInvalid
+	}
+
+	applyServiceDefaults(opts)
+
+	if useRepo, _ := opts.Vars["UseRepo"].(bool); !useRepo {
+		return "", nil
+	}
+
+	modelName, _ := opts.Vars["Model"].(string)
+	opts.OutputName = stringcase.ToSnakeCase(modelName) + "_service_test.go"
+
+	return g.Generate(ctx, opts, "service_test.tpl")
+}
+
+// applyServiceDefaults 填充 service(及测试骨架)模板所需的派生 Vars。
+func applyServiceDefaults(opts code_generator.Options) {
 	var modelName string
 	if v, ok := opts.Vars["Model"]; ok {
 		modelName, _ = v.(string)
@@ -370,12 +402,6 @@ func (g *GoGenerator) GenerateService(ctx context.Context, opts code_generator.O
 			opts.Vars["UseRepo"] = true
 		}
 	}
-
-	if opts.OutputName == "" {
-		opts.OutputName = stringcase.ToSnakeCase(modelName) + "_service.go"
-	}
-
-	return g.Generate(ctx, opts, "service.tpl")
 }
 
 func (g *GoGenerator) GenerateAssets(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {

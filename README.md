@@ -206,6 +206,8 @@ gow generate
 # 校验数据源、解析表清单并预览计划，不写入任何文件
 # （支持数据库 DSN 或内联 DDL 文本）
 gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user --dry-run
+# 追加生成 CRUD service 的单测骨架(fake 仓储,不依赖数据库)
+gow generate --dsn "mysql://..." --service user --tests
 
 # 完整命令行
 gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user

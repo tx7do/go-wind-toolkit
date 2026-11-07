@@ -175,6 +175,7 @@ func (g *Generator) WriteServicePackageCode(
 	name string,
 	targetModuleName, sourceModuleName, moduleVersion string,
 	useRepo, isGrpcService bool,
+	ormType string, withTests bool,
 ) error {
 	o := code_generator.Options{
 		OutDir: outputPath,
@@ -190,6 +191,7 @@ func (g *Generator) WriteServicePackageCode(
 			"Model":   name,
 			"IsGrpc":  isGrpcService,
 			"UseRepo": useRepo,
+			"OrmType": ormType,
 		},
 	}
 
@@ -197,6 +199,12 @@ func (g *Generator) WriteServicePackageCode(
 
 	if _, err := g.goGenerator.GenerateService(context.Background(), o); err != nil {
 		return err
+	}
+
+	if withTests {
+		if _, err := g.goGenerator.GenerateServiceTest(context.Background(), o); err != nil {
+			return err
+		}
 	}
 
 	return nil

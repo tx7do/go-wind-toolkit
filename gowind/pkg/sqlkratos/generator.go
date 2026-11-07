@@ -169,6 +169,7 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			opts.ServiceName,
 			opts.SourceModuleName, opts.ModuleVersion,
 			opts.UseRepo, useGrpc,
+			opts.OrmType, opts.GenerateTests,
 			tables,
 			services,
 			servicePackageMap,
@@ -511,6 +512,7 @@ func (g *Generator) generateServicePackageCode(
 	projectName, serviceName string,
 	sourceModuleName, moduleVersion string,
 	userRepo, isGrpcService bool,
+	ormType string, withTests bool,
 	tables sqlproto.TableDataArray,
 	services []string,
 	servicePackageMap map[string]string,
@@ -548,6 +550,7 @@ func (g *Generator) generateServicePackageCode(
 			name,
 			targetModule, effectiveSourceModule, moduleVersion,
 			userRepo, isGrpcService,
+			ormType, withTests,
 		); err != nil {
 			return err
 		}

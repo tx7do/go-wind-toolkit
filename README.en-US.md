@@ -204,6 +204,8 @@ gow generate
 
 # Validate the data source, resolve tables and preview the plan (nothing written;
 # works with a database DSN or inline DDL text)
+# Also generate unit test scaffolds (fake repo, no database needed)
+gow generate --dsn "mysql://..." --service user --tests
 gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user --dry-run
 
 # Full command line

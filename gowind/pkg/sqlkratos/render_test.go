@@ -213,11 +213,56 @@ func TestWriteServicePackageCode(t *testing.T) {
 		"role",
 		"user", "admin", "v1",
 		true, true,
+		"ent", true,
 	)
 	assert.Nil(t, err)
 
 	svcFile := filepath.Join(outputPath, "role_service.go")
 	assert.FileExists(t, svcFile)
+
+	content, readErr := os.ReadFile(svcFile)
+	assert.Nil(t, readErr)
+	// 消费方接口接缝:service 字段类型是接口而非 *data 具体指针
+	assert.Contains(t, string(content), "type RoleRepo interface {")
+	assert.Contains(t, string(content), "roleRepo RoleRepo")
+	// 构造器参数仍是具体仓储指针(隐式满足接口,wiring 无需改动)
+	assert.Contains(t, string(content), "roleRepo *data.RoleRepo,")
+
+	// 单测骨架:fake 仓储 + 守卫用例
+	testFile := filepath.Join(outputPath, "role_service_test.go")
+	assert.FileExists(t, testFile)
+	testContent, readErr := os.ReadFile(testFile)
+	assert.Nil(t, readErr)
+	assert.Contains(t, string(testContent), "type fakeRoleRepo struct")
+	assert.Contains(t, string(testContent), "func TestRoleService_Delete")
+}
+
+func TestWriteServicePackageCode_GormDeleteContract(t *testing.T) {
+	g := NewGenerator()
+	tmpDir := t.TempDir()
+	outputPath := filepath.Join(tmpDir, "app", "user", "service", "internal", "service")
+
+	// gorm 仓储的 Delete 是 (bool, error) 双返回:接口与调用侧都必须按该契约
+	err := g.WriteServicePackageCode(
+		outputPath,
+		"github.com/example/myproject", "user",
+		"role",
+		"user", "admin", "v1",
+		true, true,
+		"gorm", true,
+	)
+	assert.Nil(t, err)
+
+	svcFile := filepath.Join(outputPath, "role_service.go")
+	content, readErr := os.ReadFile(svcFile)
+	assert.Nil(t, readErr)
+	assert.Contains(t, string(content), "Delete(ctx context.Context, req *adminV1.DeleteRoleRequest) (bool, error)")
+	assert.Contains(t, string(content), "if _, err := s.roleRepo.Delete(ctx, req); err != nil")
+
+	testFile := filepath.Join(outputPath, "role_service_test.go")
+	testContent, readErr := os.ReadFile(testFile)
+	assert.Nil(t, readErr)
+	assert.Contains(t, string(testContent), "Delete(ctx context.Context, req *adminV1.DeleteRoleRequest) (bool, error)")
 }
 
 func TestWriteServicePackageCode_RestService(t *testing.T) {
@@ -231,6 +276,7 @@ func TestWriteServicePackageCode_RestService(t *testing.T) {
 		"role",
 		"user", "admin", "v1",
 		false, false,
+		"ent", false,
 	)
 	assert.Nil(t, err)
 }

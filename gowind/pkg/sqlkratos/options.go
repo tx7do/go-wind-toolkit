@@ -35,6 +35,9 @@ type (
 
 		UseRepo bool
 
+		// GenerateTests 为生成的 CRUD service 追加单测骨架(fake 仓储,
+		// 消费方接口接缝)。仅在 gRPC + 本地仓储形态下产出。
+		GenerateTests    bool
 		GenerateProto    bool
 		GenerateServer   bool
 		GenerateService  bool

@@ -23,12 +23,29 @@ import (
 {{- end}}
 )
 
+{{if .UseRepo}}
+// {{pascal .Model}}Repo 声明 service 对数据层的消费需求(Go 惯例:接口定义在消费方),
+// 由 internal/data 包的 {{pascal .Model}}Repo 实现类隐式满足,wiring 无需改动;
+// 测试以 fake 实现替换,不依赖数据库。
+type {{pascal .Model}}Repo interface {
+	List(ctx context.Context, req *paginationV1.PagingRequest) (*{{.SourceApiPackage}}.List{{pascal .Model}}Response, error)
+	Get(ctx context.Context, req *{{.SourceApiPackage}}.Get{{pascal .Model}}Request) (*{{.SourceApiPackage}}.{{pascal .Model}}, error)
+	Create(ctx context.Context, req *{{.SourceApiPackage}}.Create{{pascal .Model}}Request) (*{{.SourceApiPackage}}.{{pascal .Model}}, error)
+	Update(ctx context.Context, req *{{.SourceApiPackage}}.Update{{pascal .Model}}Request) (*{{.SourceApiPackage}}.{{pascal .Model}}, error)
+{{- if eq .OrmType "gorm"}}
+	Delete(ctx context.Context, req *{{.SourceApiPackage}}.Delete{{pascal .Model}}Request) (bool, error)
+{{- else}}
+	Delete(ctx context.Context, req *{{.SourceApiPackage}}.Delete{{pascal .Model}}Request) error
+{{- end}}
+}
+{{end}}
+
 type {{.ClassName}} struct {
 	{{.ServiceInterface}}
 
 	log *log.Helper
 
-	{{.DataSourceVar}} {{.DataSourceType}}
+	{{.DataSourceVar}} {{if .UseRepo}}{{pascal .Model}}Repo{{else}}{{.DataSourceType}}{{end}}
 }
 
 func New{{.ClassName}}(
@@ -106,7 +123,11 @@ func (s *{{.ClassName}}) Delete(ctx context.Context, req *{{.SourceApiPackage}}.
         return nil, {{.SourceApiPackage}}.ErrorBadRequest("invalid parameter")
     }
 {{if .UseRepo}}
+{{- if eq .OrmType "gorm"}}
+	if _, err := s.{{.DataSourceVar}}.Delete(ctx, req); err != nil {
+{{- else}}
 	if err := s.{{.DataSourceVar}}.Delete(ctx, req); err != nil {
+{{- end}}
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
