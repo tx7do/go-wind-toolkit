@@ -1,4 +1,4 @@
-package cli
+package ai
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// TestLoadOpenAPISpec_RejectsOversizedResponse 远端回多大的正文,CLI 就只读多大。
+// TestLoadOpenAPISpec_RejectsOversizedResponse 远端回多大的正文,加载器就只读多大。
 // 断言的是"报上限错误",不是"读进来后解析失败"——后者说明上限没起作用。
 func TestLoadOpenAPISpec_RejectsOversizedResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +23,7 @@ func TestLoadOpenAPISpec_RejectsOversizedResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := loadOpenAPISpec(srv.URL)
+	_, err := LoadOpenAPISpec(srv.URL)
 	if err == nil {
 		t.Fatal("超限响应应当被拒绝")
 	}
@@ -33,7 +33,7 @@ func TestLoadOpenAPISpec_RejectsOversizedResponse(t *testing.T) {
 }
 
 // TestLoadOpenAPISpec_TimesOutOnStalledResponse 只接受连接不回数据的地址不能把
-// CLI 永久挂住。这里把超时改短以免测试自己跑满 30 秒。
+// 调用方永久挂住。这里把超时改短以免测试自己跑满 30 秒。
 func TestLoadOpenAPISpec_TimesOutOnStalledResponse(t *testing.T) {
 	release := make(chan struct{})
 
@@ -51,7 +51,7 @@ func TestLoadOpenAPISpec_TimesOutOnStalledResponse(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := loadOpenAPISpec(srv.URL)
+		_, err := LoadOpenAPISpec(srv.URL)
 		done <- err
 	}()
 

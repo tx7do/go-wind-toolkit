@@ -13,6 +13,7 @@ import (
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/devtools"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/svcname"
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
 )
 
 // toolHandler 工具处理器:入参原始 JSON,返回可序列化结果或错误。
@@ -104,6 +105,20 @@ func toolDefinitions() []toolDef {
 				"planId": map[string]any{"type": "string", "description": "plan_backend 返回的 planId"},
 			}, "planId"),
 		},
+		{
+			Name:        "generate_frontend",
+			Description: "从 OpenAPI 规范生成前端 CRUD 页面(vue-element/vue-vben/react);openapi 缺省时用 find_openapi 自动查找,dryRun=true 只返回文件清单不写盘",
+			InputSchema: schema(map[string]any{
+				"projectRoot": map[string]any{"type": "string", "description": "项目根目录(Go 模块)"},
+				"framework":   map[string]any{"type": "string", "enum": []string{"vue-element", "vue-vben", "react"}, "description": "目标前端框架"},
+				"openapi":     map[string]any{"type": "string", "description": "OpenAPI 3.0 文件路径或 http(s) URL(缺省时自动查找项目内 openapi.yaml)"},
+				"out":         map[string]any{"type": "string", "description": "输出目录(前端项目 src 目录;相对路径时基于 projectRoot 解析)"},
+				"serviceName": map[string]any{"type": "string", "description": "服务名(generated 导入路径前缀),默认 admin"},
+				"tags":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "要生成的服务 tag 名(缺省=全部)"},
+				"types":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "文件类型 composable/page/drawer/router/locale(缺省=全部)"},
+				"dryRun":      map[string]any{"type": "boolean", "description": "只返回文件清单不写盘,默认 false"},
+			}, "projectRoot", "framework", "out"),
+		},
 	}
 }
 
@@ -118,6 +133,7 @@ func toolHandlers() map[string]toolHandler {
 		"review_files":            (*Server).handleReviewFiles,
 		"plan_backend":            (*Server).handlePlanBackend,
 		"apply_backend":           (*Server).handleApplyBackend,
+		"generate_frontend":       (*Server).handleGenerateFrontend,
 	}
 }
 
@@ -153,6 +169,17 @@ type planBackendArgs struct {
 
 type applyBackendArgs struct {
 	PlanID string `json:"planId"`
+}
+
+type generateFrontendArgs struct {
+	ProjectRoot string   `json:"projectRoot"`
+	Framework   string   `json:"framework"`
+	OpenAPI     string   `json:"openapi"`
+	Out         string   `json:"out"`
+	ServiceName string   `json:"serviceName"`
+	Tags        []string `json:"tags"`
+	Types       []string `json:"types"`
+	DryRun      bool     `json:"dryRun"`
 }
 
 // ---- AI 服务装配 ----
@@ -470,6 +497,81 @@ func (s *Server) handleApplyBackend(args json.RawMessage) (any, error) {
 
 	s.discardPlan(a.PlanID)
 	return map[string]any{"success": true, "root": plan.root}, nil
+}
+
+// handleGenerateFrontend 从 OpenAPI 规范生成前端 CRUD 页面。
+// openapi 缺省时自动查找项目内 openapi.yaml(取第一个命中);
+// 相对 out 以 projectRoot 为基准解析。
+func (s *Server) handleGenerateFrontend(args json.RawMessage) (any, error) {
+	var a generateFrontendArgs
+	if err := json.Unmarshal(args, &a); err != nil {
+		return nil, err
+	}
+	root, _, err := resolveRoot(a.ProjectRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	framework, ok := frontendgen.ParseFramework(a.Framework)
+	if !ok {
+		return nil, fmt.Errorf("无效的 framework %q(可选 vue-element / vue-vben / react)", a.Framework)
+	}
+	if strings.TrimSpace(a.Out) == "" {
+		return nil, fmt.Errorf("out 不能为空(前端项目 src 目录)")
+	}
+
+	openapiRef := a.OpenAPI
+	if openapiRef == "" {
+		files, err := ai.FindOpenAPIFiles(root)
+		if err != nil {
+			return nil, err
+		}
+		if len(files) == 0 {
+			return nil, fmt.Errorf("项目内未找到 openapi.yaml,请通过 openapi 参数显式指定")
+		}
+		openapiRef = files[0]
+	}
+	spec, err := ai.LoadOpenAPISpec(openapiRef)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := frontendgen.Options{
+		Spec:              spec,
+		Framework:         framework,
+		ServiceName:       a.ServiceName,
+		Tags:              a.Tags,
+		GenerateTypes:     a.Types,
+		AutoRouterModules: true,
+	}
+	files, err := frontendgen.Generate(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if a.DryRun {
+		manifest := make([]map[string]any, 0, len(files))
+		for _, f := range files {
+			manifest = append(manifest, map[string]any{
+				"path":        f.Path,
+				"type":        f.Type,
+				"description": f.Description,
+				"serviceName": f.ServiceName,
+				"bytes":       len(f.Content),
+			})
+		}
+		return map[string]any{"dryRun": true, "files": manifest, "count": len(manifest)}, nil
+	}
+
+	outDir := a.Out
+	if !filepath.IsAbs(outDir) {
+		outDir = filepath.Join(root, outDir)
+	}
+	results, err := frontendgen.WriteFiles(files, outDir)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"results": results, "count": len(results), "out": outDir}, nil
 }
 
 // discardPlan 清理计划与临时目录(planID 传空丢弃任意;不匹配则保留)。

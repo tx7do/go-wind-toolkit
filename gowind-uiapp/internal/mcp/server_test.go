@@ -53,10 +53,10 @@ func TestHandleMessage_ToolsList(t *testing.T) {
 	s := NewServer()
 	resp, _ := s.HandleMessage([]byte(`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`))
 	defs := toolDefinitions()
-	if len(defs) != 8 {
-		t.Fatalf("应有 8 个工具,得到 %d", len(defs))
+	if len(defs) != 9 {
+		t.Fatalf("应有 9 个工具,得到 %d", len(defs))
 	}
-	for _, want := range []string{"generate_ddl", "validate_ddl", "partition_microservices", "plan_backend", "apply_backend", "review_files"} {
+	for _, want := range []string{"generate_ddl", "validate_ddl", "partition_microservices", "plan_backend", "apply_backend", "review_files", "generate_frontend"} {
 		if !strings.Contains(string(resp), `"`+want+`"`) {
 			t.Fatalf("tools/list 应包含 %s: %.200s", want, resp)
 		}
