@@ -233,7 +233,7 @@ AI 凭据约定与 `ai` 命令一致:持久化配置为底,`GOWIND_AI_*` 环境�
 
 | 工具 | 入参 | 说明 |
 |------|------|------|
-| `generate_ddl` | requirements | 需求 → DDL(带解析校验与修复重试) |
+| `generate_ddl` | requirements | 需求 → DDL(解析校验+生成管线消费校验,失败自动修复重试) |
 | `validate_ddl` | sql | tidb parser 语法校验,返回表清单与带行列诊断 |
 | `partition_microservices` | ddl | 微服务划分(幻觉表名剔除/去重,附 warnings) |
 | `find_openapi` | projectRoot | 查找项目内 OpenAPI 文档 |
@@ -241,5 +241,6 @@ AI 凭据约定与 `ai` 命令一致:持久化配置为底,`GOWIND_AI_*` 环境�
 | `review_files` | projectRoot, paths[] | 分批结构化审查:issues + 总评(多次 LLM 调用) |
 | `plan_backend` | projectRoot, ddl, ormType, partitions | 预演生成:文件树落临时目录,返回新增/覆盖清单 |
 | `apply_backend` | planId | 确认写入项目并执行后处理链(需 go/buf/wire 在 PATH) |
+| `generate_frontend` | projectRoot, framework, out;openapi 缺省自动查找 | 从 OpenAPI 生成前端 CRUD 页(vue-element/vue-vben/react),dryRun 只返回清单 |
 
-说明:`projectRoot` 必须是可探测的 Go 模块根目录;`plan_backend` 不写任何文件,`apply_backend` 确认后才落盘——失败不回滚,错误信息以"文件已写入"前缀区分。
+说明:`projectRoot` 必须是可探测的 Go 模块根目录;`plan_backend` 不写任何文件,`apply_backend` 确认后才落盘——失败不回滚,错误信息以"文件已写入"前缀区分。`generate_ddl` 在 tidb 语法校验通过后,还会把 DDL 喂给真实生成管线(text:// 内联解析+列类型映射)做消费校验,语法正确但管线消费不了的产物同样打回重试。
