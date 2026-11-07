@@ -5,6 +5,7 @@ package einride.example.stream.v1;
 import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
+import "google/api/httpbody.proto";
 import "google/protobuf/timestamp.proto";
 
 // This API demonstrates streaming RPC patterns with HTTP annotations.
@@ -37,6 +38,17 @@ service StreamService {
     option (google.api.http) = {get: "/v1/{name=logs/*}:tail"};
   }
 
+  // Download a file as a raw byte stream.
+  //
+  // Server-streaming RPC with a google.api.HttpBody element → generated as a
+  // byte stream (Stream<Uint8List> / ServerStream<Uint8Array>), matching the
+  // protoc-gen-go-http server contract: the first chunk's content type is
+  // served as the HTTP response Content-Type header, and every chunk is raw
+  // payload bytes (no JSON framing).
+  rpc DownloadFile(DownloadFileRequest) returns (stream google.api.HttpBody) {
+    option (google.api.http) = {get: "/v1/{name=files/*}:download"};
+  }
+
   // Realtime bidirectional chat.
   //
   // Bidirectional streaming RPC → generated as WebSocket.
@@ -44,6 +56,12 @@ service StreamService {
   rpc Chat(stream ChatMessage) returns (stream ChatMessage) {
     option (google.api.http) = {get: "/v1/chat"};
   }
+}
+
+// Request message for DownloadFile.
+message DownloadFileRequest {
+  // The resource name of the file to download.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // A log entry.

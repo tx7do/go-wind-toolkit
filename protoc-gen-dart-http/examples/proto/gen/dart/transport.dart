@@ -2,6 +2,7 @@
 // Auto-generated. DO NOT EDIT.
 
 import 'dart:async';
+import 'dart:typed_data';
 
 /// Metadata for an RPC call, passed to the transport for routing and diagnostics.
 class TransportMeta {
@@ -40,6 +41,15 @@ abstract class ClientTransport {
   /// Opens a server-streaming connection (e.g. SSE).
   /// Returns a stream of JSON-decoded event payloads.
   Stream<Map<String, dynamic>> serverStream(
+    String path,
+    TransportMeta meta, {
+    Map<String, String>? headers,
+  });
+
+  /// Opens a server-streaming connection of raw bytes
+  /// (google.api.HttpBody downloads: the first chunk's content type rides
+  /// the HTTP response Content-Type header, every chunk is raw payload bytes).
+  Stream<Uint8List> byteStream(
     String path,
     TransportMeta meta, {
     Map<String, String>? headers,

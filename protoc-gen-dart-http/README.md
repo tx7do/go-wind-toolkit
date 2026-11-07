@@ -10,6 +10,7 @@
 - **零运行时依赖** — 生成的代码仅依赖 `dart:async` 和 `dart:convert`，不绑定任何特定 HTTP 库
 - **传输层抽象** — 通过 `ClientTransport` 抽象接口支持任意 HTTP 客户端实现（package:http、dio 等）
 - **流式支持** — 服务端流式 RPC 映射为 SSE，双向流式 RPC 映射为 WebSocket
+- **HttpBody 下载流** — `google.api.HttpBody` 元素的服务端流式 RPC 映射为 `Stream<Uint8List>` 原始字节块（`byteStream()`），与 protoc-gen-go-http 服务端契约对齐
 - **完整的数据模型** — 自动生成 `fromJson`、`toJson`、`toString`、`==`、`hashCode`、`copyWith`
 - **二进制 proto 编解码** — 每个消息类原生生成 `writeToBuffer()` / `fromBuffer()`（配套输出根目录自包含的 `proto_wire.dart` 运行时，零第三方依赖），枚举类带 `wire` 数值与 `fromWire()`；支持标量/枚举/嵌套/repeated（packed 读写兼容单值）/map/bytes(base64)/Timestamp/Duration/FieldMask/Empty/wrapper 系列，Any/Struct/Value/ListValue 及 google.type.* 抛 UnsupportedError
 - **Well-known 类型映射** — 自动将 `google.protobuf.Timestamp` 等 Well-known 类型映射为 Dart 原生类型
@@ -270,6 +271,19 @@ await for (final entry in stream) {
   print('收到日志: ${entry.message}');
 }
 ```
+
+### HttpBody 下载流 → 原始字节
+
+元素为 `google.api.HttpBody` 的服务端流式 RPC（文件下载等）不走 JSON 解码，映射为 `Stream<Uint8List>` 原始字节块，经 `_transport.byteStream()` 消费：
+
+```dart
+Stream<Uint8List> downloadFile(DownloadFileRequest request, {Map<String, String>? headers}) {
+  return _transport.byteStream(uri, TransportMeta(...), headers: headers);
+}
+```
+
+与 protoc-gen-go-http 的服务端契约一致：首帧的 content type 经 HTTP 响应 Content-Type 头传递，其后每个块都是原始载荷字节（无 JSON 帧）。传输实现负责把响应体按块读出。
+
 
 ### 双向流式 → WebSocket
 

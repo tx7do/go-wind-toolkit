@@ -220,6 +220,19 @@ func wireReadCaseStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	return out
 }
 
+// wireMapKeyWriteExpr 把 Dart 侧 Map<String,…> 的 String 键还原成 wire 写入所需字面量。
+// Dart 侧 map 键统一归一为 String（见 Type.Reference），按 proto 键型转回。
+func wireMapKeyWriteExpr(kind protoreflect.Kind) string {
+	switch kind {
+	case protoreflect.StringKind:
+		return "k"
+	case protoreflect.BoolKind:
+		return "(k == 'true')"
+	default: // proto map 键只能是整型/布尔/字符串
+		return "int.parse(k)"
+	}
+}
+
 // wireMapWriteStmts map 字段：线上是 repeated entry{1:key, 2:value}。
 func wireMapWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescriptor) []string {
 	fname := dartFieldName(field.JSONName())
@@ -253,7 +266,7 @@ func wireMapWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 		"if (f" + fmt.Sprint(n) + " != null) {",
 		"  f" + fmt.Sprint(n) + ".forEach((k, v) {",
 		"    final ew = ProtoWireWriter();",
-		"    ew." + keyMethod + "(1, k);",
+		"    ew." + keyMethod + "(1, " + wireMapKeyWriteExpr(field.MapKey().Kind()) + ");",
 		"    " + setValue,
 		"    w.writeRaw(" + fmt.Sprint(n) + ", ew.toBuffer());",
 		"  });",
@@ -263,12 +276,17 @@ func wireMapWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 
 // wireMapReadBody map 字段的解码循环体（不含 case 头尾）。
 func wireMapReadBody(pkg protoreflect.FullName, field protoreflect.FieldDescriptor, fname string) []string {
-	keyType := namedTypeFromField(pkg, field.MapKey())
 	valType := namedTypeFromField(pkg, field.MapValue())
 
 	keyRead := wireScalarReader(field.MapKey().Kind())
 	if keyRead == "" {
 		return []string{"r.skip();"}
+	}
+
+	// Dart 侧 map 键统一为 String（见 Type.Reference）：非字符串键读出后转 String。
+	keyReadExpr := "er." + keyRead
+	if field.MapKey().Kind() != protoreflect.StringKind {
+		keyReadExpr += ".toString()"
 	}
 
 	var valDecl string
@@ -297,12 +315,12 @@ func wireMapReadBody(pkg protoreflect.FullName, field protoreflect.FieldDescript
 
 	return []string{
 		"final er = r.readNested();",
-		keyType.Name + "? k;",
+		"String? k;",
 		valDecl + " v;",
 		"while (er.next()) {",
 		"  switch (er.fieldNumber) {",
 		"    case 1: {",
-		"      k = er." + keyRead + ";",
+		"      k = " + keyReadExpr + ";",
 		"      break;",
 		"    }",
 		"    case 2: {",

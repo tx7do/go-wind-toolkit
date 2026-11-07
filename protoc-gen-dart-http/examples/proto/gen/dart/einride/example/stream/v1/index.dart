@@ -10,6 +10,93 @@ import '../../../../proto_wire.dart';
 
 const defaultHost = 'api.example.com';
 
+/// Request message for DownloadFile.
+class DownloadFileRequest {
+  /// The resource name of the file to download.
+  ///
+  /// Behaviors: REQUIRED
+  String? name;
+
+  DownloadFileRequest({
+    this.name,
+  });
+
+  factory DownloadFileRequest.fromJson(Map<String, dynamic> json) {
+    return DownloadFileRequest(
+      name: json['name'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{};
+    if (name != null) json['name'] = name;
+    return json;
+  }
+
+  @override
+  String toString() {
+    return 'DownloadFileRequest(name: $name)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+    identical(this, other) ||
+    other is DownloadFileRequest &&
+      runtimeType == other.runtimeType
+      && name == other.name
+    ;
+
+  @override
+  int get hashCode => Object.hashAll([
+    name,
+  ]);
+
+  DownloadFileRequest copyWith({
+    String? name,
+  }) {
+    return DownloadFileRequest(
+      name: name ?? this.name,
+    );
+  }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory DownloadFileRequest.fromBuffer(List<int> bytes) {
+    return DownloadFileRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static DownloadFileRequest _readFrom(ProtoWireReader r) {
+    final m = DownloadFileRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
+}
+
 /// A log entry.
 class LogEntry {
   /// When the log entry was created.
@@ -756,6 +843,24 @@ class StreamServiceClient {
       .map((json) => LogEntry.fromJson(json));
   }
 
+  /// Download a file as a raw byte stream.
+  ///
+  /// Server-streaming RPC with a google.api.HttpBody element → generated as a
+  /// byte stream (Stream<Uint8List> / ServerStream<Uint8Array>), matching the
+  /// protoc-gen-go-http server contract: the first chunk's content type is
+  /// served as the HTTP response Content-Type header, and every chunk is raw
+  /// payload bytes (no JSON framing).
+  Stream<Uint8List> downloadFile(DownloadFileRequest request, {Map<String, String>? headers}) {
+    if (request.name == null) {
+      throw ArgumentError('missing required field request.name');
+    }
+    final path = '/v1/${request.name}:download';
+    return _transport.byteStream(path, TransportMeta(
+      service: 'StreamService',
+      method: 'DownloadFile',
+    ), headers: headers);
+  }
+
   /// Realtime bidirectional chat.
   ///
   /// Bidirectional streaming RPC → generated as WebSocket.
@@ -772,6 +877,177 @@ class StreamServiceClient {
     );
   }
 }
+
+/// Message that represents an arbitrary HTTP body. It should only be used for
+/// payload formats that can't be represented as JSON, such as raw binary or
+/// an HTML page.
+///
+///
+/// This message can be used both in streaming and non-streaming API methods in
+/// the request as well as the response.
+///
+/// It can be used as a top-level request field, which is convenient if one
+/// wants to extract parameters from either the URL or HTTP template into the
+/// request fields and also want access to the raw HTTP body.
+///
+/// Example:
+///
+/// message GetResourceRequest {
+/// // A unique request id.
+/// string request_id = 1;
+///
+/// // The raw HTTP body is bound to this field.
+/// google.api.HttpBody http_body = 2;
+///
+/// }
+///
+/// service ResourceService {
+/// rpc GetResource(GetResourceRequest)
+/// returns (google.api.HttpBody);
+/// rpc UpdateResource(google.api.HttpBody)
+/// returns (google.protobuf.Empty);
+///
+/// }
+///
+/// Example with streaming methods:
+///
+/// service CaldavService {
+/// rpc GetCalendar(stream google.api.HttpBody)
+/// returns (stream google.api.HttpBody);
+/// rpc UpdateCalendar(stream google.api.HttpBody)
+/// returns (stream google.api.HttpBody);
+///
+/// }
+///
+/// Use of this type only changes how the request and response bodies are
+/// handled, all other features will continue to work unchanged.
+class GoogleApiHttpBody {
+  /// The HTTP Content-Type header value specifying the content type of the body.
+  String? contentType;
+  /// The HTTP request/response body as raw binary.
+  String? data;
+  /// Application specific response metadata. Must be set in the first response
+  /// for streaming APIs.
+  List<Map<String, dynamic>>? extensions;
+
+  GoogleApiHttpBody({
+    this.contentType,
+    this.data,
+    this.extensions,
+  });
+
+  factory GoogleApiHttpBody.fromJson(Map<String, dynamic> json) {
+    return GoogleApiHttpBody(
+      contentType: json['contentType'] as String?,
+      data: json['data'] as String?,
+      extensions: (json['extensions'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{};
+    if (contentType != null) json['contentType'] = contentType;
+    if (data != null) json['data'] = data;
+    if (extensions != null) json['extensions'] = extensions;
+    return json;
+  }
+
+  @override
+  String toString() {
+    return 'GoogleApiHttpBody(contentType: $contentType, data: $data, extensions: $extensions)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+    identical(this, other) ||
+    other is GoogleApiHttpBody &&
+      runtimeType == other.runtimeType
+      && contentType == other.contentType
+      && data == other.data
+      && extensions == other.extensions
+    ;
+
+  @override
+  int get hashCode => Object.hashAll([
+    contentType,
+    data,
+    extensions,
+  ]);
+
+  GoogleApiHttpBody copyWith({
+    String? contentType,
+    String? data,
+    List<Map<String, dynamic>>? extensions,
+  }) {
+    return GoogleApiHttpBody(
+      contentType: contentType ?? this.contentType,
+      data: data ?? this.data,
+      extensions: extensions ?? this.extensions,
+    );
+  }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: contentType
+    final f1 = contentType;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: data
+    final f2 = data;
+    if (f2 != null) {
+      throw UnsupportedError('dart-http wire: field google.api.HttpBody.data');
+    }
+    // field 3: extensions
+    final f3 = extensions;
+    if (f3 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.Any not supported');
+    }
+  }
+
+  factory GoogleApiHttpBody.fromBuffer(List<int> bytes) {
+    return GoogleApiHttpBody._readFrom(ProtoWireReader(bytes));
+  }
+
+  static GoogleApiHttpBody _readFrom(ProtoWireReader r) {
+    final m = GoogleApiHttpBody();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: contentType
+        case 1: {
+          m.contentType = r.readString();
+          break;
+        }
+        // field 2: data
+        case 2: {
+          r.skip();
+          break;
+        }
+        // field 3: extensions
+        case 3: {
+          throw UnsupportedError('dart-http wire: google.protobuf.Any not supported');
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
+}
+
+/// Well-known type: Any
+///
+/// Maps to Dart: `Map<String, dynamic>`.
+///
+/// In JSON: `{"@type": xxx, ...}`.
 
 class ApiClient {
   final ClientTransport _transport;

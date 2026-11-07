@@ -16,6 +16,7 @@ func generateTransportSharedFile(f *codegen.File) {
 	f.P("// Auto-generated. DO NOT EDIT.")
 	f.P()
 	f.P("import 'dart:async';")
+	f.P("import 'dart:typed_data';")
 	f.P()
 
 	// --- TransportMeta ---
@@ -58,6 +59,15 @@ func generateTransportSharedFile(f *codegen.File) {
 	f.P(t(1), "/// Opens a server-streaming connection (e.g. SSE).")
 	f.P(t(1), "/// Returns a stream of JSON-decoded event payloads.")
 	f.P(t(1), "Stream<Map<String, dynamic>> serverStream(")
+	f.P(t(2), "String path,")
+	f.P(t(2), "TransportMeta meta, {")
+	f.P(t(2), "Map<String, String>? headers,")
+	f.P(t(1), "});")
+	f.P()
+	f.P(t(1), "/// Opens a server-streaming connection of raw bytes")
+	f.P(t(1), "/// (google.api.HttpBody downloads: the first chunk's content type rides")
+	f.P(t(1), "/// the HTTP response Content-Type header, every chunk is raw payload bytes).")
+	f.P(t(1), "Stream<Uint8List> byteStream(")
 	f.P(t(2), "String path,")
 	f.P(t(2), "TransportMeta meta, {")
 	f.P(t(2), "Map<String, String>? headers,")
@@ -158,7 +168,6 @@ func generateServerStreamMethod(
 	method protoreflect.MethodDescriptor,
 	rule httprule.Rule,
 ) {
-	output := typeFromMessage(pkg, method.Output())
 	dartMethodName := codegen.LowerFirst(string(method.Name()))
 
 	paramName := "request"
@@ -167,6 +176,29 @@ func generateServerStreamMethod(
 	}
 
 	commentGenerator{descriptor: method}.generateLeading(f, 1)
+	if isHttpBodyStream(method) {
+		// HttpBody 下载流:暴露原始字节块,不做 JSON 消息映射。
+		f.P(t(1), "Stream<Uint8List> ", dartMethodName, "(", typeFromMessage(pkg, method.Input()).Reference(), " ", paramName, ", {Map<String, String>? headers}) {")
+		generateMethodPathValidation(f, method.Input(), rule)
+		generateMethodPath(f, method.Input(), rule)
+		hasQP := generateMethodQuery(f, method.Input(), rule)
+		uriVar := "path"
+		if hasQP {
+			f.P(t(2), "var uri = path;")
+			f.P(t(2), "if (queryParams.isNotEmpty) {")
+			f.P(t(3), "uri += '?${queryParams.join(\"&\")}';")
+			f.P(t(2), "}")
+			uriVar = "uri"
+		}
+		f.P(t(2), "return _transport.byteStream(", uriVar, ", TransportMeta(")
+		f.P(t(3), "service: ", dartString(string(method.Parent().Name())), ",")
+		f.P(t(3), "method: ", dartString(string(method.Name())), ",")
+		f.P(t(2), "), headers: headers);")
+		f.P(t(1), "}")
+		return
+	}
+
+	output := typeFromMessage(pkg, method.Output())
 	f.P(t(1), "Stream<", output.Reference(), "> ", dartMethodName, "(", typeFromMessage(pkg, method.Input()).Reference(), " ", paramName, ", {Map<String, String>? headers}) {")
 	generateMethodPathValidation(f, method.Input(), rule)
 	generateMethodPath(f, method.Input(), rule)

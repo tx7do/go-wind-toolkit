@@ -10,6 +10,7 @@ Generates Dart HTTP client code from Protobuf definitions annotated with [HTTP r
 - **Zero runtime dependencies** — Generated code only depends on `dart:async` and `dart:convert`; no binding to any specific HTTP library
 - **Transport abstraction** — The `ClientTransport` abstract interface supports any HTTP client implementation (package:http, dio, etc.)
 - **Streaming support** — Server-streaming RPCs map to SSE; bidirectional streaming RPCs map to WebSocket
+- **HttpBody download streams** — Server-streaming RPCs with a `google.api.HttpBody` element map to raw `Stream<Uint8List>` byte chunks (`byteStream()`), aligned with the protoc-gen-go-http server contract
 - **Complete data models** — Auto-generates `fromJson`, `toJson`, `toString`, `==`, `hashCode`, `copyWith`
 - **Binary proto codec** — Every message class natively generates `writeToBuffer()` / `fromBuffer()` (backed by the self-contained `proto_wire.dart` runtime emitted at the output root, zero third-party dependencies); enum classes carry a `wire` value and `fromWire()`. Supported: scalars, enums, nested messages, repeated fields (packed reads/writes tolerate single values), maps, bytes (base64), Timestamp, Duration, FieldMask, Empty, and the wrapper series; Any/Struct/Value/ListValue and google.type.* throw `UnsupportedError`
 - **Well-known type mapping** — Automatically maps `google.protobuf.Timestamp` and other Well-known types to native Dart types
@@ -270,6 +271,19 @@ await for (final entry in stream) {
   print('Received log: ${entry.message}');
 }
 ```
+
+### HttpBody Download Streams → Raw Bytes
+
+Server-streaming RPCs whose element is `google.api.HttpBody` (file downloads etc.) skip JSON decoding entirely and map to raw `Stream<Uint8List>` byte chunks, consumed via `_transport.byteStream()`:
+
+```dart
+Stream<Uint8List> downloadFile(DownloadFileRequest request, {Map<String, String>? headers}) {
+  return _transport.byteStream(uri, TransportMeta(...), headers: headers);
+}
+```
+
+This matches the protoc-gen-go-http server contract: the first chunk's content type rides the HTTP response Content-Type header, and every chunk is raw payload bytes (no JSON framing). The transport implementation is responsible for reading the response body chunk by chunk.
+
 
 ### Bidirectional Streaming → WebSocket
 
