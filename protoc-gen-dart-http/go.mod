@@ -7,6 +7,4 @@ require (
 	google.golang.org/protobuf v1.36.12
 )
 
-require github.com/tx7do/go-wind-toolkit/protoc-gen-common v0.0.0
-
-replace github.com/tx7do/go-wind-toolkit/protoc-gen-common => ../protoc-gen-common
+require github.com/tx7do/go-wind-toolkit/protoc-gen-common v0.1.0
