@@ -47,18 +47,22 @@ func namedTypeFromField(pkg protoreflect.FullName, field protoreflect.FieldDescr
 		return Type{IsNamed: true, Name: "string"}
 	case protoreflect.BoolKind:
 		return Type{IsNamed: true, Name: "boolean"}
+	// 64 位整数在 proto3 JSON 中序列化为字符串（JS number 只有 53 位安全整数），
+	// 因此 TS 类型映射为 string，与运行时线上格式一致。
+	case
+		protoreflect.Int64Kind,
+		protoreflect.Uint64Kind,
+		protoreflect.Fixed64Kind,
+		protoreflect.Sfixed64Kind,
+		protoreflect.Sint64Kind:
+		return Type{IsNamed: true, Name: "string"}
 	case
 		protoreflect.Int32Kind,
-		protoreflect.Int64Kind,
 		protoreflect.Uint32Kind,
-		protoreflect.Uint64Kind,
 		protoreflect.DoubleKind,
 		protoreflect.Fixed32Kind,
-		protoreflect.Fixed64Kind,
 		protoreflect.Sfixed32Kind,
-		protoreflect.Sfixed64Kind,
 		protoreflect.Sint32Kind,
-		protoreflect.Sint64Kind,
 		protoreflect.FloatKind:
 		return Type{IsNamed: true, Name: "number"}
 	case protoreflect.MessageKind:
